@@ -41,7 +41,7 @@ jobs:
           github-api-token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: '${{ matrix.icon }} Setup Visual Studio'
-        uses: ilammy/msvc-dev-cmd@v1.12.1
+        uses: ilammy/msvc-dev-cmd@v1.13.0
         with:
           arch: ${{ matrix.env }}
 
