@@ -27,7 +27,7 @@ jobs:
           path: .github/workflows
 
       - name: '🟨 Setup CMake'
-        uses: jwlawson/actions-setup-cmake@v1.13
+        uses: jwlawson/actions-setup-cmake@v2.0
         with:
           cmake-version: '${{env.CMAKE_VERSION}}'
           github-api-token: ${{ secrets.GITHUB_TOKEN }}
