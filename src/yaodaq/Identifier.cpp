@@ -66,7 +66,10 @@ Identifier Identifier::parse( const std::string& id )
     identifier.generateKey( magic_enum::enum_cast<Domain>( result[0] ).value(), magic_enum::enum_cast<Class>( result[1] ).value(), magic_enum::enum_cast<Family>( result[2] ).value() );
     return identifier;
   }
-  else { throw Exception( StatusCode::WRONG_NUMBER_PARAMETERS, "Number of parameters in key should be 5 (Domain/Class/Family/Type/Name) !" ); }
+  else
+  {
+    throw Exception( StatusCode::WRONG_NUMBER_PARAMETERS, "Number of parameters in key should be 5 (Domain/Class/Family/Type/Name) !" );
+  }
 }
 
 }  // namespace yaodaq
