@@ -39,7 +39,8 @@ Signal Looper::loop()
   static Signal signal{ yaodaq::Signal::NO };
   if( m_instance == 0 )
   {
-    do {
+    do
+    {
       signal = m_Interrupt.getSignal();
       std::this_thread::sleep_for( std::chrono::microseconds( 1 ) );
     } while( signal == yaodaq::Signal::NO );
