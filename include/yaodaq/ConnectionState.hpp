@@ -4,16 +4,17 @@
 
 #include <iostream>
 #include <ixwebsocket/IXConnectionState.h>
+#include <yaodaq/Export.hpp>
 namespace yaodaq
 {
 
 class ConnectionState : public ix::ConnectionState
 {
 public:
-  ConnectionState() { _globalId--; };
-  static std::shared_ptr<yaodaq::ConnectionState> createConnectionState() { return std::make_shared<yaodaq::ConnectionState>(); }
-  virtual ~ConnectionState() = default;
-  void setID( const Identifier& id )
+  YAODAQ_API ConnectionState() { _globalId--; };
+  YAODAQ_API static std::shared_ptr<yaodaq::ConnectionState> createConnectionState() { return std::make_shared<yaodaq::ConnectionState>(); }
+  YAODAQ_API virtual ~ConnectionState() = default;
+  YAODAQ_API void setID( const Identifier& id )
   {
     if( static_cast<Component::Name>( id.component() ) == Component::Name::Browser )
     {
@@ -24,7 +25,7 @@ public:
       m_identifier = id;
     _id = m_identifier.id();
   }
-  Identifier getID() const noexcept { return m_identifier; }
+  YAODAQ_API Identifier getID() const noexcept { return m_identifier; }
 
 private:
   virtual void               computeId() final { _globalId++; }

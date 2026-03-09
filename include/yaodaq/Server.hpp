@@ -6,17 +6,17 @@
 #include <string>
 #include <yaodaq/Identifier.hpp>
 #include <yaodaq/ThreadPool.hpp>
-
+#include <yaodaq/Export.hpp>
 namespace yaodaq
 {
 
 class Server : public ix::WebSocketServer, public JsonRPCHandler
 {
 public:
-  explicit Server() noexcept = delete;
-  Server( const std::string& name, const std::string& host, const int port = SocketServer::kDefaultPort, const int backlog = SocketServer::kDefaultTcpBacklog, const std::size_t maxConnections = SocketServer::kDefaultMaxConnections,
+  YAODAQ_API explicit Server() noexcept = delete;
+  YAODAQ_API Server( const std::string& name, const std::string& host, const int port = SocketServer::kDefaultPort, const int backlog = SocketServer::kDefaultTcpBacklog, const std::size_t maxConnections = SocketServer::kDefaultMaxConnections,
           const int handshakeTimeoutSecs = WebSocketServer::kDefaultHandShakeTimeoutSecs, const int addressFamily = SocketServer::kDefaultAddressFamily, const int pingIntervalSeconds = -1, const std::string& type = "YAODAQ" );
-  void setTLS( const std::string& certFile, const std::string& keyFile, const std::string& caFile = "SYSTEM" )
+  YAODAQ_API void setTLS( const std::string& certFile, const std::string& keyFile, const std::string& caFile = "SYSTEM" )
   {
     m_tlsOptions.tls      = true;
     m_tlsOptions.certFile = certFile;
@@ -24,13 +24,13 @@ public:
     m_tlsOptions.caFile   = caFile;
     setTLSOptions( m_tlsOptions );
   }
-  bool loop();
-  void send( const std::string& str );
-  void rejectBrowsers() noexcept { m_rejectBrowser = true; }
+  YAODAQ_API bool loop();
+  YAODAQ_API void send( const std::string& str );
+  YAODAQ_API void rejectBrowsers() noexcept { m_rejectBrowser = true; }
   //void listen();
-  virtual ~Server() noexcept;
-  std::size_t       getNumberOfClients() noexcept;
-  const Identifier& identifier() const noexcept { return m_identifier; }
+  YAODAQ_API virtual ~Server() noexcept;
+  YAODAQ_API std::size_t       getNumberOfClients() noexcept;
+  YAODAQ_API const Identifier& identifier() const noexcept { return m_identifier; }
 
 private:
   ix::SocketTLSOptions m_tlsOptions;

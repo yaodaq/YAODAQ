@@ -3,6 +3,7 @@
 #include <string>
 #include <yaodaq/Identifier.hpp>
 #include <yaodaq/JsonRPCHandler.hpp>
+#include <yaodaq/Export.hpp>
 
 namespace yaodaq
 {
@@ -10,8 +11,8 @@ namespace yaodaq
 class Client : public ix::WebSocket, public JsonRPCHandler
 {
 public:
-  Client( const std::string& name, const std::string& url = "127.0.0.1", const int port = 8080, const std::string& type = "YAODAQ" );
-  void setTLS( const std::string& certFile, const std::string& keyFile, const std::string& caFile = "SYSTEM" )
+  YAODAQ_API Client( const std::string& name, const std::string& url = "127.0.0.1", const int port = 8080, const std::string& type = "YAODAQ" );
+  YAODAQ_API void setTLS( const std::string& certFile, const std::string& keyFile, const std::string& caFile = "SYSTEM" )
   {
     m_tlsOptions.certFile = certFile;
     m_tlsOptions.keyFile  = keyFile;
@@ -19,9 +20,9 @@ public:
     m_tlsOptions.tls      = true;
     setTLSOptions( m_tlsOptions );
   }
-  virtual ~Client() noexcept;
+  YAODAQ_API virtual ~Client() noexcept;
 
-  const Identifier& identifier() const noexcept { return m_identifier; }
+  YAODAQ_API const Identifier& identifier() const noexcept { return m_identifier; }
 
 protected:
   Identifier m_identifier{ Component::Name::Client };

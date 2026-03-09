@@ -3,7 +3,7 @@
 #include "yaodaq/Identifier.hpp"
 
 #include <unordered_map>
-
+#include <yaodaq/Export.hpp>
 namespace yaodaq
 {
 
@@ -11,7 +11,7 @@ namespace yaodaq
 class Response
 {
 public:
-  explicit Response( const nlohmann::json& response )
+  YAODAQ_API explicit Response( const nlohmann::json& response )
   {
     for( nlohmann::json::arra::const_iterator it = response["result"].begin(); it != response["result"].end(); ++it )
     {

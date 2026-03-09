@@ -2,21 +2,21 @@
 #include <cstring>
 #include <exception>
 #include <string>
-
+#include <yaodaq/Export.hpp>
 namespace yaodaq
 {
 
 class Exception : public std::exception
 {
 public:
-  ~Exception() noexcept override
+  YAODAQ_API ~Exception() noexcept override
   {
     if( m_is_dynamic ) { delete[] m_message; }
   }
 
   template<std::size_t N> explicit Exception( const char ( &message )[N] ) noexcept { m_message = std::move( message ); }
 
-  explicit Exception( std::string&& message )
+  YAODAQ_API explicit Exception( std::string&& message )
   try
   {
     m_message = new char[message.size() + 1];                                            // Allocate memory for the string
@@ -27,7 +27,7 @@ public:
     throw Exception();
   }
 
-  explicit Exception( const std::string& message )
+  YAODAQ_API explicit Exception( const std::string& message )
   try : m_is_dynamic( true )
   {
     m_message = new char[message.size() + 1];                                            // Allocate memory for the string
@@ -38,7 +38,7 @@ public:
     throw Exception();
   }
 
-  [[nodiscard]] const char* what() const noexcept final
+  YAODAQ_API [[nodiscard]] const char* what() const noexcept final
   {
     if( !m_message ) return "Error trying to allocate std::string in yaodaq::Exception";
     else

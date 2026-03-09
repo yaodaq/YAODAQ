@@ -2,13 +2,13 @@
 
 #include <cstdint>
 #include <string>
-
+#include <yaodaq/Export.hpp>
 namespace yaodaq
 {
 class WebSocketCloseConstant
 {
 public:
-  static const std::uint16_t NoYaodaqId{ 3000 };
-  static const std::string   NoYaodaqIdMessage;
+  YAODAQ_API static const std::uint16_t NoYaodaqId{ 3000 };
+  YAODAQ_API static const std::string   NoYaodaqIdMessage;
 };
 }  // namespace yaodaq

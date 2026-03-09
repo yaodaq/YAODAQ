@@ -5,15 +5,15 @@
 
 #include <string>
 #include <string_view>
-
+#include <yaodaq/Export.hpp>
 namespace yaodaq
 {
 
 class Identifier
 {
 public:
-  explicit Identifier( const Component::Name component ) noexcept : m_component( component ) {}
-  Identifier( const Component::Name component, const std::string_view type, const std::string_view name ) :
+  YAODAQ_API explicit Identifier( const Component::Name component ) noexcept : m_component( component ) {}
+  YAODAQ_API Identifier( const Component::Name component, const std::string_view type, const std::string_view name ) :
     m_component( component ), m_type(
                                 [type]
                                 {
@@ -28,12 +28,12 @@ public:
       }() )
   {
   }
-  yaodaq::Component component() const noexcept { return m_component; }
-  std::string_view  type() const noexcept { return m_type; }
-  std::string_view  name() const noexcept { return m_name; }
-  std::string       id() const { return m_component.str() + '/' + m_type + '/' + m_name; }
-  bool              operator<( const Identifier& id ) const { return this->id() < id.id(); };
-  bool              operator==( const Identifier& id ) const noexcept
+  YAODAQ_API yaodaq::Component component() const noexcept { return m_component; }
+  YAODAQ_API std::string_view  type() const noexcept { return m_type; }
+  YAODAQ_API std::string_view  name() const noexcept { return m_name; }
+  YAODAQ_API std::string       id() const { return m_component.str() + '/' + m_type + '/' + m_name; }
+  YAODAQ_API bool              operator<( const Identifier& id ) const { return this->id() < id.id(); };
+  YAODAQ_API bool              operator==( const Identifier& id ) const noexcept
   {
     if( m_component != id.component() ) return false;
     if( m_type != id.type() ) return false;
@@ -41,8 +41,8 @@ public:
     else
       return true;
   }
-  explicit          operator nlohmann::json() const noexcept;
-  static Identifier createFromstring( const std::string& str );
+  YAODAQ_API explicit          operator nlohmann::json() const noexcept;
+  YAODAQ_API static Identifier createFromstring( const std::string& str );
 
 private:
   explicit Identifier() = default;

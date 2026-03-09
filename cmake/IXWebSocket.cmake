@@ -15,4 +15,4 @@ include(Zlib-ng)
 CPMAddPackage(NAME IXWebSocket
               GIT_REPOSITORY "${IXWEBSOCKET_REPOSITORY}"
               GIT_TAG "${IXWEBSOCKET_TAG}"
-              OPTIONS "BUILD_DEMO 0" "USE_TLS 1" "USE_ZLIB 1" "USE_WS 0")
+              OPTIONS "BUILD_DEMO 0" "USE_TLS 0" "USE_ZLIB 1" "USE_WS 0")

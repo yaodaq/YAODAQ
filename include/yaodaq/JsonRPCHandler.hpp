@@ -8,7 +8,7 @@
 #include <unordered_map>
 #include <vector>
 #include <yaodaq/Identifier.hpp>
-
+#include <yaodaq/Export.hpp>
 namespace yaodaq
 {
 
@@ -31,22 +31,22 @@ struct ServerRequest
 class JsonRPCHandler : public jsonrpccxx::IClientConnector
 {
 public:
-  explicit JsonRPCHandler() noexcept : m_client( *this ) {}
-  virtual ~JsonRPCHandler() noexcept = default;
-  bool                   Add( const std::string& name, jsonrpccxx::MethodHandle callback, const jsonrpccxx::NamedParamMapping& mapping = std::vector<std::string>{} ) { return m_server.Add( name, callback, mapping ); }
-  bool                   Add( const std::string& name, jsonrpccxx::NotificationHandle callback, const jsonrpccxx::NamedParamMapping& mapping = std::vector<std::string>{} ) { return m_server.Add( name, callback, mapping ); }
+  YAODAQ_API explicit JsonRPCHandler() noexcept : m_client( *this ) {}
+  YAODAQ_API virtual ~JsonRPCHandler() noexcept = default;
+  YAODAQ_API bool                   Add( const std::string& name, jsonrpccxx::MethodHandle callback, const jsonrpccxx::NamedParamMapping& mapping = std::vector<std::string>{} ) { return m_server.Add( name, callback, mapping ); }
+  YAODAQ_API bool                   Add( const std::string& name, jsonrpccxx::NotificationHandle callback, const jsonrpccxx::NamedParamMapping& mapping = std::vector<std::string>{} ) { return m_server.Add( name, callback, mapping ); }
   template<typename T> T CallMethod( const std::string& name ) { return m_client.CallMethod<T>( std::to_string( generateID() ), name ); }
   template<typename T> T CallMethod( const std::string& name, const jsonrpccxx::positional_parameter& params ) { return m_client.CallMethod<T>( std::to_string( generateID() ), name, params ); }
   template<typename T> T CallMethodNamed( const std::string& name, const jsonrpccxx::named_parameter& params = {} ) { return m_client.CallMethodNamed<T>( std::to_string( generateID() ), name, params ); }
 
-  void CallNotification( const std::string& name, const jsonrpccxx::positional_parameter& params = {} ) { m_client.CallNotification( name, params ); }
-  void CallNotificationNamed( const std::string& name, const jsonrpccxx::named_parameter& params = {} ) { m_client.CallNotificationNamed( name, params ); }
+  YAODAQ_API void CallNotification( const std::string& name, const jsonrpccxx::positional_parameter& params = {} ) { m_client.CallNotification( name, params ); }
+  YAODAQ_API void CallNotificationNamed( const std::string& name, const jsonrpccxx::named_parameter& params = {} ) { m_client.CallNotificationNamed( name, params ); }
 
-  bool isRequest( const nlohmann::json& json ) const noexcept;
+  YAODAQ_API bool isRequest( const nlohmann::json& json ) const noexcept;
 
-  bool isResponse( const nlohmann::json& json ) const noexcept;
-  bool isResult( const nlohmann::json& json ) const noexcept;
-  bool isError( const nlohmann::json& json ) const noexcept;
+  YAODAQ_API bool isResponse( const nlohmann::json& json ) const noexcept;
+  YAODAQ_API bool isResult( const nlohmann::json& json ) const noexcept;
+  YAODAQ_API bool isError( const nlohmann::json& json ) const noexcept;
 
   std::mutex                                                            m_mutex;
   std::unordered_map<jsonrpccxx::id_type, std::promise<nlohmann::json>> m_responses;
