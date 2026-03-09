@@ -1,9 +1,9 @@
 #pragma once
 #include <ixwebsocket/IXWebSocket.h>
 #include <string>
+#include <yaodaq/Export.hpp>
 #include <yaodaq/Identifier.hpp>
 #include <yaodaq/JsonRPCHandler.hpp>
-#include <yaodaq/Export.hpp>
 
 namespace yaodaq
 {
@@ -11,7 +11,7 @@ namespace yaodaq
 class Client : public ix::WebSocket, public JsonRPCHandler
 {
 public:
-  YAODAQ_API Client( const std::string& name, const std::string& url = "127.0.0.1", const int port = 8080, const std::string& type = "YAODAQ" );
+  YAODAQ_API      Client( const std::string& name, const std::string& url = "127.0.0.1", const int port = 8080, const std::string& type = "YAODAQ" );
   YAODAQ_API void setTLS( const std::string& certFile, const std::string& keyFile, const std::string& caFile = "SYSTEM" )
   {
     m_tlsOptions.certFile = certFile;

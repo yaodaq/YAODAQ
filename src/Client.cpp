@@ -60,9 +60,7 @@ void yaodaq::Client::onOpen( const std::string& uri, const ix::WebSocketHttpHead
 void yaodaq::Client::onClose( const std::uint16_t code, const std::string& reason, bool remote ) { std::cout << code << " " << reason << " " << remote << std::endl; }
 
 void yaodaq::Client::onError( const std::uint32_t retries, const double wait_time, const int http_status, const std::string& reason, const bool decompressionError )
-{
-  std::cout << retries << " " << wait_time << " " << http_status << " " << reason << " " << decompressionError << std::endl;
-}
+{ std::cout << retries << " " << wait_time << " " << http_status << " " << reason << " " << decompressionError << std::endl; }
 
 void yaodaq::Client::onPing( const std::string& str, const std::size_t size, const bool binary ) { std::cout << str << " " << size << " " << binary << std::endl; }
 

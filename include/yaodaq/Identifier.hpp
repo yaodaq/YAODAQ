@@ -29,11 +29,11 @@ public:
   {
   }
   YAODAQ_API yaodaq::Component component() const noexcept { return m_component; }
-  YAODAQ_API std::string_view  type() const noexcept { return m_type; }
-  YAODAQ_API std::string_view  name() const noexcept { return m_name; }
-  YAODAQ_API std::string       id() const { return m_component.str() + '/' + m_type + '/' + m_name; }
-  YAODAQ_API bool              operator<( const Identifier& id ) const { return this->id() < id.id(); };
-  YAODAQ_API bool              operator==( const Identifier& id ) const noexcept
+  YAODAQ_API std::string_view type() const noexcept { return m_type; }
+  YAODAQ_API std::string_view name() const noexcept { return m_name; }
+  YAODAQ_API std::string id() const { return m_component.str() + '/' + m_type + '/' + m_name; }
+  YAODAQ_API bool        operator<( const Identifier& id ) const { return this->id() < id.id(); };
+  YAODAQ_API bool        operator==( const Identifier& id ) const noexcept
   {
     if( m_component != id.component() ) return false;
     if( m_type != id.type() ) return false;
