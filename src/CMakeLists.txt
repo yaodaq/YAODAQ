@@ -12,8 +12,21 @@ add_library(yaodaq SHARED
  Identifier.cpp
  WebsocketCloseConstants.cpp
 )
+
+list(APPEND YAODAQ_PUBLIC_HEADERS
+"${PROJECT_SOURCE_DIR}/include/yaodaq/Client.hpp"
+"${PROJECT_SOURCE_DIR}/include/yaodaq/Component.hpp"
+"${PROJECT_SOURCE_DIR}/include/yaodaq/ConnectionState.hpp"
+"${PROJECT_SOURCE_DIR}/include/yaodaq/Exception.hpp"
+"${PROJECT_SOURCE_DIR}/include/yaodaq/Identifier.hpp"
+"${PROJECT_SOURCE_DIR}/include/yaodaq/JsonRPCHandler.hpp"
+"${PROJECT_SOURCE_DIR}/include/yaodaq/Response.hpp"
+"${PROJECT_SOURCE_DIR}/include/yaodaq/Server.hpp"
+"${PROJECT_SOURCE_DIR}/include/yaodaq/ThreadPool.hpp"
+"${PROJECT_SOURCE_DIR}/include/yaodaq/WebsocketCloseConstants.hpp"
+)
 set_target_properties(yaodaq PROPERTIES
-                             PUBLIC_HEADER "${PROJECT_SOURCE_DIR}/include/yaodaq/Exception.hpp"
+                             PUBLIC_HEADER "${YAODAQ_PUBLIC_HEADERS}"
                              CXX_EXTENSIONS FALSE
                              CXX_STANDARD 17
                              CXX_STANDARD_REQUIRED TRUE
@@ -26,28 +39,16 @@ add_library(yaodaq::yaodaq ALIAS yaodaq)
 include(GNUInstallDirs)
 install(TARGETS yaodaq
         EXPORT YAODAQTargets
-        LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
-        ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
-        RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
-        PUBLIC_HEADER DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}
-)
+        LIBRARY DESTINATION "${CMAKE_INSTALL_LIBDIR}"
+        ARCHIVE DESTINATION "${CMAKE_INSTALL_LIBDIR}"
+        RUNTIME DESTINATION "${CMAKE_INSTALL_BINDIR}"
+        PUBLIC_HEADER DESTINATION "${CMAKE_INSTALL_INCLUDEDIR}/yaodaq")
 install(EXPORT YAODAQTargets
         FILE YAODAQTargets.cmake
         NAMESPACE yaodaq::
-        DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/YAODAQ
-)
+        DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/YAODAQ)
 
 include(CMakePackageConfigHelpers)
-configure_package_config_file("${PROJECT_SOURCE_DIR}/cmake/YAODAQConfig.cmake.in"
-  "${PROJECT_BINARY_DIR}/cmake/YAODAQConfig.cmake"
-  INSTALL_DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/YAODAQ
-)
-write_basic_package_version_file("${PROJECT_BINARY_DIR}/cmake/YAODAQConfigVersion.cmake"
-  VERSION "${PROJECT_VERSION}"
-  COMPATIBILITY AnyNewerVersion
-)
-install(FILES
-          "${PROJECT_BINARY_DIR}/cmake/YAODAQConfig.cmake"
-          "${PROJECT_BINARY_DIR}/cmake/YAODAQConfigVersion.cmake"
-        DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/YAODAQ
-)
+configure_package_config_file("${PROJECT_SOURCE_DIR}/cmake/YAODAQConfig.cmake.in" "${PROJECT_BINARY_DIR}/cmake/YAODAQConfig.cmake" INSTALL_DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/YAODAQ)
+write_basic_package_version_file("${PROJECT_BINARY_DIR}/cmake/YAODAQConfigVersion.cmake" VERSION "${PROJECT_VERSION}" COMPATIBILITY AnyNewerVersion)
+install(FILES "${PROJECT_BINARY_DIR}/cmake/YAODAQConfig.cmake" "${PROJECT_BINARY_DIR}/cmake/YAODAQConfigVersion.cmake" DESTINATION "${CMAKE_INSTALL_LIBDIR}/cmake/YAODAQ")
