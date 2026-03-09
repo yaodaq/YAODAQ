@@ -1,0 +1,75 @@
+include_guard(GLOBAL)
+
+include(Missives)
+
+if(NOT DEFINED ZLIB-NG_TAG)
+  set(ZLIB-NG_TAG "2.3.3")
+endif()
+
+if(NOT DEFINED ZLIB-NG_REPOSITORY)
+  set(ZLIB-NG_REPOSITORY "https://github.com/zlib-ng/zlib-ng.git")
+endif()
+
+if(${USE_SYSTEM_ZLIB})
+  find_package(ZLIB QUIET)
+  if(ZLIB_FOUND)
+    find_package(ZLIB)
+    set(COMPILE_ZLIB FALSE)
+  else()
+    set(COMPILE_ZLIB TRUE)
+    missive(STATUS "Zlib not found ! Zlib-ng will be compiled using ${ZLIB-NG_REPOSITORY} version ${ZLIB-NG_TAG}")
+  endif()
+else()
+  set(COMPILE_ZLIB TRUE)
+endif()
+
+mark_as_advanced(COMPILE_ZLIB)
+if(COMPILE_ZLIB)
+  include(CPM)
+  cpm(SYSTEM SHALLOW PROGRESS EXCLUDE_FROM_ALL)
+
+  unset(ZLIB_FOUND CACHE)
+  get_directory_property(hasParent PARENT_DIRECTORY)
+  if(hasParent)
+    unset(ZLIB_FOUND PARENT_SCOPE)
+  endif()
+  set(ZLIB_FOUND TRUE CACHE BOOL "" FORCE)
+  CPMAddPackage(NAME zlib-ng
+                GIT_REPOSITORY "${ZLIB-NG_REPOSITORY}"
+                GIT_TAG "${ZLIB-NG_TAG}"
+                OPTIONS "BUILD_TESTING 0" "ZLIB_COMPAT 1" "WITH_NATIVE_INSTRUCTIONS TRUE" "BUILD_SHARED_LIBS FALSE" "CMAKE_POSITION_INDEPENDENT_CODE TRUE")
+  if(zlib-ng_ADDED)
+    if(EXISTS "${zlib-ng_SOURCE_DIR}/zlib.h.in")
+      file(STRINGS "${zlib-ng_SOURCE_DIR}/zlib.h.in" ZLIB_H REGEX "^#define ZLIB_VERSION \"[^\"]*\"$")
+    else()
+      file(STRINGS "${zlib-ng_SOURCE_DIR}/zlib.h" ZLIB_H REGEX "^#define ZLIB_VERSION \"[^\"]*\"$")
+    endif()
+    string(REGEX REPLACE "^.*ZLIB_VERSION \"([0-9]+).*$" "\\1" ZLIB_VERSION_MAJOR "${ZLIB_H}")
+    string(REGEX REPLACE "^.*ZLIB_VERSION \"[0-9]+\\.([0-9]+).*$" "\\1" ZLIB_VERSION_MINOR  "${ZLIB_H}")
+    string(REGEX REPLACE "^.*ZLIB_VERSION \"[0-9]+\\.[0-9]+\\.([0-9]+).*$" "\\1" ZLIB_VERSION_PATCH "${ZLIB_H}")
+    set(ZLIB_VERSION_STRING "${ZLIB_VERSION_MAJOR}.${ZLIB_VERSION_MINOR}.${ZLIB_VERSION_PATCH}")
+
+    set(ZLIB_VERSION_TWEAK "")
+    if("${ZLIB_H}" MATCHES "ZLIB_VERSION \"[0-9]+\\.[0-9]+\\.[0-9]+\\.([0-9]+)")
+      set(ZLIB_VERSION_TWEAK "${CMAKE_MATCH_1}")
+      string(APPEND ZLIB_VERSION_STRING ".${ZLIB_VERSION_TWEAK}")
+    endif()
+
+    set(ZLIB_VERSION ${ZLIB_VERSION_STRING} CACHE INTERNAL "")
+    set(ZLIB_VERSION_STRING ${ZLIB_VERSION_STRING} CACHE INTERNAL "")
+
+    set(ZLIB_INCLUDE_DIR "${zlib-ng_SOURCE_DIR}" CACHE INTERNAL "")
+    set(ZLIB_INCLUDE_DIRS "${zlib-ng_SOURCE_DIR}" CACHE INTERNAL "")
+    add_library(ZLIB IMPORTED INTERFACE GLOBAL)
+    target_include_directories(ZLIB INTERFACE $<BUILD_INTERFACE:${ZLIB_INCLUDE_DIR}> $<INSTALL_INTERFACE:${CMAKE_INSTALL_PREFIX}>)
+
+    target_link_libraries(ZLIB INTERFACE zlib-ng::zlib)
+    add_library(ZLIB::ZLIB ALIAS ZLIB)
+    set(ZLIB_LIBRARY ZLIB  CACHE INTERNAL "")
+    set(ZLIB_LIBRARIES ZLIB CACHE INTERNAL "")
+    set(ZLIB_LIBRARY_DEBUG "" CACHE INTERNAL "")
+    set(ZLIB_LIBRARY_RELEASE ZLIB CACHE INTERNAL "")
+
+    find_package(ZLIB REQUIRED)
+  endif()
+endif()

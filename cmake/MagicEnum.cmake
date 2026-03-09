@@ -1,0 +1,17 @@
+include_guard(GLOBAL)
+
+include(CPM)
+cpm(SYSTEM SHALLOW PROGRESS EXCLUDE_FROM_ALL)
+
+if(NOT DEFINED MAGIC_ENUM_REPOSITORY)
+  set(MAGIC_ENUM_REPOSITORY "https://github.com/Neargye/magic_enum.git")
+endif()
+
+if(NOT DEFINED MAGIC_ENUM_TAG)
+  set(MAGIC_ENUM_TAG "v0.9.7")
+endif()
+
+CPMAddPackage(NAME magic_enum
+              GIT_REPOSITORY "${MAGIC_ENUM_REPOSITORY}"
+              GIT_TAG "${MAGIC_ENUM_TAG}"
+              OPTIONS "MAGIC_ENUM_OPT_BUILD_EXAMPLES OFF" "MAGIC_ENUM_OPT_BUILD_TESTS OFF" "MAGIC_ENUM_OPT_INSTALL ON")

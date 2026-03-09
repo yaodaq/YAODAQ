@@ -1,0 +1,1 @@
+#include "yaodaq/Exception.hpp"
