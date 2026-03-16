@@ -11,7 +11,7 @@ namespace yaodaq
 class ConnectionState : public ix::ConnectionState
 {
 public:
-  YAODAQ_API ConnectionState() { _globalId--; };
+  YAODAQ_API                                                 ConnectionState() { _globalId--; };
   YAODAQ_API static std::shared_ptr<yaodaq::ConnectionState> createConnectionState() { return std::make_shared<yaodaq::ConnectionState>(); }
   YAODAQ_API virtual ~ConnectionState() = default;
   YAODAQ_API void setID( const Identifier& id )

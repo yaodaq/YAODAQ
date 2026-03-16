@@ -79,9 +79,7 @@ void yaodaq::Server::onMessage( std::shared_ptr<ix::ConnectionState> connectionS
 void yaodaq::Server::onFragment( std::shared_ptr<ix::ConnectionState> connectionState, ix::WebSocket& webSocket, const std::string& str, const std::size_t size, const bool binary ) { std::cout << str << " " << size << " " << binary << std::endl; }
 
 void yaodaq::Server::onOpen( std::shared_ptr<ix::ConnectionState> connectionState, ix::WebSocket& webSocket, const std::string& uri, ix::WebSocketHttpHeaders& headers, const std::string& protocol )
-{
-  std::cout << uri << "**" << protocol << " " << headers["Yaodaq-Id"] << std::endl;
-}
+{ std::cout << uri << "**" << protocol << " " << headers["Yaodaq-Id"] << std::endl; }
 
 void yaodaq::Server::onClose( std::shared_ptr<ix::ConnectionState> connectionState, ix::WebSocket& webSocket, const std::uint16_t code, const std::string& reason, bool remote ) { std::cout << code << " " << reason << " " << remote << std::endl; }
 

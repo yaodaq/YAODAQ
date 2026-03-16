@@ -4,9 +4,9 @@
 #include <cstddef>
 #include <ixwebsocket/IXWebSocketServer.h>
 #include <string>
+#include <yaodaq/Export.hpp>
 #include <yaodaq/Identifier.hpp>
 #include <yaodaq/ThreadPool.hpp>
-#include <yaodaq/Export.hpp>
 namespace yaodaq
 {
 
@@ -14,8 +14,8 @@ class Server : public ix::WebSocketServer, public JsonRPCHandler
 {
 public:
   YAODAQ_API explicit Server() noexcept = delete;
-  YAODAQ_API Server( const std::string& name, const std::string& host, const int port = SocketServer::kDefaultPort, const int backlog = SocketServer::kDefaultTcpBacklog, const std::size_t maxConnections = SocketServer::kDefaultMaxConnections,
-          const int handshakeTimeoutSecs = WebSocketServer::kDefaultHandShakeTimeoutSecs, const int addressFamily = SocketServer::kDefaultAddressFamily, const int pingIntervalSeconds = -1, const std::string& type = "YAODAQ" );
+  YAODAQ_API      Server( const std::string& name, const std::string& host, const int port = SocketServer::kDefaultPort, const int backlog = SocketServer::kDefaultTcpBacklog, const std::size_t maxConnections = SocketServer::kDefaultMaxConnections,
+                          const int handshakeTimeoutSecs = WebSocketServer::kDefaultHandShakeTimeoutSecs, const int addressFamily = SocketServer::kDefaultAddressFamily, const int pingIntervalSeconds = -1, const std::string& type = "YAODAQ" );
   YAODAQ_API void setTLS( const std::string& certFile, const std::string& keyFile, const std::string& caFile = "SYSTEM" )
   {
     m_tlsOptions.tls      = true;
