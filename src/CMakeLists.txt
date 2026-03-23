@@ -1,20 +1,27 @@
+set(CMAKE_POSITION_INDEPENDENT_CODE TRUE)
+
 include(IXWebSocket)
 include(spdlog)
 include(MagicEnum)
-include(JsonRpcCxx)
+include(cxx-jsonrpc)
+include(cpp-terminal)
 
 add_library(yaodaq SHARED
  Component.cpp
  Client.cpp
  Exception.cpp
  Server.cpp
+ Log.cpp
  JsonRPCHandler.cpp
  Identifier.cpp
+ Response.cpp
  WebsocketCloseConstants.cpp
 )
 
 list(APPEND YAODAQ_PUBLIC_HEADERS
 "${PROJECT_SOURCE_DIR}/include/yaodaq/Client.hpp"
+"${PROJECT_SOURCE_DIR}/include/yaodaq/Module.hpp"
+"${PROJECT_SOURCE_DIR}/include/yaodaq/Board.hpp"
 "${PROJECT_SOURCE_DIR}/include/yaodaq/Component.hpp"
 "${PROJECT_SOURCE_DIR}/include/yaodaq/ConnectionState.hpp"
 "${PROJECT_SOURCE_DIR}/include/yaodaq/Exception.hpp"
@@ -33,14 +40,14 @@ set_target_properties(yaodaq PROPERTIES
                              CXX_VISIBILITY_PRESET "hidden"
                              VISIBILITY_INLINES_HIDDEN TRUE
                              POSITION_INDEPENDENT_CODE TRUE)
-target_link_libraries(yaodaq PUBLIC ixwebsocket::ixwebsocket json-rpc-cxx::json-rpc-cxx PRIVATE magic_enum::magic_enum fmt::fmt spdlog::spdlog)
-target_compile_definitions(yaodaq PRIVATE $<$<STREQUAL:$<TARGET_PROPERTY:yaodaq,TYPE>,SHARED_LIBRARY>:YAODAQ_BUILD_DLL=1>)
+target_link_libraries(yaodaq PUBLIC ixwebsocket::ixwebsocket cxx-jsonrpc::cxx-jsonrpc PRIVATE magic_enum::magic_enum spdlog::spdlog fmt::fmt cpp-terminal::cpp-terminal nlohmann_json::nlohmann_json)
+target_compile_definitions(yaodaq PRIVATE $<$<STREQUAL:$<TARGET_PROPERTY:yaodaq,TYPE>,SHARED_LIBRARY>:YAODAQ_BUILD_DLL=1> $<$<STREQUAL:$<TARGET_PROPERTY:yaodaq,TYPE>,SHARED_LIBRARY>:CXX_JSONRPC_BUILD_DLL=1>)
 target_include_directories(yaodaq PUBLIC $<BUILD_INTERFACE:${PROJECT_SOURCE_DIR}/include> $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>)
 target_compile_features(yaodaq PUBLIC cxx_std_17)
 add_library(yaodaq::yaodaq ALIAS yaodaq)
 
 include(GNUInstallDirs)
-install(TARGETS yaodaq
+install(TARGETS yaodaq spdlog fmt
         EXPORT YAODAQTargets
         LIBRARY DESTINATION "${CMAKE_INSTALL_LIBDIR}"
         ARCHIVE DESTINATION "${CMAKE_INSTALL_LIBDIR}"

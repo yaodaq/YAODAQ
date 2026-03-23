@@ -17,7 +17,9 @@ CPMAddPackage(NAME spdlog
               GIT_REPOSITORY ${SPDLOG_REPOSITORY}
               GIT_TAG ${SPDLOG_TAG}
               OPTIONS "SPDLOG_BUILD_ALL OFF"
-                      "SPDLOG_ENABLE_PCH ON"
+                      "SPDLOG_BUILD_SHARED ON"
+                      "SPDLOG_BUILD_PIC ON"
+                      "SPDLOG_ENABLE_PCH OFF"
                       "SPDLOG_BUILD_EXAMPLE OFF"
                       "SPDLOG_BUILD_EXAMPLE_HO OFF"
                       "SPDLOG_BUILD_TESTS OFF"

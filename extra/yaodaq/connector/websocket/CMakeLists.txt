@@ -1,0 +1,5 @@
+add_library(ConnectorWebsocket SHARED Websocket.cpp)
+target_link_libraries(ConnectorWebsocket PRIVATE yaodaq::yaodaq ixwebsocket::ixwebsocket)
+message(STATUS "*****************  ${CMAKE_CURRENT_SOURCE_DIR}")
+target_include_directories(ConnectorWebsocket PUBLIC $<BUILD_INTERFACE:${PROJECT_SOURCE_DIR}/extra> $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>)
+add_library(yaodaq::connector::websocket ALIAS ConnectorWebsocket)

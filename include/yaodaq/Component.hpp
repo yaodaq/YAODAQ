@@ -1,7 +1,8 @@
 #pragma once
+#include "yaodaq/Export.hpp"
+
 #include <cstdint>
 #include <string>
-#include <yaodaq/Export.hpp>
 
 namespace yaodaq
 {
@@ -9,30 +10,30 @@ namespace yaodaq
 class Component
 {
 public:
-  enum class Name : std::uint_least8_t
+  enum class Role : std::uint_least8_t
   {
     Server = 1,  //< A Yaodaq server
-    Client,      //< A generic Yaodaq client
-    Module,      //< A specific module within the Yaodaq system
-    Board,       //< A board, presumably a hardware or logical component
-
+    Client,
+    Module,         //< A specific module within the Yaodaq system
+    Board,          //< A board, presumably a hardware or logical component
     Browser = 100,  //< A client that is a browser (not a Yaodaq client)
   };
+  using role                      = Role;
   YAODAQ_API Component() noexcept = delete;
-  YAODAQ_API Component( const Component::Name& name ) noexcept : m_component( name ) {}
-  YAODAQ_API std::string str() const;
-  YAODAQ_API explicit    operator int() const noexcept { return static_cast<int>( m_component ); }
-  YAODAQ_API explicit    operator Name() const noexcept { return static_cast<Name>( m_component ); }
-  YAODAQ_API bool        operator==( const Component& comp ) const noexcept
+  YAODAQ_API explicit Component( const Component::Role role ) noexcept : m_role( role ) {}
+  YAODAQ_API explicit operator std::string() const;
+  YAODAQ_API explicit operator int() const noexcept { return static_cast<int>( m_role ); }
+  YAODAQ_API explicit operator role() const noexcept { return static_cast<role>( m_role ); }
+  YAODAQ_API bool     operator==( const Component& comp ) const noexcept
   {
-    if( static_cast<int>( m_component ) == static_cast<int>( comp ) ) return true;
+    if( m_role == comp.m_role ) return true;
     else
       return false;
   }
-  YAODAQ_API bool operator!=( const Component& comp ) const noexcept { return !( ( *this ) == comp ); }
+  YAODAQ_API bool operator!=( const Component& comp ) const noexcept { return !( *this == comp ); }
 
 private:
-  Name m_component{ static_cast<Name>( 0 ) };
+  role m_role{ static_cast<role>( 0 ) };
 };
 
 }  // namespace yaodaq

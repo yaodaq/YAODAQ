@@ -3,7 +3,7 @@ cmake_minimum_required(VERSION 3.15 FATAL_ERROR)
 list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake")
 
 include(GetCMakeMM)
-cmmm(VERSION 1.1)
+cmmm(VERSION 1.1 NO_CHANGELOG)
 
 cmmm_modules_list(URL "gh:cmake-tools/cmcm")
 
@@ -28,8 +28,8 @@ include(CPM)
 cpm(SYSTEM SHALLOW PROGRESS EXCLUDE_FROM_ALL)
 
 add_subdirectory(src)
+add_subdirectory(extra)
 add_subdirectory(web)
-
 add_subdirectory(apps)
 
 if(YAODAQ_TESTS)

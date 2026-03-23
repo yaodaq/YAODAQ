@@ -1,66 +1,50 @@
 #pragma once
+#include <cxx/jsonrpc/client.hpp>
+#include <cxx/jsonrpc/server.hpp>
 #include <future>
 #include <iostream>
-#include <jsonrpccxx/batchclient.hpp>
-#include <jsonrpccxx/server.hpp>
 #include <mutex>
 #include <string>
 #include <unordered_map>
 #include <vector>
 #include <yaodaq/Export.hpp>
 #include <yaodaq/Identifier.hpp>
+#include <yaodaq/Response.hpp>
+
 namespace yaodaq
 {
 
-struct ServerRequest
-{
-  std::mutex                                      mtx;  // protect shared state
-  std::condition_variable                         cv;
-  std::unordered_map<std::string, nlohmann::json> responses;
-  size_t                                          expected_responses{ 0 };
-  size_t                                          received_responses{ 0 };
-  void                                            print()
-  {
-    std::cout << "expected: " << expected_responses << std::endl;
-    std::cout << "received_responses: " << received_responses << std::endl;
-    std::cout << "responses: " << std::endl;
-    for( std::unordered_map<std::string, nlohmann::json>::const_iterator it = responses.begin(); it != responses.end(); ++it ) { std::cout << it->first << "  : " << it->second << std::endl; }
-  }
-};
-
-class JsonRPCHandler : public jsonrpccxx::IClientConnector
+class JsonRPCHandler : public jsonrpc::IAsyncClientConnector
 {
 public:
-  YAODAQ_API explicit JsonRPCHandler() noexcept : m_client( *this ) {}
-  YAODAQ_API virtual ~JsonRPCHandler() noexcept = default;
-  YAODAQ_API bool        Add( const std::string& name, jsonrpccxx::MethodHandle callback, const jsonrpccxx::NamedParamMapping& mapping = std::vector<std::string>{} ) { return m_server.Add( name, callback, mapping ); }
-  YAODAQ_API bool        Add( const std::string& name, jsonrpccxx::NotificationHandle callback, const jsonrpccxx::NamedParamMapping& mapping = std::vector<std::string>{} ) { return m_server.Add( name, callback, mapping ); }
-  template<typename T> T CallMethod( const std::string& name ) { return m_client.CallMethod<T>( std::to_string( generateID() ), name ); }
-  template<typename T> T CallMethod( const std::string& name, const jsonrpccxx::positional_parameter& params ) { return m_client.CallMethod<T>( std::to_string( generateID() ), name, params ); }
-  template<typename T> T CallMethodNamed( const std::string& name, const jsonrpccxx::named_parameter& params = {} ) { return m_client.CallMethodNamed<T>( std::to_string( generateID() ), name, params ); }
-
-  YAODAQ_API void CallNotification( const std::string& name, const jsonrpccxx::positional_parameter& params = {} ) { m_client.CallNotification( name, params ); }
-  YAODAQ_API void CallNotificationNamed( const std::string& name, const jsonrpccxx::named_parameter& params = {} ) { m_client.CallNotificationNamed( name, params ); }
-
-  YAODAQ_API bool isRequest( const nlohmann::json& json ) const noexcept;
-
-  YAODAQ_API bool isResponse( const nlohmann::json& json ) const noexcept;
-  YAODAQ_API bool isResult( const nlohmann::json& json ) const noexcept;
-  YAODAQ_API bool isError( const nlohmann::json& json ) const noexcept;
-
-  std::mutex                                                            m_mutex;
-  std::unordered_map<jsonrpccxx::id_type, std::promise<nlohmann::json>> m_responses;
-
-  std::mutex                                                              m_map_mutex;
-  std::unordered_map<jsonrpccxx::id_type, std::shared_ptr<ServerRequest>> m_server_construct_response;
+  YAODAQ_API JsonRPCHandler() : m_client( *this ) { Add( "listProcedures", GetHandle( &yaodaq::JsonRPCHandler::getProcedures, *this ) ); }
+  YAODAQ_API virtual ~JsonRPCHandler() noexcept {};
 
 protected:
-  std::string HandleRequest( const nlohmann::json& requestString ) { return m_server.HandleRequest( requestString.dump() ); }
-
+  YAODAQ_API static std::int64_t generateID();  // nanosecond since epoch
 private:
-  static std::int64_t        generateID();  // nanosecond since
-  jsonrpccxx::BatchClient    m_client;
-  jsonrpccxx::JsonRpc2Server m_server;
+  jsonrpc::JsonRpcClient m_client;
+  jsonrpc::JsonRpcServer m_server;
+
+public:
+  YAODAQ_API bool Add( const std::string& name, jsonrpc::Method callback, const std::initializer_list<std::string>& mapping = {} ) { return m_server.Add( name, std::move( callback ), mapping ); }
+  YAODAQ_API bool Add( const std::string& name, jsonrpc::Notification callback, const std::initializer_list<std::string>& mapping = {} ) { return m_server.Add( name, std::move( callback ), mapping ); }
+  Response        CallMethod( const std::string& name ) { return Response( m_client.CallMethod<nlohmann::json>( std::to_string( generateID() ), name ) ); }
+  Response        CallMethod( const std::string& name, const jsonrpc::positional_parameter& params ) { return Response( m_client.CallMethod<nlohmann::json>( std::to_string( generateID() ), name, params ) ); }
+  Response        CallMethodNamed( const std::string& name, const jsonrpc::named_parameter& params = {} ) { return Response( m_client.CallMethodNamed<nlohmann::json>( std::to_string( generateID() ), name, params ) ); }
+
+  YAODAQ_API void CallNotification( const std::string& name, const jsonrpc::positional_parameter& params = {} ) { m_client.CallNotification( name, params ); }
+  YAODAQ_API void CallNotificationNamed( const std::string& name, const jsonrpc::named_parameter& params = {} ) { m_client.CallNotificationNamed( name, params ); }
+
+  YAODAQ_API nlohmann::json getProcedures() { return m_server.getProcedures(); }
+  //std::mutex                                                            m_mutex;
+  //std::unordered_map<jsonrpccxx::id_type, std::promise<nlohmann::json>> m_responses;
+
+  //std::mutex                                                              m_map_mutex;
+  //std::unordered_map<jsonrpccxx::id_type, std::shared_ptr<yaodaq::ServerRequest>> m_server_construct_response;
+
+protected:
+  YAODAQ_API std::string HandleRequest( const nlohmann::json& requestString ) { return m_server.HandleRequest( requestString.dump() ); }
 };
 
 }  // namespace yaodaq

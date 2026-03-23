@@ -14,7 +14,7 @@ namespace yaodaq
 class ThreadPool
 {
 public:
-  ThreadPool( size_t threads = std::thread::hardware_concurrency() ) : stop( false )
+  ThreadPool( const std::size_t threads = std::thread::hardware_concurrency() ) : stop( false )
   {
     for( std::size_t i = 0; i < threads; ++i )
     {
@@ -27,11 +27,11 @@ public:
             {
               std::unique_lock<std::mutex> lock( this->queueMutex );
               this->condition.wait( lock, [this] { return stop || !tasks.empty(); } );
-              if( stop && tasks.empty() ) return;  // inside lock
-              task = std::move( tasks.front() );   // inside lock
-              tasks.pop();                         // inside lock
+              if( stop && tasks.empty() ) return;
+              task = std::move( tasks.front() );
+              tasks.pop();
             }
-            task();  // execute outside lock
+            task();
           }
         } );
     }
