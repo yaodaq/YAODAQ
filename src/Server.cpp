@@ -123,6 +123,7 @@ YAODAQ_API yaodaq::Server::Server( const std::string_view name,  //<! Name of th
     } );
   // Register procedure understood by the websocket server
   Add( "getNumberOfClients", GetHandle( &yaodaq::Server::getNumberOfClients, *this ) );
+  Add( "set_state", GetHandle( &yaodaq::Server::getNumberOfClients, *this ) );
 }
 
 void yaodaq::Server::start()
@@ -197,6 +198,15 @@ void yaodaq::Server::onMessage( std::shared_ptr<ix::ConnectionState> connectionS
     if( message.contains( "method" ) || message.contains( "notification" ) ) onJsonRPCRequest( connectionState, webSocket, message );
     else if( message.contains( "result" ) || message.contains( "error" ) )
       onJsonRPCResponse( connectionState, webSocket, message );
+    else if( message.contains( "yaodaq" ) && message["type"] == "log" )
+    {
+      // Log the message with the original level, logger, and source location
+
+      logger()->log( static_cast<spdlog::level::level_enum>( message["log"]["level"] ),
+                     message["log"]["payload"]  // Log the original payload
+      );
+      std::cout << message.dump( 2 ) << std::endl;
+    }
   }
   else
     std::cout << str << " " << size << " " << binary << std::endl;

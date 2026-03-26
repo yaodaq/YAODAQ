@@ -41,6 +41,7 @@ public:
     m_url = std::move( url );
   }
 
+protected:
   YAODAQ_API void start()
   {
     m_url = m_tls ? "wss://" : "ws://" + m_url;
@@ -58,7 +59,6 @@ public:
     m_tlsOptions.tls      = true;
     setTLSOptions( m_tlsOptions );
   }*/
-
 private:
   YAODAQ_API explicit Client() noexcept = delete;
   const Identifier m_identifier;

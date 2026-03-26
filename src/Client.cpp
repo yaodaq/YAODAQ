@@ -6,6 +6,7 @@
 #include <chrono>
 #include <cstdint>
 #include <ixwebsocket/IXNetSystem.h>
+#include <string>
 #include <string_view>
 #include <thread>
 
@@ -39,6 +40,36 @@ yaodaq::Client::Client( const Identifier& identifier, const std::string_view hos
   setURL( host, port, path );
   enableAutomaticReconnection();
   enablePerMessageDeflate();
+  std::function<void( const spdlog::details::log_msg& msg )> callback = [this]( const spdlog::details::log_msg& msg )
+  {
+    // Convert payload to std::string
+    std::string payload( msg.payload.data(), msg.payload.size() );
+
+    // Create JSON object
+    nlohmann::json j;
+    j["yaodaq"] = true;
+    j["type"]   = "log";
+    nlohmann::json rr;
+    rr["logger_name"] = std::string( msg.logger_name.data(), msg.logger_name.size() );
+    rr["level"]       = static_cast<int>( msg.level );  // or spdlog::level::to_string_view(msg.level)
+    rr["payload"]     = payload;
+
+    // Convert time to nanoseconds since epoch
+    auto time_ns = std::chrono::duration_cast<std::chrono::nanoseconds>( msg.time.time_since_epoch() ).count();
+    rr["time"]   = time_ns;
+
+    // Handle source location (check for null pointers if needed)
+    nlohmann::json source_loc;
+    if( msg.source.filename ) { source_loc["filename"] = std::string( msg.source.filename ); }
+    if( msg.source.funcname ) { source_loc["funcname"] = std::string( msg.source.funcname ); }
+    source_loc["line"] = msg.source.line;
+    rr["source_loc"]   = source_loc;
+    j["log"]           = rr;
+    sendUtf8Text( j.dump() );
+    // Print JSON
+    //std::cout << j.dump(2) << std::endl;
+  };
+  add_callback( callback );
 }
 
 void yaodaq::Client::Send( const std::string_view request ) { sendUtf8Text( std::string( request ) ); }

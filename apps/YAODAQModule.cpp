@@ -28,7 +28,7 @@ try
   }
   yaodaq::Module module( name, host, port );
   //client.setTLS("/home/work/YAODAQ-1/localhost.crt","/home/work/YAODAQ-1/localhost.key","NONE");
-  module.start();
+  module.link();
 
   Term::cout << "Press 3 times CTRL+C to stop" << std::endl;
   std::size_t nbrCTLC{ 0 };
@@ -40,16 +40,67 @@ try
       case Term::Event::Type::Key:
       {
         Term::Key key( event );
-        if( key == Term::Key::Ctrl_C )
+        if( key == Term::Key::Ctrl_Q )
         {
           ++nbrCTLC;
           if( nbrCTLC == 3 ) return 0;
         }
-        else if( key == Term::Key::i )
+        else if( key == Term::Key::s )
         {
-          nlohmann::json nbr = module.CallMethod( "getNumberOfClients" );
-          std::cout << "They are " << nbr.dump( 2 ) << " clients connected " << std::endl;
+          nlohmann::json nbr = module.CallMethod( "getState" );
+          std::cout << nbr.dump( 2 ) << std::endl;
         }
+        else if( key == Term::Key::Ctrl_I )
+        {
+          nlohmann::json nbr = module.CallMethod( "initialize" );
+          std::cout << nbr.dump( 2 ) << std::endl;
+        }
+        else if( key == Term::Key::Ctrl_C )
+        {
+          nlohmann::json nbr = module.CallMethod( "configure" );
+          std::cout << nbr.dump( 2 ) << std::endl;
+        }
+        else if( key == Term::Key::Ctrl_S )
+        {
+          nlohmann::json nbr = module.CallMethod( "start" );
+          std::cout << nbr.dump( 2 ) << std::endl;
+        }
+        else if( key == Term::Key::p )
+        {
+          nlohmann::json nbr = module.CallMethod( "pause" );
+          std::cout << nbr.dump( 2 ) << std::endl;
+        }
+        else if( key == Term::Key::Ctrl_Z )
+        {
+          nlohmann::json nbr = module.CallMethod( "stop" );
+          std::cout << nbr.dump( 2 ) << std::endl;
+        }
+        else if( key == Term::Key::Ctrl_K )
+        {
+          nlohmann::json nbr = module.CallMethod( "clear" );
+          std::cout << nbr.dump( 2 ) << std::endl;
+        }
+        else if( key == Term::Key::Ctrl_R )
+        {
+          nlohmann::json nbr = module.CallMethod( "release" );
+          std::cout << nbr.dump( 2 ) << std::endl;
+        }
+        else if( key == Term::Key::Ctrl_L )
+        {
+          nlohmann::json nbr = module.CallMethod( "connect" );
+          std::cout << nbr.dump( 2 ) << std::endl;
+        }
+        else if( key == Term::Key::r )
+        {
+          nlohmann::json nbr = module.CallMethod( "resume" );
+          std::cout << nbr.dump( 2 ) << std::endl;
+        }
+        else if( key == Term::Key::Ctrl_D )
+        {
+          nlohmann::json nbr = module.CallMethod( "disconnect" );
+          std::cout << nbr.dump( 2 ) << std::endl;
+        }
+        else if( key == Term::Key::h ) { std::cout << module.CallMethod( "listProcedures" ).pretty_format() << std::endl; }
         break;
       }
       default: break;

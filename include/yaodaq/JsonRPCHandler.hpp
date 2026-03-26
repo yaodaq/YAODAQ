@@ -37,11 +37,6 @@ public:
   YAODAQ_API void CallNotificationNamed( const std::string& name, const jsonrpc::named_parameter& params = {} ) { m_client.CallNotificationNamed( name, params ); }
 
   YAODAQ_API nlohmann::json getProcedures() { return m_server.getProcedures(); }
-  //std::mutex                                                            m_mutex;
-  //std::unordered_map<jsonrpccxx::id_type, std::promise<nlohmann::json>> m_responses;
-
-  //std::mutex                                                              m_map_mutex;
-  //std::unordered_map<jsonrpccxx::id_type, std::shared_ptr<yaodaq::ServerRequest>> m_server_construct_response;
 
 protected:
   YAODAQ_API std::string HandleRequest( const nlohmann::json& requestString ) { return m_server.HandleRequest( requestString.dump() ); }

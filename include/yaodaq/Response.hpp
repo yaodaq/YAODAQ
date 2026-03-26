@@ -35,7 +35,7 @@ private:
       s += pad + "{\n";
       for( auto it = j.begin(); it != j.end(); ++it )
       {
-        s += pad + fmt::format( "{}:\n", fmt::styled( it.key(), fmt::fg( fmt::color::blue ) | fmt::emphasis::bold ) );
+        s += pad + fmt::format( "{}:", fmt::styled( it.key(), fmt::fg( fmt::color::blue ) | fmt::emphasis::bold ) );
 
         // Recursive call
         s += color_json( it.value(), indent + 1 );
@@ -49,17 +49,21 @@ private:
     }
     else if( j.is_array() )
     {
-      s += pad + "[\n";
-      for( size_t i = 0; i < j.size(); ++i )
+      if( j.size() == 0 ) s += pad + "[]";
+      else
       {
-        s += pad + "  " + color_json( j[i], indent + 1 );
+        s += pad + "[\n";
+        for( size_t i = 0; i < j.size(); ++i )
+        {
+          s += pad + "  " + color_json( j[i], indent + 1 );
 
-        // Add comma if not last
-        if( i + 1 != j.size() ) s += ",\n";
-        else
-          s += "\n";
+          // Add comma if not last
+          if( i + 1 != j.size() ) s += ",";
+          else
+            s += "\n";
+        }
+        s += pad + "]";
       }
-      s += pad + "]";
     }
     else if( j.is_string() ) { s += fmt::format( "{}", fmt::styled( "\"" + j.get<std::string>() + "\"", fmt::fg( fmt::color::green ) ) ); }
     else if( j.is_number_integer() ) { s += fmt::format( "{}", fmt::styled( j.get<int>(), fmt::fg( fmt::color::magenta ) ) ); }
