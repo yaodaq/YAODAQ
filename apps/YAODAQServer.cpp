@@ -1,4 +1,5 @@
 #include <CLI/CLI.hpp>
+#include <cpp-terminal/color.hpp>
 #include <cpp-terminal/input.hpp>
 #include <cpp-terminal/iostream.hpp>
 #include <cpp-terminal/terminal.hpp>
@@ -44,10 +45,10 @@ try
   if( rejectBrowsers ) server.rejectBrowsers();
   //server.setTLS("/home/work/YAODAQ-1/localhost.crt","/home/work/YAODAQ-1/localhost.key","/home/work/YAODAQ-1/RootCA.pem");
   server.start();
-  Term::cout << "Press 3 times CTRL+C to stop" << std::endl;
   Term::cout << "This server understand these procedures : " << std::endl;
   Term::cout << server.getProcedures() << std::endl;
-  std::size_t nbrCTLC{ 0 };
+  std::size_t nbrCTLC{ 3 };
+  Term::cout << Term::color_fg( Term::Color::Name::Red ) << "Press " << std::to_string( nbrCTLC ) << " times CTRL+Q to stop" << Term::color_fg( Term::Color::Name::Default ) << std::endl;
   while( true )
   {
     Term::Event event = Term::read_event();
@@ -56,13 +57,22 @@ try
       case Term::Event::Type::Key:
       {
         Term::Key key( event );
-        if( key == Term::Key::Ctrl_C )
+        if( key == Term::Key::Ctrl_Q )
         {
-          ++nbrCTLC;
-          if( nbrCTLC == 3 ) return 0;
+          --nbrCTLC;
+          if( nbrCTLC == 0 ) return 0;
+          else
+            Term::cout << Term::color_fg( Term::Color::Name::Red ) << "Press Ctrl+Q " << std::to_string( nbrCTLC ) << " times to quit" << Term::color_fg( Term::Color::Name::Default ) << std::endl;
         }
-        else if( key == Term::Key::p ) { std::cout << server.CallMethod( "listProcedures" ).pretty_format() << std::endl; }
-        else if( key == Term::Key::i ) { std::cout << server.CallMethod( "listProcedures555" ).pretty_format() << std::endl; }
+        else if( key == Term::Key::p )
+        {
+          nbrCTLC = 3;
+          std::cout << server.CallMethod( "listProcedures" ).pretty_format() << std::endl;
+        }
+        else
+        {
+          nbrCTLC = 3;
+        }
         break;
       }
       default: break;

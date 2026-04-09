@@ -5,6 +5,7 @@
 
 #include <chrono>
 #include <cstdint>
+#include <iostream>
 #include <ixwebsocket/IXNetSystem.h>
 #include <string>
 #include <string_view>
@@ -69,10 +70,8 @@ yaodaq::Client::Client( const Identifier& identifier, const std::string_view hos
     // Print JSON
     //std::cout << j.dump(2) << std::endl;
   };
-  add_callback( callback );
+  if( identifier.component().role() != Component::Role::Logger ) add_callback( callback );
 }
-
-void yaodaq::Client::Send( const std::string_view request ) { sendUtf8Text( std::string( request ) ); }
 
 void yaodaq::Client::onOpen( const std::string& uri, const ix::WebSocketHttpHeaders& headers, const std::string& protocol ) { logger()->info( "connected at {} with protocol {}", getUrl(), protocol ); }
 
@@ -109,8 +108,10 @@ void yaodaq::Client::onReject( const std::uint16_t code, const std::string& reas
  **/
 void yaodaq::Client::onJsonRPC( const nlohmann::json& json )
 {
-  if( json.contains( "result" ) || json.contains( "error" ) ) this->Receive( json.dump() );
+  if( json.contains( "result" ) || json.contains( "error" ) ) onResponse( json.dump() );
   else if( json.contains( "method" ) || json.contains( "notification" ) ) { sendUtf8Text( HandleRequest( json ).c_str() ); }
+  else if( json.contains( "yaodaq" ) && json["type"] == "log" )
+    onLog( json );
 }
 
 //void yaodaq::Client::onFragment( const std::string& str, const std::size_t size, const bool binary ) { std::cout << str << " " << size << " " << binary << std::endl; }
@@ -123,6 +124,13 @@ void yaodaq::Client::onJsonRPC( const nlohmann::json& json )
 void yaodaq::Client::onPing( const std::string& str, const std::size_t size, const bool binary ) { logger()->info( "received ping: {}", str ); }
 
 void yaodaq::Client::onPong( const std::string& str, const std::size_t size, const bool binary ) { logger()->info( "received pong: {}", str ); }
+
+void yaodaq::Client::onLog( const nlohmann::json& json )
+{
+  logger()->log( static_cast<spdlog::level::level_enum>( json["log"]["level"] ),
+                 fmt::format( "{}: {}", fmt::styled( json["log"]["logger_name"].get<std::string>(), fmt::fg( fmt::color::gray ) | fmt::emphasis::bold ), json["log"]["payload"].get<std::string>() )  // Log the original payload
+  );
+}
 
 //void yaodaq::Client::onText( const std::string& text ) { std::cout << text << std::endl; }
 

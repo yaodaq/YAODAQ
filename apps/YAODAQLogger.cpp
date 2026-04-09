@@ -4,15 +4,15 @@
 #include <cpp-terminal/iostream.hpp>
 #include <cpp-terminal/terminal.hpp>
 #include <yaodaq/Exception.hpp>
-#include <yaodaq/Module.hpp>
+#include <yaodaq/Logger.hpp>
 
 int main( int argc, char* argv[] )
 try
 {
   Term::terminal.setOptions( Term::Option::Raw, Term::Option::Cursor );
-  CLI::App app{ "YAODAQ module" };
+  CLI::App app{ "YAODAQ logger" };
   argv = app.ensure_utf8( argv );
-  std::string name{ "module" };
+  std::string name{ "logger" };
   app.add_option( "-n,--name", name, "Name of the client" );
   std::string host{ "127.0.0.1" };
   app.add_option( "-i,--ip", host, "IP of the server" ) /*->check( CLI::ValidIPV4 )*/;
@@ -27,10 +27,9 @@ try
   {
     return app.exit( e );
   }
-  yaodaq::Module module( name, host, port );
+  yaodaq::Logger logger( name, host, port );
   //client.setTLS("/home/work/YAODAQ-1/localhost.crt","/home/work/YAODAQ-1/localhost.key","NONE");
-  module.link();
-
+  logger.link();
   std::size_t nbrCTLC{ 3 };
   Term::cout << Term::color_fg( Term::Color::Name::Red ) << "Press " << std::to_string( nbrCTLC ) << " times CTRL+C to stop" << Term::color_fg( Term::Color::Name::Default ) << std::endl;
   while( true )
@@ -51,7 +50,20 @@ try
         else
         {
           nbrCTLC = 3;
-          Term::cout << Term::color_fg( Term::Color::Name::Red ) << "Press Ctrl+Q " << std::to_string( nbrCTLC ) << " times to quit" << Term::color_fg( Term::Color::Name::Default ) << std::endl;
+          Term::cout << "Press :" << std::endl;
+          Term::cout << "h : list procedures" << std::endl;
+          Term::cout << "s : list states" << std::endl;
+
+          Term::cout << "Ctrl+I : initialize" << std::endl;
+          Term::cout << "Ctrl+L : connect" << std::endl;
+          Term::cout << "Ctrl+C : configure" << std::endl;
+          Term::cout << "Ctrl+S : start" << std::endl;
+          Term::cout << "p : pause" << std::endl;
+          Term::cout << "r : resume" << std::endl;
+          Term::cout << "Ctrl+Q : stop" << std::endl;
+          Term::cout << "Ctrl+Z : clear" << std::endl;
+          Term::cout << "Ctrl+D : disconnect" << std::endl;
+          Term::cout << "Ctrl+R : release" << std::endl;
         }
         break;
       }

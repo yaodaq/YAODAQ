@@ -11,8 +11,9 @@ add_library(yaodaq SHARED
  Client.cpp
  Exception.cpp
  Server.cpp
+ Controller.cpp
  Log.cpp
- JsonRPCHandler.cpp
+ JsonRPCAsker.cpp
  Identifier.cpp
  Response.cpp
  WebsocketCloseConstants.cpp

@@ -11,11 +11,87 @@
 
 // Assuming you have a Term class for terminal width
 // and a color_json function for JSON syntax highlighting
+
+#include <fmt/color.h>
+#include <fmt/core.h>
+#include <nlohmann/json.hpp>
+
+using json = nlohmann::json;
+
+// --- Color helpers ---
+inline std::string key_color( const std::string& s ) { return fmt::format( "{}", fmt::styled( s, fmt::fg( fmt::color::cornflower_blue ) | fmt::emphasis::bold ) ); }
+
+inline std::string string_color( const std::string& s ) { return fmt::format( "{}", fmt::styled( "\"" + s + "\"", fmt::fg( fmt::color::light_green ) ) ); }
+
+inline std::string number_int_color( long long v ) { return fmt::format( "{}", fmt::styled( v, fmt::fg( fmt::color::plum ) ) ); }
+
+inline std::string number_float_color( double v ) { return fmt::format( "{}", fmt::styled( v, fmt::fg( fmt::color::medium_purple ) ) ); }
+
+inline std::string bool_color( bool v ) { return fmt::format( "{}", fmt::styled( v ? "true" : "false", fmt::fg( fmt::color::orange ) | fmt::emphasis::bold ) ); }
+
+inline std::string null_color() { return fmt::format( "{}", fmt::styled( "null", fmt::fg( fmt::color::gray ) ) ); }
+
+inline std::string punct( const std::string& s ) { return fmt::format( "{}", fmt::styled( s, fmt::fg( fmt::color::gray ) ) ); }
+
+// --- Main printer ---
+std::string pretty_printer( const json& j, int indent = 0 )
+{
+  std::string out;
+  std::string pad( indent * 2, ' ' );
+
+  if( j.is_object() )
+  {
+    out += punct( "{" ) + "\n";
+
+    auto it = j.begin();
+    while( it != j.end() )
+    {
+      out += pad + "  ";
+      out += key_color( "\"" + it.key() + "\"" );
+      out += punct( ": " );
+
+      out += pretty_printer( it.value(), indent + 1 );
+
+      ++it;
+      if( it != j.end() ) out += punct( "," );
+      out += "\n";
+    }
+
+    out += pad + punct( "}" );
+  }
+  else if( j.is_array() )
+  {
+    if( j.empty() ) { out += punct( "[]" ); }
+    else
+    {
+      out += punct( "[" ) + "\n";
+
+      for( size_t i = 0; i < j.size(); ++i )
+      {
+        out += pad + "  ";
+        out += pretty_printer( j[i], indent + 1 );
+
+        if( i + 1 != j.size() ) out += punct( "," );
+        out += "\n";
+      }
+
+      out += pad + punct( "]" );
+    }
+  }
+  else if( j.is_string() ) { out += string_color( j.get<std::string>() ); }
+  else if( j.is_number_integer() ) { out += number_int_color( j.get<long long>() ); }
+  else if( j.is_number_float() ) { out += number_float_color( j.get<double>() ); }
+  else if( j.is_boolean() ) { out += bool_color( j.get<bool>() ); }
+  else if( j.is_null() ) { out += null_color(); }
+
+  return out;
+}
+
 std::string yaodaq::Response::pretty_format()
 {
   if( !m_json.is_array() ) return fmt::format( fmt::fg( fmt::color::crimson ) | fmt::emphasis::bold, "No result array found\n" );
-
-  std::map<std::string, std::string> m_results;
+  return pretty_printer( m_json );
+  /* std::map<std::string, std::string> m_results;
   std::map<std::string, std::string> m_errors;
   std::size_t                        term_width = static_cast<std::size_t>( Term::screen_size().columns() );
 
@@ -24,7 +100,7 @@ std::string yaodaq::Response::pretty_format()
   {
     if( !item.is_object() ) continue;
 
-    std::string id = item.contains( "yaodaq_id" ) ? item["yaodaq_id"].get<std::string>() : "<unknown>";
+    std::string id = item.contains( "yaodaq_id" ) ? item["yaodaq_id"]["component"].get<std::string>() : "<unknown>";
 
     if( item.contains( "error" ) )
     {
@@ -92,5 +168,5 @@ std::string yaodaq::Response::pretty_format()
   // Add bottom border if there were results or errors
   if( !m_results.empty() || !m_errors.empty() ) { output += fmt::format( "{}\n", fmt::format( fmt::fg( fmt::color::light_slate_gray ), "{:─^{}}", "", term_width ) ); }
 
-  return output;
+  return output;*/
 }

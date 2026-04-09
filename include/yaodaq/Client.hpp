@@ -2,7 +2,7 @@
 #include "yaodaq/Defaults.hpp"
 #include "yaodaq/Export.hpp"
 #include "yaodaq/Identifier.hpp"
-#include "yaodaq/JsonRPCHandler.hpp"
+#include "yaodaq/JsonRPCResponder.hpp"
 #include "yaodaq/Log.hpp"
 
 #include <cstdint>
@@ -13,7 +13,7 @@
 namespace yaodaq
 {
 
-class YAODAQ_API Client : public JsonRPCHandler, public ix::WebSocket, public Log  //TODO : Why YAODAQ_API is needed here ?
+class YAODAQ_API Client : public JsonRPCResponder, public ix::WebSocket, public Log  //TODO : Why YAODAQ_API is needed here ?
 {
 public:
   YAODAQ_API virtual ~Client() noexcept;
@@ -49,7 +49,7 @@ protected:
     ix::WebSocket::start();
     logger()->info( "trying to connect to {}", m_url );
   }
-
+  virtual void     onResponse( const std::string& ) {}
   /*YAODAQ_API void setTLS( const std::string& certFile, const std::string& keyFile, const std::string& caFile = "SYSTEM" )
   {
     m_tls = true;
@@ -59,12 +59,13 @@ protected:
     m_tlsOptions.tls      = true;
     setTLSOptions( m_tlsOptions );
   }*/
+  const Identifier m_identifier;
+
 private:
   YAODAQ_API explicit Client() noexcept = delete;
-  const Identifier m_identifier;
+
   //ix::SocketTLSOptions m_tlsOptions;
 
-  virtual void    Send( const std::string_view request ) override final;
   // Messages
   YAODAQ_API void onMessage( const std::string& str, const std::size_t size, const bool binary );
   YAODAQ_API void onJsonRPC( const nlohmann::json& json );
@@ -79,6 +80,7 @@ private:
   YAODAQ_API void onError( const std::uint32_t retries, const double wait_time, const int http_status, const std::string& reason, const bool decompressionError );*/
   YAODAQ_API void onPing( const std::string& str, const std::size_t size, const bool binary );
   YAODAQ_API void onPong( const std::string& str, const std::size_t size, const bool binary );
+  YAODAQ_API void onLog( const nlohmann::json& json );
 
   /*YAODAQ_API void onText( const std::string& text );
   YAODAQ_API void onJson( const nlohmann::json& json );*/

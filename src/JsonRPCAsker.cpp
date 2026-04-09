@@ -1,11 +1,11 @@
-#include "yaodaq/JsonRPCHandler.hpp"
+#include "yaodaq/JsonRPCAsker.hpp"
 #if defined( _WIN32 )
   #include <windows.h>
 #endif
 #include <chrono>
 #include <cstdint>
 
-std::int64_t yaodaq::JsonRPCHandler::generateID()
+std::int64_t yaodaq::JsonRPCAsker::generateID()
 {
 #if defined( _WIN32 )
   // Use system_clock for epoch reference

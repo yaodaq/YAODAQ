@@ -6,7 +6,9 @@
 
 #include <cstddef>
 #include <cstdint>
+#include <fmt/color.h>
 #include <fmt/ranges.h>
+#include <iostream>
 #include <ixwebsocket/IXNetSystem.h>
 #include <ixwebsocket/IXWebSocketServer.h>
 #include <memory>
@@ -65,7 +67,9 @@ void yaodaq::Server::Send( const std::string_view request )
     json["result"]  = nlohmann::json::array();
     for( auto& [clientId, response]: answers->responses )
     {
-      response["yaodaq_id"] = clientId;
+      response["yaodaq_id"]["component"] = std::string( clientId.component() );
+      response["yaodaq_id"]["type"]      = clientId.type();
+      response["yaodaq_id"]["name"]      = clientId.name();
       response.erase( "jsonrpc" );
       json["result"].push_back( response );
     }
@@ -90,7 +94,7 @@ YAODAQ_API yaodaq::Server::Server( const std::string_view name,  //<! Name of th
                                    const std::size_t maxConnections, const int handshakeTimeoutSecs, const int pingIntervalSeconds,
                                    const int backlog,  //<! maximum number of clients waiting to be connected
                                    const int addressFamily, const std::string_view type ) :
-  m_identifier( Component::role::Server, type, name ), ix::WebSocketServer( port, std::string( host ), backlog, maxConnections, handshakeTimeoutSecs, addressFamily, pingIntervalSeconds ), Log( { Component::role::Server, type, name } )
+  m_identifier( Component::Role::Server, type, name ), ix::WebSocketServer( port, std::string( host ), backlog, maxConnections, handshakeTimeoutSecs, addressFamily, pingIntervalSeconds ), Log( { Component::Role::Server, type, name } )
 {
   ix::initNetSystem();
   this->setConnectionStateFactory( [this]() { return yaodaq::ConnectionState::createConnectionState(); } );
@@ -109,10 +113,17 @@ YAODAQ_API yaodaq::Server::Server( const std::string_view name,  //<! Name of th
         if( WebSocketCloseConstant::isRejected( msg->closeInfo.code ) ) { onReject( connectionState, webSocket, msg->closeInfo.code, msg->closeInfo.reason, msg->closeInfo.remote ); }
         else
         {
-          const std::string name = std::string( std::static_pointer_cast<yaodaq::ConnectionState>( connectionState )->getID().name() );
+          auto              cs   = std::static_pointer_cast<yaodaq::ConnectionState>( connectionState );
+          const std::string name = std::string( cs->getID().name() );
           {
             std::lock_guard<std::mutex> lock( m_mutex );
             m_clients.erase( name );
+            auto it = m_clientss.find( cs->getID().component().role() );
+            if( it != m_clientss.end() )
+            {
+              auto& vec = it->second;
+              vec.erase( std::remove_if( vec.begin(), vec.end(), [&]( std::reference_wrapper<ix::WebSocket> ref ) { return &ref.get() == &webSocket; } ), vec.end() );
+            }
           }
           onClose( connectionState, webSocket, msg->closeInfo.code, msg->closeInfo.reason, msg->closeInfo.remote );
         }
@@ -124,6 +135,34 @@ YAODAQ_API yaodaq::Server::Server( const std::string_view name,  //<! Name of th
   // Register procedure understood by the websocket server
   Add( "getNumberOfClients", GetHandle( &yaodaq::Server::getNumberOfClients, *this ) );
   Add( "set_state", GetHandle( &yaodaq::Server::getNumberOfClients, *this ) );
+  std::function<void( const spdlog::details::log_msg& msg )> callback = [this]( const spdlog::details::log_msg& msg )
+  {
+    // Convert payload to std::string
+    std::string payload( msg.payload.data(), msg.payload.size() );
+
+    // Create JSON object
+    nlohmann::json j;
+    j["yaodaq"] = true;
+    j["type"]   = "log";
+    nlohmann::json rr;
+    rr["logger_name"] = std::string( msg.logger_name.data(), msg.logger_name.size() );
+    rr["level"]       = static_cast<int>( msg.level );  // or spdlog::level::to_string_view(msg.level)
+    rr["payload"]     = payload;
+
+    // Convert time to nanoseconds since epoch
+    auto time_ns = std::chrono::duration_cast<std::chrono::nanoseconds>( msg.time.time_since_epoch() ).count();
+    rr["time"]   = time_ns;
+
+    // Handle source location (check for null pointers if needed)
+    nlohmann::json source_loc;
+    if( msg.source.filename ) { source_loc["filename"] = std::string( msg.source.filename ); }
+    if( msg.source.funcname ) { source_loc["funcname"] = std::string( msg.source.funcname ); }
+    source_loc["line"] = msg.source.line;
+    rr["source_loc"]   = source_loc;
+    j["log"]           = rr;
+    sendToLoggers( j.dump() );
+  };
+  add_callback( callback );
 }
 
 void yaodaq::Server::start()
@@ -158,11 +197,17 @@ void yaodaq::Server::checkClient( std::shared_ptr<ix::ConnectionState> connectio
   }
   const std::string name = std::string( std::static_pointer_cast<yaodaq::ConnectionState>( connectionState )->getID().name() );
   {
-    std::lock_guard<std::mutex> lock( m_mutex );
-    if( m_clients.count( name ) == 0 ) { m_clients.insert( name ); }
-    else
     {
-      webSocket.stop( WebSocketCloseConstant::ClientWithThisNameAlreadyConnected, WebSocketCloseConstant::ClientWithThisNameAlreadyConnectedMessage );
+      std::lock_guard<std::mutex> lock( m_mutex );
+      if( m_clients.count( name ) == 0 )
+      {
+        m_clients.insert( name );
+        m_clientss[std::static_pointer_cast<yaodaq::ConnectionState>( connectionState )->getID().component().role()].push_back( webSocket );
+      }
+      else
+      {
+        webSocket.stop( WebSocketCloseConstant::ClientWithThisNameAlreadyConnected, WebSocketCloseConstant::ClientWithThisNameAlreadyConnectedMessage );
+      }
     }
   }
 }
@@ -199,17 +244,14 @@ void yaodaq::Server::onMessage( std::shared_ptr<ix::ConnectionState> connectionS
     else if( message.contains( "result" ) || message.contains( "error" ) )
       onJsonRPCResponse( connectionState, webSocket, message );
     else if( message.contains( "yaodaq" ) && message["type"] == "log" )
-    {
-      // Log the message with the original level, logger, and source location
-
-      logger()->log( static_cast<spdlog::level::level_enum>( message["log"]["level"] ),
-                     message["log"]["payload"]  // Log the original payload
-      );
-      std::cout << message.dump( 2 ) << std::endl;
-    }
+      onLog( connectionState, webSocket, message );
   }
-  else
-    std::cout << str << " " << size << " " << binary << std::endl;
+}
+
+void yaodaq::Server::onLog( std::shared_ptr<ix::ConnectionState> connectionState, ix::WebSocket& webSocket, nlohmann::json request )
+{
+  // Log the message with the original level, logger, and source location
+  sendToLoggers( request.dump() );
 }
 
 /**
@@ -229,10 +271,10 @@ void yaodaq::Server::onJsonRPCRequest( std::shared_ptr<ix::ConnectionState> conn
   // Capture everything by value or reference safely
   auto task = [this, connectionState, &webSocket, request]() mutable
   {
-    std::string ret                       = HandleRequest( request );  // Server handler request
-    auto        answers                   = std::make_shared<ServerRequest>();
-    answers->expected_responses           = getClients().size() - 1;
-    answers->responses[m_identifier.id()] = nlohmann::json::parse( ret );  // put the webserver response to the request
+    std::string ret                  = HandleRequest( request );  // Server handler request
+    auto        answers              = std::make_shared<ServerRequest>();
+    answers->expected_responses      = getClients().size() - 1;
+    answers->responses[m_identifier] = nlohmann::json::parse( ret );  // put the webserver response to the request
 
     // Extract ID
     jsonrpc::id_t id;
@@ -260,7 +302,9 @@ void yaodaq::Server::onJsonRPCRequest( std::shared_ptr<ix::ConnectionState> conn
     json["result"]  = nlohmann::json::array();
     for( auto& [clientId, response]: answers->responses )
     {
-      response["yaodaq_id"] = clientId;
+      response["yaodaq_id"]["component"] = std::string( clientId.component() );
+      response["yaodaq_id"]["type"]      = clientId.type();
+      response["yaodaq_id"]["name"]      = clientId.name();
       response.erase( "jsonrpc" );
       json["result"].push_back( response );
     }
@@ -308,7 +352,7 @@ void yaodaq::Server::onJsonRPCResponse( std::shared_ptr<ix::ConnectionState> con
   {
     {
       std::lock_guard<std::mutex> lock( request->mtx );
-      request->responses[connectionState->getId()] = std::move( response );
+      request->responses[std::static_pointer_cast<yaodaq::ConnectionState>( connectionState )->getID()] = std::move( response );
       request->received_responses++;
     }
     request->cv.notify_one();
@@ -329,7 +373,7 @@ void yaodaq::Server::onJsonRPCResponse( std::shared_ptr<ix::ConnectionState> con
   {
     {
       std::lock_guard<std::mutex> lock( request->mtx );
-      request->responses[connectionState->getId()] = std::move( response );
+      request->responses[std::static_pointer_cast<yaodaq::ConnectionState>( connectionState )->getID()] = std::move( response );
       request->received_responses++;
     }
     request->cv.notify_one();
@@ -372,6 +416,12 @@ void yaodaq::Server::sendTo( const std::string& str, ix::WebSocket& webSocket )
       client->sendUtf8Text( str.c_str() );
     }
   }
+}
+
+// Send to loggers
+void yaodaq::Server::sendToLoggers( const std::string& str )
+{
+  for( auto&& client: m_clientss[yaodaq::Component::Role::Logger] ) { client.get().sendUtf8Text( str.c_str() ); }
 }
 
 // Send to all

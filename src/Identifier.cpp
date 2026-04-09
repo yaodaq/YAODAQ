@@ -13,10 +13,10 @@ yaodaq::Identifier yaodaq::Identifier::createFromstring( const std::string_view 
   const std::size_t firstSlash{ str.find( '/' ) };
   const std::size_t secondSlash{ str.find( '/', firstSlash + 1 ) };
 
-  auto maybeComponent = magic_enum::enum_cast<Component::role>( str.substr( 0, firstSlash ) );
+  auto maybeComponent = magic_enum::enum_cast<Component::Role>( str.substr( 0, firstSlash ) );
   if( !maybeComponent.has_value() ) throw Exception( "Unknown component" );
 
-  const Component::role component{ maybeComponent.value() };
+  const Component::Role component{ maybeComponent.value() };
 
   const std::string type{ str.substr( firstSlash + 1, secondSlash - firstSlash - 1 ) };
   const std::string name{ str.substr( secondSlash + 1 ) };

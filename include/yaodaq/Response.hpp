@@ -24,57 +24,30 @@ public:
   // Pretty formatter for JSON-RPC array of results/errors
   YAODAQ_API std::string pretty_format();
 
+protected:
+  nlohmann::json m_json;
+};
+
+// Response where you don't care the server response
+class ResponseClients : public Response
+{
+public:
+  YAODAQ_API ResponseClients( const Response& response ) : Response( response )  // uses your conversion operator
+  { filter(); }
+  YAODAQ_API explicit ResponseClients( const nlohmann::json& response ) : Response( response ) { filter(); }
+
 private:
-  std::string color_json( const nlohmann::json& j, int indent = 0 )
+  void filter()
   {
-    std::string s;
-    std::string pad( indent * 2, ' ' );
-
-    if( j.is_object() )
+    for( auto it = m_json.begin(); it != m_json.end(); )
     {
-      s += pad + "{\n";
-      for( auto it = j.begin(); it != j.end(); ++it )
-      {
-        s += pad + fmt::format( "{}:", fmt::styled( it.key(), fmt::fg( fmt::color::blue ) | fmt::emphasis::bold ) );
-
-        // Recursive call
-        s += color_json( it.value(), indent + 1 );
-
-        // Add comma if not last
-        if( std::next( it ) != j.end() ) s += ",\n";
-        else
-          s += "\n";
-      }
-      s += pad + "}";
-    }
-    else if( j.is_array() )
-    {
-      if( j.size() == 0 ) s += pad + "[]";
+      if( it->is_object() && it->contains( "yaodaq_id" ) && ( *it )["yaodaq_id"].contains( "component" ) && ( *it )["yaodaq_id"]["component"] == "Server" ) { it = m_json.erase( it ); }
       else
       {
-        s += pad + "[\n";
-        for( size_t i = 0; i < j.size(); ++i )
-        {
-          s += pad + "  " + color_json( j[i], indent + 1 );
-
-          // Add comma if not last
-          if( i + 1 != j.size() ) s += ",";
-          else
-            s += "\n";
-        }
-        s += pad + "]";
+        ++it;
       }
     }
-    else if( j.is_string() ) { s += fmt::format( "{}", fmt::styled( "\"" + j.get<std::string>() + "\"", fmt::fg( fmt::color::green ) ) ); }
-    else if( j.is_number_integer() ) { s += fmt::format( "{}", fmt::styled( j.get<int>(), fmt::fg( fmt::color::magenta ) ) ); }
-    else if( j.is_number_float() ) { s += fmt::format( "{}", fmt::styled( j.get<double>(), fmt::fg( fmt::color::magenta ) ) ); }
-    else if( j.is_boolean() ) { s += fmt::format( "{}", fmt::styled( j.get<bool>() ? "true" : "false", fmt::fg( fmt::color::yellow ) | fmt::emphasis::bold ) ); }
-    else if( j.is_null() ) { s += fmt::format( "{}", fmt::styled( "null", fmt::fg( fmt::color::gray ) ) ); }
-
-    return s;
   }
-
-  nlohmann::json m_json;
 };
 
 }  // namespace yaodaq

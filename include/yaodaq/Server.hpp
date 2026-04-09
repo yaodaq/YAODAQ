@@ -2,13 +2,15 @@
 #include "yaodaq/Defaults.hpp"
 #include "yaodaq/Export.hpp"
 #include "yaodaq/Identifier.hpp"
-#include "yaodaq/JsonRPCHandler.hpp"
+#include "yaodaq/JsonRPCAsker.hpp"
+#include "yaodaq/JsonRPCResponder.hpp"
 #include "yaodaq/Log.hpp"
 #include "yaodaq/ThreadPool.hpp"
 
 #include <cstddef>
 #include <cstdint>
 #include <ixwebsocket/IXWebSocketServer.h>
+#include <memory>
 #include <mutex>
 #include <spdlog/sinks/stdout_color_sinks.h>
 #include <spdlog/spdlog.h>
@@ -21,14 +23,14 @@ namespace yaodaq
 
 struct ServerRequest
 {
-  std::mutex                                      mtx;  // protect shared state
-  std::condition_variable                         cv;
-  std::unordered_map<std::string, nlohmann::json> responses;
-  size_t                                          expected_responses{ 0 };
-  size_t                                          received_responses{ 0 };
+  std::mutex                                             mtx;  // protect shared state
+  std::condition_variable                                cv;
+  std::unordered_map<yaodaq::Identifier, nlohmann::json> responses;
+  std::size_t                                            expected_responses{ 0 };
+  std::size_t                                            received_responses{ 0 };
 };
 
-class Server : public ix::WebSocketServer, public JsonRPCHandler, public Log
+class Server : public ix::WebSocketServer, public JsonRPCResponder, public Log, public JsonRPCAsker
 {
 public:
   YAODAQ_API ~Server() noexcept;
@@ -74,6 +76,7 @@ private:
   void onMessage( std::shared_ptr<ix::ConnectionState> connectionState, ix::WebSocket& webSocket, const std::string& str, const std::size_t size, const bool binary );
   void onJsonRPCResponse( std::shared_ptr<ix::ConnectionState> connectionState, ix::WebSocket& webSocket, nlohmann::json response );
   void onJsonRPCRequest( std::shared_ptr<ix::ConnectionState> connectionState, ix::WebSocket& webSocket, nlohmann::json request );
+  void onLog( std::shared_ptr<ix::ConnectionState> connectionState, ix::WebSocket& webSocket, nlohmann::json request );
   // Others
   void onOpen( std::shared_ptr<ix::ConnectionState> connectionState, ix::WebSocket& webSocket, const std::string& uri, ix::WebSocketHttpHeaders& headers, const std::string& protocol );
   void onClose( std::shared_ptr<ix::ConnectionState> connectionState, ix::WebSocket& webSocket, const std::uint16_t code, const std::string& reason, bool remote );
@@ -98,10 +101,13 @@ private:
   void sendTo( const std::string& str, ix::WebSocket& webSocket );
   // Send to all
   void sendToAll( const std::string& str );
+  // Send to loggers
+  void sendToLoggers( const std::string& str );
 
   // Check if a client already have this name
-  std::unordered_set<std::string> m_clients;
-  std::mutex                      m_mutex;
+  std::unordered_set<std::string>                                                         m_clients;
+  std::unordered_map<Component::Role, std::vector<std::reference_wrapper<ix::WebSocket>>> m_clientss;
+  std::mutex                                                                              m_mutex;
 };
 
 }  // namespace yaodaq
