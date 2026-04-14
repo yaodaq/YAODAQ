@@ -18,9 +18,19 @@ yaodaq::Client::~Client() noexcept
   ix::uninitNetSystem();
 }
 
-yaodaq::Client::Client( const Identifier& id, const ClientConfig& client_config ) : m_identifier( id ), Log( id )
+yaodaq::Client::Client( const Identifier& id, const ClientConfig& client_config ) : m_identifier( id ), Log( id ), m_url( client_config.url() )
 {
   ix::initNetSystem();
+  ix::WebSocket::setUrl( m_url );
+  if( client_config.isTLS() )
+  {
+    ix::SocketTLSOptions m_tlsOptions;
+    m_tlsOptions.certFile = client_config.certFile();
+    m_tlsOptions.keyFile  = client_config.keyFile();
+    m_tlsOptions.caFile   = client_config.caFile();
+    m_tlsOptions.tls      = true;
+    setTLSOptions( m_tlsOptions );
+  }
   setExtraHeaders( { { "Yaodaq-Id", m_identifier.id() } } );
   setOnMessageCallback(
     [this]( const ix::WebSocketMessagePtr& msg )
@@ -38,7 +48,6 @@ yaodaq::Client::Client( const Identifier& id, const ClientConfig& client_config 
       else if( msg->type == ix::WebSocketMessageType::Ping ) { onPing( msg->str, msg->wireSize, msg->binary ); }
       else if( msg->type == ix::WebSocketMessageType::Pong ) { onPong( msg->str, msg->wireSize, msg->binary ); }
     } );
-  setURL( client_config.getHost(), client_config.getPort(), client_config.getPath() );
   enableAutomaticReconnection();
   enablePerMessageDeflate();
   std::function<void( const spdlog::details::log_msg& msg )> callback = [this]( const spdlog::details::log_msg& msg )

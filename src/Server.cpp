@@ -93,6 +93,15 @@ YAODAQ_API yaodaq::Server::Server( const ServerConfig& cfg, const std::string_vi
   Log( { Component::Role::Server, type, name } )
 {
   ix::initNetSystem();
+  if( cfg.isTLS() )
+  {
+    ix::SocketTLSOptions m_tlsOptions;
+    m_tlsOptions.certFile = cfg.certFile();
+    m_tlsOptions.keyFile  = cfg.keyFile();
+    m_tlsOptions.caFile   = cfg.caFile();
+    m_tlsOptions.tls      = true;
+    setTLSOptions( m_tlsOptions );
+  }
   this->setConnectionStateFactory( [this]() { return yaodaq::ConnectionState::createConnectionState(); } );
   this->setOnClientMessageCallback(
     [this]( std::shared_ptr<ix::ConnectionState> connectionState, ix::WebSocket& webSocket, const ix::WebSocketMessagePtr& msg )

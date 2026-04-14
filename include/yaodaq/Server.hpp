@@ -73,7 +73,21 @@ public:
     m_tls = t;
     return *this;
   }
-
+  YAODAQ_API ServerConfig& certFile( std::string& file )
+  {
+    m_certFile = file;
+    return *this;
+  }
+  YAODAQ_API ServerConfig& keyFile( std::string& file )
+  {
+    m_keyFile = file;
+    return *this;
+  }
+  YAODAQ_API ServerConfig& caFile( std::string& file )
+  {
+    m_caFile = file;
+    return *this;
+  }
   YAODAQ_API const std::string_view getHost() const noexcept { return m_host; }
   YAODAQ_API std::uint16_t getPort() const noexcept { return m_port; }
   YAODAQ_API std::size_t getMaxConnections() const noexcept { return m_maxConnections; }
@@ -83,6 +97,9 @@ public:
   YAODAQ_API std::size_t getBacklog() const noexcept { return m_backlog; }
   YAODAQ_API int         getAddressFamily() const noexcept { return m_addressFamily; }
   YAODAQ_API bool        isTLS() const noexcept { return m_tls; }
+  YAODAQ_API const std::string& certFile() const noexcept { return m_certFile; }
+  YAODAQ_API const std::string& keyFile() const noexcept { return m_keyFile; }
+  YAODAQ_API const std::string& caFile() const noexcept { return m_caFile; }
 
 private:
   std::string   m_host{ defaults::host };
@@ -94,6 +111,9 @@ private:
   std::size_t   m_backlog{ defaults::backlog };
   int           m_addressFamily{ defaults::ip6 ? AF_INET6 : AF_INET };
   bool          m_tls{ false };
+  std::string   m_certFile;
+  std::string   m_keyFile;
+  std::string   m_caFile{ "SYSTEM" };
 };
 
 struct ServerRequest
@@ -119,15 +139,6 @@ public:
 
   YAODAQ_API void rejectBrowsers() noexcept { m_rejectBrowser = true; }
 
-  /*YAODAQ_API void setTLS( const std::string& certFile, const std::string& keyFile, const std::string& caFile = "SYSTEM" )
-  {
-    m_tlsOptions.tls      = true;
-    m_tlsOptions.certFile = certFile;
-    m_tlsOptions.keyFile  = keyFile;
-    m_tlsOptions.caFile   = caFile;
-    setTLSOptions( m_tlsOptions );
-  }*/
-
   YAODAQ_API std::size_t getNumberOfClients() noexcept;
 
 private:
@@ -136,7 +147,6 @@ private:
   ThreadPool m_threadPool;
   bool       m_ssl{ false };
   bool       m_rejectBrowser{ false };  //< Reject the Browsers
-  //ix::SocketTLSOptions m_tlsOptions;
 
   virtual void Send( const std::string_view request ) override final;
   /* Check if client has all to be an yaodaq one and if he has the authorizations */
