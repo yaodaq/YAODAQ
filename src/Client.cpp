@@ -18,7 +18,7 @@ yaodaq::Client::~Client() noexcept
   ix::uninitNetSystem();
 }
 
-yaodaq::Client::Client( const Identifier& identifier, const std::string_view host, const std::uint16_t port, const std::string_view path ) : m_identifier( identifier ), Log( identifier )
+yaodaq::Client::Client( const Identifier& id, const ClientConfig& client_config ) : m_identifier( id ), Log( id )
 {
   ix::initNetSystem();
   setExtraHeaders( { { "Yaodaq-Id", m_identifier.id() } } );
@@ -38,7 +38,7 @@ yaodaq::Client::Client( const Identifier& identifier, const std::string_view hos
       else if( msg->type == ix::WebSocketMessageType::Ping ) { onPing( msg->str, msg->wireSize, msg->binary ); }
       else if( msg->type == ix::WebSocketMessageType::Pong ) { onPong( msg->str, msg->wireSize, msg->binary ); }
     } );
-  setURL( host, port, path );
+  setURL( client_config.getHost(), client_config.getPort(), client_config.getPath() );
   enableAutomaticReconnection();
   enablePerMessageDeflate();
   std::function<void( const spdlog::details::log_msg& msg )> callback = [this]( const spdlog::details::log_msg& msg )
@@ -70,7 +70,7 @@ yaodaq::Client::Client( const Identifier& identifier, const std::string_view hos
     // Print JSON
     //std::cout << j.dump(2) << std::endl;
   };
-  if( identifier.component().role() != Component::Role::Logger ) add_callback( callback );
+  if( m_identifier.component().role() != Component::Role::Logger ) add_callback( callback );
 }
 
 void yaodaq::Client::onOpen( const std::string& uri, const ix::WebSocketHttpHeaders& headers, const std::string& protocol ) { logger()->info( "connected at {} with protocol {}", getUrl(), protocol ); }

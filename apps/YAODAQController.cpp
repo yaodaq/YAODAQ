@@ -27,7 +27,9 @@ try
   {
     return app.exit( e );
   }
-  yaodaq::Controller controller( name, host, port );
+  yaodaq::ClientConfig cfg;
+  cfg().setPort( port ).setHost( host );
+  yaodaq::Controller controller( name, cfg );
   //client.setTLS("/home/work/YAODAQ-1/localhost.crt","/home/work/YAODAQ-1/localhost.key","NONE");
   controller.link();
   std::size_t nbrCTLC{ 3 };

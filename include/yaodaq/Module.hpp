@@ -21,8 +21,7 @@ namespace yaodaq
 class Module : public yaodaq::Client
 {
 public:
-  YAODAQ_API Module( const std::string_view name, const std::string_view host = defaults::host, const std::uint16_t port = defaults::port, const std::string_view path = defaults::path, const Component::Role role = Component::Role::Module,
-                     const std::string_view type = "UserType" ) : Client( { role, type, name }, host, port, path )
+  YAODAQ_API Module( ClientConfig& client_config, const std::string_view name, const std::string_view type = "yaodaq", const Component::Role role = Component::Role::Module ) : Client( Identifier( role, type, name ), client_config )
   {
     Add( "initialize", jsonrpc::GetHandle( &yaodaq::Module::initialize, *this ) );
     Add( "configure", jsonrpc::GetHandle( &yaodaq::Module::configure, *this ) );
@@ -123,11 +122,10 @@ public:
       }
 
       // Reset state variables safely under lock
-      m_stopped.store( false );
-      m_paused.store( false );
       m_event_nbr.store( 0 );
 
-      // Update module state under lock
+      // Update module state  under lock
+      m_worker_state.store( WorkerState::Running );
       m_State.setId( State::ID::Started );
     }
 
@@ -135,19 +133,12 @@ public:
     m_worker = std::thread(
       [this]()
       {
-        while( !m_stopped.load() )
+        while( m_worker_state.load() != WorkerState::Stopped )
         {
           std::unique_lock lk( m_mutex );
 
-          // Wait until not paused or stopped; optional timeout to avoid deadlock
-          cv.wait_for( lk, std::chrono::seconds( 1 ), [this]() { return !m_paused.load() || m_stopped.load(); } );
-
-          if( m_stopped.load() )
-          {
-            logger()->info( "Worker thread stopped." );
-            break;
-          }
-
+          cv.wait( lk, [this]() { return m_worker_state.load() != WorkerState::Paused; } );
+          if( m_worker_state.load() == WorkerState::Stopped ) break;
           lk.unlock();  // Release lock during run()
 
           try
@@ -155,7 +146,7 @@ public:
             if( !run() )
             {
               logger()->error( "Run failed, stopping worker thread." );
-              m_stopped.store( true );
+              m_worker_state.store( WorkerState::Stopped );
               break;
             }
             m_event_nbr++;
@@ -163,15 +154,13 @@ public:
           catch( const std::exception& e )
           {
             logger()->error( "Exception in run(): {}", e.what() );
-            m_stopped.store( true );
-            m_paused.store( false );
+            m_worker_state.store( WorkerState::Stopped );
             break;
           }
           catch( ... )
           {
             logger()->error( "Unknown exception in run()" );
-            m_stopped.store( true );
-            m_paused.store( false );
+            m_worker_state.store( WorkerState::Stopped );
             break;
           }
         }
@@ -193,7 +182,7 @@ public:
         {
           std::unique_lock lk( m_mutex );
           m_State.setId( State::ID::Paused );
-          m_paused.store( true );
+          m_worker_state.store( WorkerState::Paused );
         }
         cv.notify_all();  // Notify the worker thread to check the pause state
       }
@@ -218,7 +207,7 @@ public:
       {
         {
           std::unique_lock lk( m_mutex );
-          m_paused.store( false );
+          m_worker_state.store( WorkerState::Running );
           m_State.setId( State::ID::Started );
         }
         cv.notify_all();
@@ -242,8 +231,7 @@ public:
       bool ret = on_stop();
       if( ret )
       {
-        m_stopped.store( true );
-        m_paused.store( false );
+        m_worker_state.store( WorkerState::Stopped );
         m_event_nbr.store( 0 );
         cv.notify_all();
         if( m_worker.joinable() ) { m_worker.join(); }
@@ -337,8 +325,7 @@ public:
     {
       {
         std::unique_lock lk( m_mutex );
-        m_stopped.store( true );
-        m_paused.store( false );
+        m_worker_state.store( WorkerState::Stopped );
       }
       cv.notify_all();
       on_stop();  // call hook for proper cleanup
@@ -366,9 +353,8 @@ protected:
     std::this_thread::sleep_for( std::chrono::seconds( 1 ) );
     return true;
   }
-  State m_State;
-
-private:
+  State      m_State;
+  std::mutex m_mutex;
   enum class Transition : int
   {
     allowed     = true,
@@ -453,9 +439,15 @@ private:
       default: return Transition::refused;
     }
   }
-  std::atomic<bool>          m_paused{ false };
-  std::atomic<bool>          m_stopped{ false };
-  std::mutex                 m_mutex;
+
+private:
+  enum class WorkerState : int
+  {
+    Running,
+    Paused,
+    Stopped
+  };
+  std::atomic<WorkerState>   m_worker_state{ WorkerState::Stopped };
   std::condition_variable    cv;
   std::thread                m_worker;
   std::atomic<std::uint64_t> m_event_nbr{ 0 };

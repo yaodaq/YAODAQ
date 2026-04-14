@@ -18,7 +18,6 @@ try
   app.add_option( "-i,--ip", host, "IP of the server" ) /*->check( CLI::ValidIPV4 )*/;
   int port{ 8888 };
   app.add_option( "-p,--port", port, "Port to listen" )->check( CLI::Range( 0, 65535 ) );
-
   try
   {
     app.parse( argc, argv );
@@ -27,7 +26,10 @@ try
   {
     return app.exit( e );
   }
-  yaodaq::Module module( name, host, port );
+
+  yaodaq::ClientConfig cfg;
+  cfg().setPort( port ).setHost( host );
+  yaodaq::Module module( cfg, name );
   //client.setTLS("/home/work/YAODAQ-1/localhost.crt","/home/work/YAODAQ-1/localhost.key","NONE");
   module.link();
 

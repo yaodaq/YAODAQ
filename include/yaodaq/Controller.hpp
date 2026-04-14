@@ -22,10 +22,7 @@ namespace yaodaq
 class YAODAQ_API Controller : public yaodaq::Client, public JsonRPCAsker
 {
 public:
-  YAODAQ_API Controller( const std::string_view name, const std::string_view host = defaults::host, const std::uint16_t port = defaults::port, const std::string_view path = defaults::path, const std::string_view type = "UserType" ) :
-    Client( { Component::Role::Controller, type, name }, host, port, path )
-  {
-  }
+  YAODAQ_API Controller( const std::string_view name, ClientConfig& client_config, const std::string_view type = "yaodaq" ) : Client( Identifier( Component::Role::Controller, type, name ), client_config ) {}
 
   // Events
   YAODAQ_API bool link()

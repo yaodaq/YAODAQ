@@ -40,8 +40,9 @@ try
   {
     return app.exit( e );
   }
-
-  yaodaq::Server server( name, host, port, maxConnections, handshakeTimeoutSecs, 150, addressFamily );
+  yaodaq::ServerConfig cfg;
+  cfg.setHost( host ).setPort( port ).setMaxConnections( maxConnections ).setHandshakeTimeoutSecs( handshakeTimeoutSecs ).setBacklog( 150 );
+  yaodaq::Server server( cfg, name );
   if( rejectBrowsers ) server.rejectBrowsers();
   //server.setTLS("/home/work/YAODAQ-1/localhost.crt","/home/work/YAODAQ-1/localhost.key","/home/work/YAODAQ-1/RootCA.pem");
   server.start();

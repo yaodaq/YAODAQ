@@ -12,3 +12,6 @@ target_link_libraries(YAODAQLogger PRIVATE yaodaq::yaodaq CLI11::CLI11 cpp-termi
 
 add_executable(YAODAQServer YAODAQServer.cpp)
 target_link_libraries(YAODAQServer PRIVATE yaodaq::yaodaq CLI11::CLI11 cpp-terminal::cpp-terminal spdlog::spdlog)
+
+add_executable(YAODAQBoard YAODAQBoard.cpp)
+target_link_libraries(YAODAQBoard PRIVATE yaodaq::yaodaq CLI11::CLI11 cpp-terminal::cpp-terminal spdlog::spdlog)

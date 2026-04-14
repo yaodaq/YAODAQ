@@ -88,13 +88,9 @@ void yaodaq::Server::Send( const std::string_view request )
   m_threadPool.enqueue( task );
 }
 
-YAODAQ_API yaodaq::Server::Server( const std::string_view name,  //<! Name of the server
-                                   const std::string_view host,  //<! Host of the server
-                                   const std::uint16_t    port,  //<! port listen by the server
-                                   const std::size_t maxConnections, const int handshakeTimeoutSecs, const int pingIntervalSeconds,
-                                   const int backlog,  //<! maximum number of clients waiting to be connected
-                                   const int addressFamily, const std::string_view type ) :
-  m_identifier( Component::Role::Server, type, name ), ix::WebSocketServer( port, std::string( host ), backlog, maxConnections, handshakeTimeoutSecs, addressFamily, pingIntervalSeconds ), Log( { Component::Role::Server, type, name } )
+YAODAQ_API yaodaq::Server::Server( const ServerConfig& cfg, const std::string_view name, const std::string_view type ) :
+  m_identifier( Component::Role::Server, type, name ), ix::WebSocketServer( cfg.getPort(), cfg.getHost().data(), cfg.getBacklog(), cfg.getMaxConnections(), cfg.getHandshakeTimeoutSecs(), cfg.getAddressFamily(), cfg.getPingIntervalSeconds() ),
+  Log( { Component::Role::Server, type, name } )
 {
   ix::initNetSystem();
   this->setConnectionStateFactory( [this]() { return yaodaq::ConnectionState::createConnectionState(); } );
