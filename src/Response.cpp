@@ -14,7 +14,6 @@
 
 #include <fmt/color.h>
 #include <fmt/core.h>
-#include <nlohmann/json.hpp>
 
 using json = nlohmann::json;
 

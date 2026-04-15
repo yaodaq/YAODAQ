@@ -1,0 +1,21 @@
+#pragma once
+#include <cstdint>
+
+namespace yaodaq
+{
+
+class Version
+{
+public:
+  static std::uint32_t major() noexcept { return m_major;}
+  static std::uint32_t minor() noexcept { return m_minor;}
+  static std::uint32_t patch() noexcept { return m_patch;}
+  static std::uint32_t tweak() noexcept { return m_tweak;}
+private:
+  static const std::uint32_t m_major{@PROJECT_VERSION_MAJOR@};
+  static const std::uint32_t m_minor{@PROJECT_VERSION_MINOR@};
+  static const std::uint32_t m_patch{@PROJECT_VERSION_PATCH@};
+  static const std::uint32_t m_tweak{@PROJECT_VERSION_TWEAK@};
+};
+
+}

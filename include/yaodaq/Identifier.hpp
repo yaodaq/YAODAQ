@@ -45,7 +45,7 @@ public:
 private:
   YAODAQ_API explicit Identifier() = default;
   yaodaq::Component m_component;
-  std::string       m_type{ "YAODAQ" };
+  std::string       m_type{ "yaodaq" };
   std::string       m_name{ "Unnamed" };
   static void       is_valid( const std::string_view s, std::string_view which )
   {

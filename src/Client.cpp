@@ -1,6 +1,7 @@
 #include "yaodaq/Client.hpp"
 
 #include "yaodaq/Identifier.hpp"
+#include "yaodaq/Version.hpp"
 #include "yaodaq/WebsocketCloseConstants.hpp"
 
 #include <chrono>
@@ -57,8 +58,11 @@ yaodaq::Client::Client( const Identifier& id, const ClientConfig& client_config 
 
     // Create JSON object
     nlohmann::json j;
-    j["yaodaq"] = true;
-    j["type"]   = "log";
+    j["yaodaq"]["version"]["major"] = yaodaq::Version::major();
+    j["yaodaq"]["version"]["minor"] = yaodaq::Version::minor();
+    j["yaodaq"]["version"]["patch"] = yaodaq::Version::patch();
+    j["yaodaq"]["version"]["tweak"] = yaodaq::Version::tweak();
+    j["type"]                       = "log";
     nlohmann::json rr;
     rr["logger_name"] = std::string( msg.logger_name.data(), msg.logger_name.size() );
     rr["level"]       = static_cast<int>( msg.level );  // or spdlog::level::to_string_view(msg.level)
@@ -139,6 +143,7 @@ void yaodaq::Client::onLog( const nlohmann::json& json )
   logger()->log( static_cast<spdlog::level::level_enum>( json["log"]["level"] ),
                  fmt::format( "{}: {}", fmt::styled( json["log"]["logger_name"].get<std::string>(), fmt::fg( fmt::color::gray ) | fmt::emphasis::bold ), json["log"]["payload"].get<std::string>() )  // Log the original payload
   );
+  logger()->warn( "{}", json["meta"].dump() );
 }
 
 //void yaodaq::Client::onText( const std::string& text ) { std::cout << text << std::endl; }

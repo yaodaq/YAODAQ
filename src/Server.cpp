@@ -2,6 +2,7 @@
 
 #include "yaodaq/ConnectionState.hpp"
 #include "yaodaq/Exception.hpp"
+#include "yaodaq/MetaInfos.hpp"
 #include "yaodaq/WebsocketCloseConstants.hpp"
 
 #include <cstddef>
@@ -148,6 +149,7 @@ YAODAQ_API yaodaq::Server::Server( const ServerConfig& cfg, const std::string_vi
     // Create JSON object
     nlohmann::json j;
     j["yaodaq"] = true;
+    j["meta"]   = yaodaq::MetaInfos::raw();
     j["type"]   = "log";
     nlohmann::json rr;
     rr["logger_name"] = std::string( msg.logger_name.data(), msg.logger_name.size() );
