@@ -6,6 +6,7 @@
 #include <limits>
 #include <spdlog/spdlog.h>
 #include <yaodaq/Exception.hpp>
+#include <yaodaq/Formatter.hpp>
 #include <yaodaq/Server.hpp>
 
 int main( int argc, char** argv )
@@ -44,10 +45,9 @@ try
   cfg.setHost( host ).setPort( port ).setMaxConnections( maxConnections ).setHandshakeTimeoutSecs( handshakeTimeoutSecs ).setBacklog( 150 );
   yaodaq::Server server( cfg, name );
   if( rejectBrowsers ) server.rejectBrowsers();
-  //server.setTLS("/home/work/YAODAQ-1/localhost.crt","/home/work/YAODAQ-1/localhost.key","/home/work/YAODAQ-1/RootCA.pem");
   server.start();
   Term::cout << "This server understand these procedures : " << std::endl;
-  Term::cout << server.getProcedures() << std::endl;
+  Term::cout << yaodaq::Formatter::format( server.getProcedures() ) << std::endl;
   std::size_t nbrCTLC{ 3 };
   Term::cout << Term::color_fg( Term::Color::Name::Red ) << "Press " << std::to_string( nbrCTLC ) << " times CTRL+Q to stop" << Term::color_fg( Term::Color::Name::Default ) << std::endl;
   while( true )

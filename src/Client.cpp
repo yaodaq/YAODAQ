@@ -1,6 +1,7 @@
 #include "yaodaq/Client.hpp"
 
 #include "yaodaq/Identifier.hpp"
+#include "yaodaq/Message.hpp"
 #include "yaodaq/Version.hpp"
 #include "yaodaq/WebsocketCloseConstants.hpp"
 
@@ -50,40 +51,8 @@ yaodaq::Client::Client( const Identifier& id, const ClientConfig& client_config 
     } );
   enableAutomaticReconnection();
   enablePerMessageDeflate();
-  std::function<void( const spdlog::details::log_msg& msg )> callback = [this]( const spdlog::details::log_msg& msg )
-  {
-    // Convert payload to std::string
-    std::string payload( msg.payload.data(), msg.payload.size() );
-
-    // Create JSON object
-    nlohmann::json j;
-    j["yaodaq"] = true;
-    //j["yaodaq"]["version"]["major"] = yaodaq::Version::major();
-    //j["yaodaq"]["version"]["minor"] = yaodaq::Version::minor();
-    //j["yaodaq"]["version"]["patch"] = yaodaq::Version::patch();
-    //j["yaodaq"]["version"]["tweak"] = yaodaq::Version::tweak();
-    j["type"]   = "log";
-    nlohmann::json rr;
-    rr["logger_name"] = std::string( msg.logger_name.data(), msg.logger_name.size() );
-    rr["level"]       = static_cast<int>( msg.level );  // or spdlog::level::to_string_view(msg.level)
-    rr["payload"]     = payload;
-
-    // Convert time to nanoseconds since epoch
-    auto time_ns = std::chrono::duration_cast<std::chrono::nanoseconds>( msg.time.time_since_epoch() ).count();
-    rr["time"]   = time_ns;
-
-    // Handle source location (check for null pointers if needed)
-    nlohmann::json source_loc;
-    if( msg.source.filename ) { source_loc["filename"] = std::string( msg.source.filename ); }
-    if( msg.source.funcname ) { source_loc["funcname"] = std::string( msg.source.funcname ); }
-    source_loc["line"] = msg.source.line;
-    rr["source_loc"]   = source_loc;
-    j["log"]           = rr;
-    sendUtf8Text( j.dump() );
-    // Print JSON
-    //std::cout << j.dump(2) << std::endl;
-  };
-  if( m_identifier.component().role() != Component::Role::Logger ) add_callback( callback );
+  std::function<void( const spdlog::details::log_msg& msg )> callback = [this]( const spdlog::details::log_msg& msg ) { sendUtf8Text( Log( msg ).dump() ); };
+  if( m_identifier.component().role() != Component::Role::Logger ) add_callback( callback );  // Avoid recursion infinity
 }
 
 void yaodaq::Client::onOpen( const std::string& uri, const ix::WebSocketHttpHeaders& headers, const std::string& protocol ) { logger()->info( "connected at {} with protocol {}", getUrl(), protocol ); }
@@ -123,7 +92,7 @@ void yaodaq::Client::onJsonRPC( const nlohmann::json& json )
 {
   if( json.contains( "result" ) || json.contains( "error" ) ) onResponse( json.dump() );
   else if( json.contains( "method" ) || json.contains( "notification" ) ) { sendUtf8Text( HandleRequest( json ).c_str() ); }
-  else if( json.contains( "yaodaq" ) && json["type"] == "log" )
+  else if( json.contains( "yaodaq" ) && json["type"] == "Log" )
     onLog( json );
 }
 
@@ -140,9 +109,8 @@ void yaodaq::Client::onPong( const std::string& str, const std::size_t size, con
 
 void yaodaq::Client::onLog( const nlohmann::json& json )
 {
-  logger()->log( static_cast<spdlog::level::level_enum>( json["log"]["level"] ),
-                 fmt::format( "{}: {}", fmt::styled( json["log"]["logger_name"].get<std::string>(), fmt::fg( fmt::color::gray ) | fmt::emphasis::bold ), json["log"]["payload"].get<std::string>() )  // Log the original payload
-  );
+  logger()->log( static_cast<spdlog::level::level_enum>( json["content"]["level"] ),
+                 fmt::format( "{}: {}", fmt::styled( json["content"]["logger_name"].get<std::string>(), fmt::fg( fmt::color::gray ) | fmt::emphasis::bold ), json["content"]["payload"].get<std::string>() ) );
 }
 
 //void yaodaq::Client::onText( const std::string& text ) { std::cout << text << std::endl; }

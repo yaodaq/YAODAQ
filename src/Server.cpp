@@ -2,6 +2,8 @@
 
 #include "yaodaq/ConnectionState.hpp"
 #include "yaodaq/Exception.hpp"
+#include "yaodaq/Formatter.hpp"
+#include "yaodaq/Message.hpp"
 #include "yaodaq/MetaInfos.hpp"
 #include "yaodaq/WebsocketCloseConstants.hpp"
 
@@ -112,7 +114,7 @@ YAODAQ_API yaodaq::Server::Server( const ServerConfig& cfg, const std::string_vi
       else if( msg->type == ix::WebSocketMessageType::Open )
       {
         checkClient( connectionState, webSocket, msg );
-        onOpen( connectionState, webSocket, msg->openInfo.uri, msg->openInfo.headers, msg->openInfo.protocol );
+        onOpen( connectionState, webSocket, Open( msg->openInfo ) );
       }
       else if( msg->type == ix::WebSocketMessageType::Close )
       {
@@ -141,34 +143,7 @@ YAODAQ_API yaodaq::Server::Server( const ServerConfig& cfg, const std::string_vi
   // Register procedure understood by the websocket server
   Add( "getNumberOfClients", GetHandle( &yaodaq::Server::getNumberOfClients, *this ) );
   Add( "set_state", GetHandle( &yaodaq::Server::getNumberOfClients, *this ) );
-  std::function<void( const spdlog::details::log_msg& msg )> callback = [this]( const spdlog::details::log_msg& msg )
-  {
-    // Convert payload to std::string
-    std::string payload( msg.payload.data(), msg.payload.size() );
-
-    // Create JSON object
-    nlohmann::json j;
-    j["yaodaq"] = true;
-    j["meta"]   = yaodaq::MetaInfos::raw();
-    j["type"]   = "log";
-    nlohmann::json rr;
-    rr["logger_name"] = std::string( msg.logger_name.data(), msg.logger_name.size() );
-    rr["level"]       = static_cast<int>( msg.level );  // or spdlog::level::to_string_view(msg.level)
-    rr["payload"]     = payload;
-
-    // Convert time to nanoseconds since epoch
-    auto time_ns = std::chrono::duration_cast<std::chrono::nanoseconds>( msg.time.time_since_epoch() ).count();
-    rr["time"]   = time_ns;
-
-    // Handle source location (check for null pointers if needed)
-    nlohmann::json source_loc;
-    if( msg.source.filename ) { source_loc["filename"] = std::string( msg.source.filename ); }
-    if( msg.source.funcname ) { source_loc["funcname"] = std::string( msg.source.funcname ); }
-    source_loc["line"] = msg.source.line;
-    rr["source_loc"]   = source_loc;
-    j["log"]           = rr;
-    sendToLoggers( j.dump() );
-  };
+  std::function<void( const spdlog::details::log_msg& msg )> callback = [this]( const spdlog::details::log_msg& msg ) { sendToLoggers( Log( msg ).dump() ); };
   add_callback( callback );
 }
 
@@ -219,14 +194,8 @@ void yaodaq::Server::checkClient( std::shared_ptr<ix::ConnectionState> connectio
   }
 }
 
-void yaodaq::Server::onOpen( std::shared_ptr<ix::ConnectionState> connectionState, ix::WebSocket& webSocket, const std::string& uri, ix::WebSocketHttpHeaders& headers, const std::string& protocol )
-{
-  std::vector<std::string> items;
-  items.reserve( headers.size() );
-  for( const auto& kv: headers ) { items.push_back( fmt::format( "    {}: {}\n", kv.first, kv.second ) ); }
-  std::string result = fmt::format( "headers:\n{}", fmt::join( items, "" ) );
-  logger()->info( "client {} at {} port {} connected to server:\n  uri: {}\n  protocol: {}\n  {}", connectionState->getId(), connectionState->getRemoteIp(), connectionState->getRemotePort(), uri, protocol, result );
-}
+void yaodaq::Server::onOpen( std::shared_ptr<ix::ConnectionState> connectionState, ix::WebSocket& webSocket, const yaodaq::Open& open )
+{ logger()->info( "client {} at {} port {} connected to server:\n  {}", connectionState->getId(), connectionState->getRemoteIp(), connectionState->getRemotePort(), yaodaq::Formatter::format( open.content() ) ); }
 
 void yaodaq::Server::onClose( std::shared_ptr<ix::ConnectionState> connectionState, ix::WebSocket& webSocket, const std::uint16_t code, const std::string& reason, bool remote )
 {

@@ -30,7 +30,6 @@ try
   yaodaq::ClientConfig cfg;
   cfg().setPort( port ).setHost( host );
   yaodaq::Logger logger( cfg, name );
-  //client.setTLS("/home/work/YAODAQ-1/localhost.crt","/home/work/YAODAQ-1/localhost.key","NONE");
   logger.link();
   std::size_t nbrCTLC{ 3 };
   Term::cout << Term::color_fg( Term::Color::Name::Red ) << "Press " << std::to_string( nbrCTLC ) << " times CTRL+C to stop" << Term::color_fg( Term::Color::Name::Default ) << std::endl;

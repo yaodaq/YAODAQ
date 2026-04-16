@@ -18,7 +18,7 @@ class Response
 {
 public:
   YAODAQ_API explicit Response( const nlohmann::json& response ) : m_json( response ) {}
-  YAODAQ_API std::string_view dump( const std::size_t j ) { return m_json.dump( j ); }
+  YAODAQ_API std::string_view dump( const std::size_t j = 0 ) { return m_json.dump( j ); }
   YAODAQ_API                  operator const nlohmann::json&() const noexcept { return m_json; }
   YAODAQ_API                  operator nlohmann::json() noexcept { return m_json; }
   // Pretty formatter for JSON-RPC array of results/errors

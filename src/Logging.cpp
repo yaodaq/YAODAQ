@@ -11,6 +11,7 @@ yaodaq::Logging::Logging( const Identifier& identifier ) : m_logger( std::make_s
   {
     std::lock_guard<std::mutex> lock( m_mutex );
     m_logger->sinks().push_back( std::make_shared<spdlog::sinks::stdout_color_sink_mt>() );
+    //m_logger->set_pattern("[%Y-%m-%d %H:%M:%S.%e] [%n] [%l] [%s:%# %!] %v");
   }
 }
 

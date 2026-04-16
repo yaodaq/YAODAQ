@@ -5,6 +5,7 @@
 #include "yaodaq/JsonRPCAsker.hpp"
 #include "yaodaq/JsonRPCResponder.hpp"
 #include "yaodaq/Logging.hpp"
+#include "yaodaq/Message.hpp"
 #include "yaodaq/ThreadPool.hpp"
 
 #include <cstddef>
@@ -157,7 +158,7 @@ private:
   void onJsonRPCRequest( std::shared_ptr<ix::ConnectionState> connectionState, ix::WebSocket& webSocket, nlohmann::json request );
   void onLog( std::shared_ptr<ix::ConnectionState> connectionState, ix::WebSocket& webSocket, nlohmann::json request );
   // Others
-  void onOpen( std::shared_ptr<ix::ConnectionState> connectionState, ix::WebSocket& webSocket, const std::string& uri, ix::WebSocketHttpHeaders& headers, const std::string& protocol );
+  void onOpen( std::shared_ptr<ix::ConnectionState> connectionState, ix::WebSocket& webSocket, const Open& open );
   void onClose( std::shared_ptr<ix::ConnectionState> connectionState, ix::WebSocket& webSocket, const std::uint16_t code, const std::string& reason, bool remote );
   void onReject( std::shared_ptr<ix::ConnectionState> connectionState, ix::WebSocket& webSocket, const std::uint16_t code, const std::string& reason, bool remote );
   void onPing( std::shared_ptr<ix::ConnectionState> connectionState, ix::WebSocket& webSocket, const std::string& str, const std::size_t size, const bool binary );

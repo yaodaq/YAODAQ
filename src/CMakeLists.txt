@@ -21,6 +21,8 @@ add_library(yaodaq SHARED
  Response.cpp
  WebsocketCloseConstants.cpp
  State.cpp
+ Message.cpp
+ Formatter.cpp
 )
 
 list(APPEND YAODAQ_PUBLIC_HEADERS

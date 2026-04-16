@@ -30,7 +30,6 @@ try
   yaodaq::ClientConfig cfg;
   cfg().setPort( port ).setHost( host );
   yaodaq::Board board( cfg, name );
-  //client.setTLS("/home/work/YAODAQ-1/localhost.crt","/home/work/YAODAQ-1/localhost.key","NONE");
   board.link();
 
   std::size_t nbrCTLC{ 3 };
