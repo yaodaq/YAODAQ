@@ -9,11 +9,11 @@
 namespace yaodaq
 {
 
-class Log
+class Logging
 {
 public:
-  explicit Log() = delete;
-  explicit Log( const Identifier& identifier );
+  explicit Logging() = delete;
+  explicit Logging( const Identifier& identifier );
   std::shared_ptr<spdlog::logger> logger() const { return m_logger; }
   void                            add_callback( std::function<void( const spdlog::details::log_msg& msg )>& f );
 

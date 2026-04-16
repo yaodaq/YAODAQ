@@ -91,7 +91,7 @@ void yaodaq::Server::Send( const std::string_view request )
 
 YAODAQ_API yaodaq::Server::Server( const ServerConfig& cfg, const std::string_view name, const std::string_view type ) :
   m_identifier( Component::Role::Server, type, name ), ix::WebSocketServer( cfg.getPort(), cfg.getHost().data(), cfg.getBacklog(), cfg.getMaxConnections(), cfg.getHandshakeTimeoutSecs(), cfg.getAddressFamily(), cfg.getPingIntervalSeconds() ),
-  Log( { Component::Role::Server, type, name } )
+  Logging( { Component::Role::Server, type, name } )
 {
   ix::initNetSystem();
   if( cfg.isTLS() )

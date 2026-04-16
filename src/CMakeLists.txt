@@ -14,7 +14,7 @@ add_library(yaodaq SHARED
  Exception.cpp
  Server.cpp
  Controller.cpp
- Log.cpp
+ Logging.cpp
  JsonRPCAsker.cpp
  MetaInfos.cpp
  Identifier.cpp

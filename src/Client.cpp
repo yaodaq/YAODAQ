@@ -14,12 +14,11 @@
 
 yaodaq::Client::~Client() noexcept
 {
-  while( getReadyState() == ix::ReadyState::Closing ) std::this_thread::sleep_for( std::chrono::microseconds( 100 ) );
   stop();
   ix::uninitNetSystem();
 }
 
-yaodaq::Client::Client( const Identifier& id, const ClientConfig& client_config ) : m_identifier( id ), Log( id ), m_url( client_config.url() )
+yaodaq::Client::Client( const Identifier& id, const ClientConfig& client_config ) : m_identifier( id ), Logging( id ), m_url( client_config.url() )
 {
   ix::initNetSystem();
   ix::WebSocket::setUrl( m_url );
@@ -58,11 +57,12 @@ yaodaq::Client::Client( const Identifier& id, const ClientConfig& client_config 
 
     // Create JSON object
     nlohmann::json j;
-    j["yaodaq"]["version"]["major"] = yaodaq::Version::major();
-    j["yaodaq"]["version"]["minor"] = yaodaq::Version::minor();
-    j["yaodaq"]["version"]["patch"] = yaodaq::Version::patch();
-    j["yaodaq"]["version"]["tweak"] = yaodaq::Version::tweak();
-    j["type"]                       = "log";
+    j["yaodaq"] = true;
+    //j["yaodaq"]["version"]["major"] = yaodaq::Version::major();
+    //j["yaodaq"]["version"]["minor"] = yaodaq::Version::minor();
+    //j["yaodaq"]["version"]["patch"] = yaodaq::Version::patch();
+    //j["yaodaq"]["version"]["tweak"] = yaodaq::Version::tweak();
+    j["type"]   = "log";
     nlohmann::json rr;
     rr["logger_name"] = std::string( msg.logger_name.data(), msg.logger_name.size() );
     rr["level"]       = static_cast<int>( msg.level );  // or spdlog::level::to_string_view(msg.level)
@@ -143,7 +143,6 @@ void yaodaq::Client::onLog( const nlohmann::json& json )
   logger()->log( static_cast<spdlog::level::level_enum>( json["log"]["level"] ),
                  fmt::format( "{}: {}", fmt::styled( json["log"]["logger_name"].get<std::string>(), fmt::fg( fmt::color::gray ) | fmt::emphasis::bold ), json["log"]["payload"].get<std::string>() )  // Log the original payload
   );
-  logger()->warn( "{}", json["meta"].dump() );
 }
 
 //void yaodaq::Client::onText( const std::string& text ) { std::cout << text << std::endl; }

@@ -1,10 +1,9 @@
 #pragma once
-#include "Identifier.hpp"
 #include "yaodaq/Defaults.hpp"
 #include "yaodaq/Export.hpp"
 #include "yaodaq/Identifier.hpp"
 #include "yaodaq/JsonRPCResponder.hpp"
-#include "yaodaq/Log.hpp"
+#include "yaodaq/Logging.hpp"
 
 #include <cstdint>
 #include <functional>
@@ -94,7 +93,7 @@ private:
   bool          m_tls{ false };
 };
 
-class YAODAQ_API Client : public JsonRPCResponder, public ix::WebSocket, public Log  //TODO : Why YAODAQ_API is needed here ?
+class YAODAQ_API Client : public JsonRPCResponder, public ix::WebSocket, public Logging  //TODO : Why YAODAQ_API is needed here ?
 {
 public:
   YAODAQ_API virtual ~Client() noexcept;

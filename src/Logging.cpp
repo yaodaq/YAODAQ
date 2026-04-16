@@ -1,4 +1,4 @@
-#include "yaodaq/Log.hpp"
+#include "yaodaq/Logging.hpp"
 
 #include "yaodaq/Identifier.hpp"
 
@@ -6,7 +6,7 @@
 #include <spdlog/sinks/stdout_color_sinks.h>
 #include <spdlog/spdlog.h>
 
-yaodaq::Log::Log( const Identifier& identifier ) : m_logger( std::make_shared<spdlog::logger>( identifier.id() ) )
+yaodaq::Logging::Logging( const Identifier& identifier ) : m_logger( std::make_shared<spdlog::logger>( identifier.id() ) )
 {
   {
     std::lock_guard<std::mutex> lock( m_mutex );
@@ -14,7 +14,7 @@ yaodaq::Log::Log( const Identifier& identifier ) : m_logger( std::make_shared<sp
   }
 }
 
-void yaodaq::Log::add_callback( std::function<void( const spdlog::details::log_msg& msg )>& f )
+void yaodaq::Logging::add_callback( std::function<void( const spdlog::details::log_msg& msg )>& f )
 {
   {
     std::lock_guard<std::mutex> lock( m_mutex );

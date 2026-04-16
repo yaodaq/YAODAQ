@@ -4,7 +4,7 @@
 #include "yaodaq/Identifier.hpp"
 #include "yaodaq/JsonRPCAsker.hpp"
 #include "yaodaq/JsonRPCResponder.hpp"
-#include "yaodaq/Log.hpp"
+#include "yaodaq/Logging.hpp"
 #include "yaodaq/ThreadPool.hpp"
 
 #include <cstddef>
@@ -12,7 +12,6 @@
 #include <ixwebsocket/IXWebSocketServer.h>
 #include <memory>
 #include <mutex>
-#include <spdlog/sinks/stdout_color_sinks.h>
 #include <spdlog/spdlog.h>
 #include <string_view>
 #include <unordered_map>
@@ -125,7 +124,7 @@ struct ServerRequest
   std::size_t                                            received_responses{ 0 };
 };
 
-class Server : public ix::WebSocketServer, public JsonRPCResponder, public Log, public JsonRPCAsker
+class Server : public ix::WebSocketServer, public JsonRPCResponder, public Logging, public JsonRPCAsker
 {
 public:
   YAODAQ_API ~Server() noexcept;
