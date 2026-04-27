@@ -3,34 +3,58 @@
 #include "yaodaq/Version.hpp"
 
 #include <algorithm>
+#include <chrono>
+#include <ixwebsocket/IXConnectionState.h>
+#include <ixwebsocket/IXWebSocket.h>
 #include <ixwebsocket/IXWebSocketOpenInfo.h>
 #include <magic_enum/magic_enum.hpp>
 #include <spdlog/details/log_msg.h>
+#include <string_view>
+
+yaodaq::Message::Message( const std::string_view msg, const std::size_t wireSize, const bool binary ) {}
+
+void yaodaq::Message::setConnectionStateInfos( ix::ConnectionState& connection )
+{
+  meta()["remote_ip"]   = connection.getRemoteIp();
+  meta()["remote_port"] = connection.getRemotePort();
+}
+
+void yaodaq::Message::setWebsocketInfos( ix::WebSocket& socket )
+{
+  meta()["ur"]           = socket.getUrl();
+  meta()["sub_protocol"] = socket.getSubProtocols();
+}
 
 yaodaq::Message::Message( const yaodaq::Message::Type type )
 {
-  m_data["yaodaq"]["version"]["major"] = yaodaq::Version::major();
-  m_data["yaodaq"]["version"]["minor"] = yaodaq::Version::minor();
-  m_data["yaodaq"]["version"]["patch"] = yaodaq::Version::patch();
-  m_data["yaodaq"]["version"]["tweak"] = yaodaq::Version::tweak();
-  m_data["type"]                       = std::string( magic_enum::enum_name( type ) );
-  m_data["content"]                    = nlohmann::json::object();
+  meta()["yaodaq"]["version"]["major"] = yaodaq::Version::major();
+  meta()["yaodaq"]["version"]["minor"] = yaodaq::Version::minor();
+  meta()["yaodaq"]["version"]["patch"] = yaodaq::Version::patch();
+  meta()["yaodaq"]["version"]["tweak"] = yaodaq::Version::tweak();
+  meta()["type"]                       = std::string( magic_enum::enum_name( type ) );
+  payload()                            = nlohmann::json::object();
 }
 
 yaodaq::Log::Log( const spdlog::details::log_msg& msg ) : Message( yaodaq::Message::Type::Log )
 {
-  m_data["content"]["logger_name"]            = std::string( msg.logger_name.data(), msg.logger_name.size() );
-  m_data["content"]["level"]                  = static_cast<int>( msg.level );
-  m_data["content"]["payload"]                = std::string( msg.payload.data(), msg.payload.size() );
-  m_data["content"]["time"]                   = std::chrono::duration_cast<std::chrono::nanoseconds>( msg.time.time_since_epoch() ).count();
-  m_data["content"]["source_loc"]["filename"] = msg.source.filename == nullptr ? "" : std::string( msg.source.filename );
-  m_data["content"]["source_loc"]["funcname"] = msg.source.funcname == nullptr ? "" : std::string( msg.source.funcname );
-  m_data["content"]["source_loc"]["line"]     = msg.source.line;
+  payload()["logger_name"]            = std::string( msg.logger_name.data(), msg.logger_name.size() );
+  payload()["level"]                  = static_cast<int>( msg.level );
+  payload()["message"]                = std::string( msg.payload.data(), msg.payload.size() );
+  payload()["time"]                   = std::chrono::duration_cast<std::chrono::nanoseconds>( msg.time.time_since_epoch() ).count();
+  payload()["source_loc"]["filename"] = msg.source.filename == nullptr ? "" : std::string( msg.source.filename );
+  payload()["source_loc"]["funcname"] = msg.source.funcname == nullptr ? "" : std::string( msg.source.funcname );
+  payload()["source_loc"]["line"]     = msg.source.line;
 }
 
 yaodaq::Open::Open( const ix::WebSocketOpenInfo& open ) : Message( yaodaq::Message::Type::Open )
 {
-  m_data["content"]["uri"]      = open.uri;
-  m_data["content"]["headers"]  = open.headers;
-  m_data["content"]["protocol"] = open.protocol;
+  payload()["uri"]      = open.uri;
+  payload()["headers"]  = open.headers;
+  payload()["protocol"] = open.protocol;
 }
+
+yaodaq::Except::Except( const Exception& exception ) : Message( yaodaq::Message::Type::Exception ) { payload()["what"] = exception.what(); }
+
+yaodaq::Except::Except( const std::exception& exception ) : Message( yaodaq::Message::Type::Exception ) { payload()["what"] = exception.what(); }
+
+yaodaq::Except::Except( const std::string_view& exception ) : Message( yaodaq::Message::Type::Exception ) { payload()["what"] = exception; }

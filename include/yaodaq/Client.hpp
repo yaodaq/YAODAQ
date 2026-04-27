@@ -4,6 +4,7 @@
 #include "yaodaq/Identifier.hpp"
 #include "yaodaq/JsonRPCResponder.hpp"
 #include "yaodaq/Logging.hpp"
+#include "yaodaq/Message.hpp"
 
 #include <cstdint>
 #include <functional>
@@ -93,7 +94,7 @@ private:
   bool          m_tls{ false };
 };
 
-class YAODAQ_API Client : public JsonRPCResponder, public ix::WebSocket, public Logging  //TODO : Why YAODAQ_API is needed here ?
+class YAODAQ_API Client : public JsonRPCResponder, public Logging  //TODO : Why YAODAQ_API is needed here ?
 {
 public:
   YAODAQ_API virtual ~Client() noexcept;
@@ -102,23 +103,33 @@ public:
   YAODAQ_API const Identifier& identifier() const noexcept { return m_identifier; }
 
 protected:
+  ix::WebSocket&  getWebsocketClient() noexcept { return m_client; }
   YAODAQ_API void start()
   {
-    ix::WebSocket::start();
-    logger()->info( "trying to connect to {}", m_url );
+    m_client.start();
+    logger()->info( "trying to connect to {}", m_client.getUrl() );
+  }
+  YAODAQ_API void close()
+  {
+    logger()->info( "Closing {}", m_client.getUrl() );
+    m_client.close();
   }
   virtual void     onResponse( const std::string& ) {}
   const Identifier m_identifier;
 
+protected:
+  void send( const Message& msg, const bool callback = true ) noexcept;
+
 private:
-  std::string m_url;
+  ix::WebSocket m_client;
+  void          handleMessage( const ix::WebSocketMessagePtr& msg ) noexcept;
   YAODAQ_API explicit Client() noexcept = delete;
 
   // Messages
   YAODAQ_API void onMessage( const std::string& str, const std::size_t size, const bool binary );
   YAODAQ_API void onJsonRPC( const nlohmann::json& json );
   // Others
-  YAODAQ_API void onOpen( const std::string& uri, const ix::WebSocketHttpHeaders& headers, const std::string& protocol );
+  YAODAQ_API void onOpen( const Open& open );
   YAODAQ_API void onClose( const std::uint16_t code, const std::string& reason, bool remote );
   YAODAQ_API void onReject( const std::uint16_t code, const std::string& reason, bool remote );  // Has been closed by server because of some criteria
 

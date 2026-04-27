@@ -81,7 +81,7 @@ public:
   YAODAQ_API bool relink()
   {
     logger()->info( "Relinking" );
-    yaodaq::Client::stop();
+    stop();
     bool ret = link();
     m_State.setId( State::ID::Linked );
     return ret;

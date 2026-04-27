@@ -1,5 +1,6 @@
 #pragma once
 
+#include <cstddef>
 #include <exception>
 #include <string>
 #include <yaodaq/Export.hpp>
@@ -7,49 +8,19 @@
 namespace yaodaq
 {
 
-class ExceptionAllocationProblem : public std::exception
-{
-public:
-  YAODAQ_API ExceptionAllocationProblem() noexcept           = default;
-  YAODAQ_API ~ExceptionAllocationProblem() noexcept override = default;
-  YAODAQ_API [[nodiscard]] const char* what() const noexcept final { return "Problem while allocating an yaodaq::Exception"; }
-};
-
 class Exception : public std::exception
 {
 public:
-  YAODAQ_API ~Exception() noexcept override = default;
-
-  explicit Exception( const char* const message )
-  try : m_message( message ) {}
-  catch( ... )
-  {
-    throw m_problem_allocation;
-  }
-
-  template<std::size_t N> explicit Exception( const char ( &message )[N] )
-  try : m_message( message ) {}
-  catch( ... )
-  {
-    throw m_problem_allocation;
-  }
-
+  YAODAQ_API ~Exception() noexcept override       = default;
+  YAODAQ_API explicit Exception( std::nullptr_t ) = delete;
+  YAODAQ_API explicit Exception( const char* const message ) : m_message( message ? message : u8"" ) {}
+  template<std::size_t N> YAODAQ_API explicit Exception( const char ( &message )[N] ) : m_message( message ) {}
   YAODAQ_API explicit Exception( std::string&& message ) noexcept : m_message( std::move( message ) ) {}
-
-  YAODAQ_API explicit Exception( const std::string& message )
-  try
-  {
-  }
-  catch( ... )
-  {
-    throw m_problem_allocation;
-  }
-
-  YAODAQ_API [[nodiscard]] const char* what() const noexcept final { return m_message.data(); };
+  YAODAQ_API explicit Exception( const std::string& message ) : m_message( message ) {}
+  YAODAQ_API [[nodiscard]] const char* what() const noexcept final { return m_message.c_str(); };
 
 private:
-  const static ExceptionAllocationProblem m_problem_allocation;
-  explicit Exception() noexcept = default;
+  explicit Exception() noexcept = delete;
   const std::string m_message;
 };
 

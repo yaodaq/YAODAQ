@@ -125,7 +125,7 @@ struct ServerRequest
   std::size_t                                            received_responses{ 0 };
 };
 
-class Server : public ix::WebSocketServer, public JsonRPCResponder, public Logging, public JsonRPCAsker
+class Server : public JsonRPCResponder, public Logging, public JsonRPCAsker
 {
 public:
   YAODAQ_API ~Server() noexcept;
@@ -143,10 +143,11 @@ public:
 
 private:
   YAODAQ_API explicit Server() noexcept = delete;
-  Identifier m_identifier;
-  ThreadPool m_threadPool;
-  bool       m_ssl{ false };
-  bool       m_rejectBrowser{ false };  //< Reject the Browsers
+  ix::WebSocketServer m_server;
+  Identifier          m_identifier;
+  ThreadPool          m_threadPool;
+  void                handleMessage( std::shared_ptr<ix::ConnectionState> connectionState, ix::WebSocket& webSocket, const ix::WebSocketMessagePtr& msg ) noexcept;
+  bool                m_rejectBrowser{ false };  //< Reject the Browsers
 
   virtual void Send( const std::string_view request ) override final;
   /* Check if client has all to be an yaodaq one and if he has the authorizations */
@@ -180,7 +181,7 @@ private:
   // Send only to webSocket
   void sendTo( const std::string& str, ix::WebSocket& webSocket );
   // Send to all
-  void sendToAll( const std::string& str );
+  void sendToAll( const std::string_view& str ) noexcept;
   // Send to loggers
   void sendToLoggers( const std::string& str );
 

@@ -1,6 +1,7 @@
 #include "yaodaq/Logging.hpp"
 
 #include "yaodaq/Identifier.hpp"
+#include "yaodaq/Message.hpp"
 
 #include <spdlog/sinks/callback_sink.h>
 #include <spdlog/sinks/stdout_color_sinks.h>
@@ -11,14 +12,19 @@ yaodaq::Logging::Logging( const Identifier& identifier ) : m_logger( std::make_s
   {
     std::lock_guard<std::mutex> lock( m_mutex );
     m_logger->sinks().push_back( std::make_shared<spdlog::sinks::stdout_color_sink_mt>() );
-    //m_logger->set_pattern("[%Y-%m-%d %H:%M:%S.%e] [%n] [%l] [%s:%# %!] %v");
   }
 }
 
-void yaodaq::Logging::add_callback( std::function<void( const spdlog::details::log_msg& msg )>& f )
+void yaodaq::Logging::add_websocket_callback( const std::function<void( const Log& msg )>& f )
 {
+  const auto sink = std::make_shared<spdlog::sinks::callback_sink_mt>(
+    [this, f = std::move( f )]( const spdlog::details::log_msg& msg )
+    {
+      if( !m_ws_enabled ) return;
+      f( Log( msg ) );
+    } );
   {
     std::lock_guard<std::mutex> lock( m_mutex );
-    m_logger->sinks().push_back( std::make_shared<spdlog::sinks::callback_sink_mt>( f ) );
+    m_logger->sinks().push_back( sink );
   }
 }

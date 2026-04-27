@@ -296,7 +296,7 @@ public:
   YAODAQ_API bool relink()
   {
     logger()->info( "Relinking" );
-    yaodaq::Client::stop();
+    stop();
     bool ret = link();
     if( ret )
     {
@@ -331,6 +331,7 @@ public:
       on_stop();  // call hook for proper cleanup
       m_worker.join();
     }
+    logger()->info( "Stopping Module" );
   }
 
 protected:
