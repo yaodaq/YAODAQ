@@ -334,6 +334,8 @@ public:
     logger()->info( "Stopping Module" );
   }
 
+  void send( const nlohmann::json& json ) { send( json.dump() ); }
+
 protected:
   virtual bool on_initialize() { return true; };
   virtual bool on_configure() { return true; };

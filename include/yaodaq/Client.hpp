@@ -119,6 +119,7 @@ protected:
 
 protected:
   void send( const Message& msg, const bool callback = true ) noexcept;
+  void send( const nlohmann::json& json );
 
 private:
   ix::WebSocket m_client;

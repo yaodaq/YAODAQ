@@ -159,3 +159,5 @@ void yaodaq::Client::send( const Message& msg, const bool callback ) noexcept
       logger()->error( "error sending {}\npayloadSize {} wireSize {}{}", msg.dump(), ret.payloadSize, ret.wireSize, ret.compressionError ? " compression error" : "" );
   }
 }
+
+void yaodaq::Client::send( const nlohmann::json& json ) { ix::WebSocketSendInfo ret = m_client.sendUtf8Text( json.dump() ); }
