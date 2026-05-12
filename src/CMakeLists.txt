@@ -11,7 +11,6 @@ configure_file("${PROJECT_SOURCE_DIR}/include/yaodaq/Version.hpp.in" "${PROJECT_
 add_library(yaodaq SHARED
  Component.cpp
  Client.cpp
- Exception.cpp
  Server.cpp
  Controller.cpp
  Logging.cpp

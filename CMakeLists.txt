@@ -31,6 +31,7 @@ add_subdirectory(src)
 add_subdirectory(extra)
 add_subdirectory(web)
 add_subdirectory(apps)
+add_subdirectory(examples)
 
 if(YAODAQ_TESTS)
   #include(CTest)
