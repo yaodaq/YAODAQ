@@ -40,11 +40,14 @@ public:
   Message( const std::string_view msg, const std::size_t wireSize, const bool binary );
   YAODAQ_API explicit Message( const Type type );
   YAODAQ_API std::string dump( const std::size_t i = 0 ) const { return m_data.dump( i ); }
-  YAODAQ_API void        setConnectionStateInfos( ix::ConnectionState& connection );
+  YAODAQ_API void        setConnectionStateInfos( std::shared_ptr<ix::ConnectionState>& connection );
   YAODAQ_API void        setWebsocketInfos( ix::WebSocket& socket );
+  YAODAQ_API void        setMessageMetas( const std::size_t size, const bool binary );
   YAODAQ_API const nlohmann::json& payload() const noexcept { return m_data["payload"]; }
   YAODAQ_API const nlohmann::json& meta() const noexcept { return m_data["meta"]; }
   YAODAQ_API const nlohmann::json& operator()() const noexcept { return m_data; }
+  YAODAQ_API std::string url() const noexcept { return meta()["url"]; }
+  YAODAQ_API std::string subprotocol() const noexcept { return meta()["sub_protocol"]; }
 
 protected:
   YAODAQ_API nlohmann::json& payload() noexcept { return m_data["payload"]; }

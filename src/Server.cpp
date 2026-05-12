@@ -383,6 +383,9 @@ void yaodaq::Server::handleMessage( std::shared_ptr<ix::ConnectionState> connect
     else if( msg->type == ix::WebSocketMessageType::Open )
     {
       checkClient( connectionState, webSocket, msg );
+      Open open( msg->openInfo );
+      open.setConnectionStateInfos( connectionState );
+      open.setWebsocketInfos( webSocket );
       onOpen( connectionState, webSocket, Open( msg->openInfo ) );
     }
     else if( msg->type == ix::WebSocketMessageType::Close )

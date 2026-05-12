@@ -1,5 +1,6 @@
 #include "yaodaq/Client.hpp"
 
+#include "yaodaq/Formatter.hpp"
 #include "yaodaq/Identifier.hpp"
 #include "yaodaq/Message.hpp"
 #include "yaodaq/Version.hpp"
@@ -47,7 +48,12 @@ void yaodaq::Client::handleMessage( const ix::WebSocketMessagePtr& msg ) noexcep
   {
     if( msg->type == ix::WebSocketMessageType::Message ) { onMessage( msg->str, msg->wireSize, msg->binary ); }
     //else if( msg->type == ix::WebSocketMessageType::Fragment ) { onFragment( msg->str, msg->wireSize, msg->binary ); }
-    else if( msg->type == ix::WebSocketMessageType::Open ) { onOpen( Open( msg->openInfo ) ); }
+    else if( msg->type == ix::WebSocketMessageType::Open )
+    {
+      Open open( msg->openInfo );
+      open.setWebsocketInfos( m_client );
+      onOpen( open );
+    }
     else if( msg->type == ix::WebSocketMessageType::Close )
     {
       if( WebSocketCloseConstant::isRejected( msg->closeInfo.code ) ) onReject( msg->closeInfo.code, msg->closeInfo.reason, msg->closeInfo.remote );
@@ -75,7 +81,8 @@ void yaodaq::Client::handleMessage( const ix::WebSocketMessagePtr& msg ) noexcep
   }
 }
 
-void yaodaq::Client::onOpen( const Open& open ) { logger()->info( "connected at {} headers: {}\nprotocol: {}", open.uri(), open.headers(), open.protocol() ); }
+void yaodaq::Client::onOpen( const Open& open )
+{ logger()->info( "Connected to {} (uri: {})\nheaders: {}\nprotocol: {}\n{}", open.url(), open.uri(), yaodaq::Formatter::format( open.payload()["headers"] ), open.protocol(), yaodaq::Formatter::format( open.dump() ) ); }
 
 void yaodaq::Client::onMessage( const std::string& str, const std::size_t size, const bool binary )
 {
