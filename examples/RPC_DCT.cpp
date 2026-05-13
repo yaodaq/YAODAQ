@@ -8,10 +8,10 @@
 #include <yaodaq/Exception.hpp>
 #include <yaodaq/Module.hpp>
 
-class TDC : public yaodaq::Module
+class DCT : public yaodaq::Module
 {
 public:
-  TDC( yaodaq::ClientConfig cfg, const std::string_view name ) : yaodaq::Module( cfg, "TDC", "MPI" ) {}
+  DCT( yaodaq::ClientConfig cfg, const std::string_view name ) : yaodaq::Module( cfg, "DCT", "MPI" ) {}
   virtual bool run()
   {
     std::size_t retries{ 0 };
@@ -38,8 +38,8 @@ public:
         nlohmann::json payload = nlohmann::json::array();
         for( auto& row: reader )
         {
-          //payload.push_back(std::stol(row["elink_out_tmp[27:0]"].get<std::string>(),nullptr,16));
-          //bcids.push_back(std::stol(row["bcid320[11:0]"].get<std::string>(),nullptr,16));
+          payload.push_back( std::stol( row["elink_out_tmp[27:0]"].get<std::string>(), nullptr, 16 ) );
+          bcids.push_back( std::stol( row["bcid320[11:0]"].get<std::string>(), nullptr, 16 ) );
         }
         json["rawdata"]["bcouts"] = bcids;
         json["rawdata"]["words"]  = payload;
@@ -67,10 +67,8 @@ public:
   {
     createTempDirectory();
     //std::cout<<"HERE "<<m_temp.c_str()<<std::endl;
-    std::string   script = fmt::format( u8R"(set nEvts 1000000
-    set inputDir BI_DCT_FW
-    set outputDir DCT_raw_files
-    set inputPath ./$inputDir
+    std::string   script = fmt::format( u8R"(set nEvts {}
+    set inputPath {}
     # channel mask
     # . layer2. layer1. layer0
     set eta1_1 000000000000000000000000
@@ -119,7 +117,7 @@ public:
     }}
     close_hw_manager
     exit)",
-                                        m_temp.c_str() );
+                                        m_events, m_binary_path.c_str(), m_temp.c_str() );
     std::ofstream script_file( std::string( m_temp.c_str() ) + std::string( "script.tcl" ) );
     script_file << script;
     script_file.close();
@@ -129,8 +127,11 @@ public:
     // std::cout<<"HERE2"<<std::endl;
     return ret;
   }
+  void setBinaryPath( const std::string& binary_path ) { m_binary_path = binary_path; }
+  void setEventNumbers( const std::size_t event ) { m_events = event; }
 
 private:
+  std::size_t m_events{ 1000 };
   std::string makeFileName( int index ) { return m_temp += "/event_" + std::to_string( index ) + ".csv"; }
 
   bool fileExists( const std::string& path ) { return std::filesystem::exists( path ); }
@@ -144,6 +145,7 @@ private:
   std::atomic<int>      expectedIndex{ 0 };
   std::mutex            mtx;
   std::filesystem::path m_temp;
+  std::string           m_binary_path{ "./" };
 };
 
 int main( int argc, char* argv[] )
@@ -156,9 +158,10 @@ try
   app.add_option( "-i,--ip", host, "IP of the server" ) /*->check( CLI::ValidIPV4 )*/;
   int port{ 8888 };
   app.add_option( "-p,--port", port, "Port to listen" )->check( CLI::Range( 0, 65535 ) );
-  std::string path;
-  app.add_option( "--path", path, "path to read the CSV" );
-
+  std::string path_binary{ "./" };
+  app.add_option( "--path", path_binary, "binaries path to load to the DCT" );
+  std::size_t event_number{ 1000 };
+  app.add_option( "-e,--events", event_number, "Number of events to take" );
   try
   {
     app.parse( argc, argv );
@@ -169,7 +172,9 @@ try
   }
   yaodaq::ClientConfig cfg;
   cfg().setPort( port ).setHost( host );
-  TDC module( cfg, "TDC" );
+  DCT module( cfg, "DCT" );
+  module.setBinaryPath( path_binary );
+  module.setEventNumbers( event_number );
   //client.setTLS("/home/work/YAODAQ-1/localhost.crt","/home/work/YAODAQ-1/localhost.key","NONE");
   module.link();
 

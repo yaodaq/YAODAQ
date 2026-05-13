@@ -10,5 +10,5 @@ FetchContent_Declare(
 )
 FetchContent_MakeAvailable(csv)
 
-add_executable(TDC RPC_TDC.cpp)
-target_link_libraries(TDC PRIVATE yaodaq::yaodaq CLI11::CLI11 cpp-terminal::cpp-terminal spdlog::spdlog csv)
+add_executable(DCT RPC_DCT.cpp)
+target_link_libraries(DCT PRIVATE yaodaq::yaodaq CLI11::CLI11 cpp-terminal::cpp-terminal spdlog::spdlog csv)
