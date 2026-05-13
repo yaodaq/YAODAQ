@@ -1,10 +1,15 @@
 #include "csv.hpp"
 
 #include <CLI/CLI.hpp>
+#include <cpp-terminal/color.hpp>
 #include <cpp-terminal/input.hpp>
 #include <cpp-terminal/iostream.hpp>
 #include <cpp-terminal/terminal.hpp>
 #include <filesystem>
+#include <fmt/ranges.h>
+#include <fmt/std.h>
+#include <sys/wait.h>
+#include <unistd.h>
 #include <yaodaq/Exception.hpp>
 #include <yaodaq/Module.hpp>
 
@@ -66,7 +71,7 @@ public:
   bool on_start() override
   {
     createTempDirectory();
-    //std::cout<<"HERE "<<m_temp.c_str()<<std::endl;
+    logger()->info( "DCT Rawdata (csv) will be written in {}", m_temp.c_str() );
     std::string   script = fmt::format( u8R"(set nEvts {}
     set inputPath {}
     # channel mask
@@ -121,31 +126,137 @@ public:
     std::ofstream script_file( std::string( m_temp.c_str() ) + std::string( "script.tcl" ) );
     script_file << script;
     script_file.close();
-    //std::cout<<script<<std::endl;
-    std::string path{ "export PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/games:/usr/local/games:/snap/bin:/tools/Xilinx/2025.1.1/Vivado/bin:/tools/Xilinx/2025.1.1/Vivado/bin" };
-    bool        ret = std::system( fmt::format( "{}\nvivado -mode batch -source {}", path, std::string( m_temp.c_str() ) + std::string( "script.tcl" ) ).c_str() );
-    // std::cout<<"HERE2"<<std::endl;
-    return ret;
+    logger()->info( "Vivado script has been written and will be launched !" );
+    //std::string path{fmt::format("export PATH=$PATH:{}",m_vivado_path)};
+    //std::string command = fmt::format(
+    //"{} && vivado -mode batch -source \"{}/script.tcl\"",
+    //path,
+    //m_temp.string()
+    //);
+
+    auto result = runProcessCapture( "vivado", { "-mode", "batch", "-source", ( m_temp / "script.tcl" ).string() } );
+
+    Term::terminal.setOptions( Term::Option::Raw, Term::Option::Cursor );
+    if( result.exitCode != 0 )
+    {
+      logger()->error( "Vivado failed with exit code {}", result.exitCode );
+      return false;
+    }
+    else
+    {
+      logger()->info( "Process terminated successfully" );
+      return true;
+    }
   }
   void setBinaryPath( const std::string& binary_path ) { m_binary_path = binary_path; }
   void setEventNumbers( const std::size_t event ) { m_events = event; }
+  void setVivadoPath( const std::string& vivado ) { m_vivado_path = vivado; }
 
 private:
+  struct ProcessResult
+  {
+    int         exitCode;
+    std::string output;
+  };
+
+  ProcessResult runProcessCapture( const std::string& exe, const std::vector<std::string>& args )
+  {
+    logger()->info( "Running : {} {}", exe, fmt::join( args, " " ) );
+    int pipefd[2];
+    pipe( pipefd );  // pipefd[0] = read, pipefd[1] = write
+
+    pid_t pid = fork();
+
+    if( pid < 0 ) return { -1, "fork failed" };
+
+    if( pid == 0 )
+    {
+      // CHILD
+
+      ::dup2( pipefd[1], STDOUT_FILENO );
+      ::dup2( pipefd[1], STDERR_FILENO );
+
+      ::close( pipefd[0] );
+      ::close( pipefd[1] );
+
+      std::vector<char*> argv;
+      argv.push_back( const_cast<char*>( exe.c_str() ) );
+
+      for( auto& a: args ) argv.push_back( const_cast<char*>( a.c_str() ) );
+
+      argv.push_back( nullptr );
+
+      ::execvp( exe.c_str(), argv.data() );
+
+      ::_exit( 127 );
+    }
+
+    // PARENT
+    ::close( pipefd[1] );
+
+    std::string line;
+    char        tmp[4096];
+
+    ssize_t n;
+    while( ( n = read( pipefd[0], tmp, sizeof( tmp ) ) ) > 0 )
+    {
+      for( ssize_t i = 0; i < n; ++i )
+      {
+        char c = tmp[i];
+
+        if( c == '\n' )
+        {
+          if( !line.empty() )
+          {
+            logger()->info( "Vivado: {}", line );
+            line.clear();
+          }
+        }
+        else
+        {
+          line += c;
+        }
+      }
+    }
+
+    // flush last partial line
+    if( !line.empty() ) { logger()->info( "Vivado: {}", line ); }
+
+    ::close( pipefd[0] );
+
+    int status = 0;
+    waitpid( pid, &status, 0 );
+
+    int code = -1;
+
+    if( WIFEXITED( status ) ) code = WEXITSTATUS( status );
+    else if( WIFSIGNALED( status ) )
+      code = 128 + WTERMSIG( status );
+
+    return { code, "" };
+  }
+
   std::size_t m_events{ 1000 };
-  std::string makeFileName( int index ) { return m_temp += "/event_" + std::to_string( index ) + ".csv"; }
+  std::string makeFileName( const int index ) { return ( m_temp / fmt::format( "event_{}.csv", index ) ).string(); }
 
   bool fileExists( const std::string& path ) { return std::filesystem::exists( path ); }
   bool createTempDirectory()
   {
-    m_temp = std::filesystem::temp_directory_path() /= std::tmpnam( nullptr );
-    std::filesystem::create_directories( m_temp );
-    return true;
+    char  dirTemplate[] = "/tmp/DCTRawData_XXXXXX";
+    char* result        = mkdtemp( dirTemplate );
+    if( result )
+    {
+      m_temp = result;
+      return true;
+    }
+    return false;
   }
 
   std::atomic<int>      expectedIndex{ 0 };
   std::mutex            mtx;
   std::filesystem::path m_temp;
   std::string           m_binary_path{ "./" };
+  std::string           m_vivado_path{ "/tools/Xilinx/2025.1.1/Vivado/bin" };
 };
 
 int main( int argc, char* argv[] )
@@ -162,6 +273,8 @@ try
   app.add_option( "--path", path_binary, "binaries path to load to the DCT" );
   std::size_t event_number{ 1000 };
   app.add_option( "-e,--events", event_number, "Number of events to take" );
+  std::string vivado_path{ "/tools/Xilinx/2025.1.1/Vivado/bin" };
+  app.add_option( "--vivado", vivado_path, "Vivado installation path" );
   try
   {
     app.parse( argc, argv );
@@ -175,11 +288,12 @@ try
   DCT module( cfg, "DCT" );
   module.setBinaryPath( path_binary );
   module.setEventNumbers( event_number );
+  module.setVivadoPath( vivado_path );
   //client.setTLS("/home/work/YAODAQ-1/localhost.crt","/home/work/YAODAQ-1/localhost.key","NONE");
   module.link();
 
-  Term::cout << "Press 3 times CTRL+C to stop" << std::endl;
-  std::size_t nbrCTLC{ 0 };
+  std::size_t nbrCTLC{ 3 };
+  Term::cout << Term::color_fg( Term::Color::Name::Red ) << "Press " << std::to_string( nbrCTLC ) << " times CTRL+C to stop" << Term::color_fg( Term::Color::Name::Default ) << std::endl;
   while( true )
   {
     Term::Event event = Term::read_event();
@@ -190,12 +304,15 @@ try
         Term::Key key( event );
         if( key == Term::Key::Ctrl_Q )
         {
-          ++nbrCTLC;
-          if( nbrCTLC == 3 ) return 0;
+          --nbrCTLC;
+          if( nbrCTLC == 0 ) return 0;
+          else
+            Term::cout << Term::color_fg( Term::Color::Name::Red ) << "Press Ctrl+Q " << std::to_string( nbrCTLC ) << " times to quit" << Term::color_fg( Term::Color::Name::Default ) << std::endl;
         }
         else
         {
-          nbrCTLC = 0;
+          nbrCTLC = 3;
+          Term::cout << Term::color_fg( Term::Color::Name::Red ) << "Press Ctrl+Q " << std::to_string( nbrCTLC ) << " times to quit" << Term::color_fg( Term::Color::Name::Default ) << std::endl;
         }
         break;
       }
