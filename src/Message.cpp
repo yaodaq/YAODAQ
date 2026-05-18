@@ -11,18 +11,10 @@
 #include <spdlog/details/log_msg.h>
 #include <string_view>
 
-yaodaq::Message::Message( const std::string_view msg, const std::size_t wireSize, const bool binary ) {}
-
 void yaodaq::Message::setConnectionStateInfos( std::shared_ptr<ix::ConnectionState>& connection )
 {
   meta()["remote_ip"]   = connection->getRemoteIp();
   meta()["remote_port"] = connection->getRemotePort();
-}
-
-void yaodaq::Message::setMessageMetas( const std::size_t size, const bool binary )
-{
-  meta()["wire_size"] = size;
-  meta()["binary"]    = binary;
 }
 
 void yaodaq::Message::setWebsocketInfos( ix::WebSocket& socket )

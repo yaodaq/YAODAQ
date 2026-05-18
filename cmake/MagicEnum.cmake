@@ -8,7 +8,7 @@ if(NOT DEFINED MAGIC_ENUM_REPOSITORY)
 endif()
 
 if(NOT DEFINED MAGIC_ENUM_TAG)
-  set(MAGIC_ENUM_TAG "v0.9.7")
+  set(MAGIC_ENUM_TAG "v0.9.8")
 endif()
 
 CPMAddPackage(NAME magic_enum

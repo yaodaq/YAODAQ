@@ -187,7 +187,7 @@ void yaodaq::Server::onMessage( std::shared_ptr<ix::ConnectionState> connectionS
     if( message.contains( "method" ) || message.contains( "notification" ) ) onJsonRPCRequest( connectionState, webSocket, message );
     else if( message.contains( "result" ) || message.contains( "error" ) )
       onJsonRPCResponse( connectionState, webSocket, message );
-    else if( message.contains( "yaodaq" ) && message["type"] == "log" )
+    else if( message.contains( "meta" ) && message["meta"]["type"] == "Log" )
       onLog( connectionState, webSocket, message );
   }
 }
