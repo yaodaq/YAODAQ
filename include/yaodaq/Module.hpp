@@ -33,11 +33,25 @@ public:
     Add( "release", jsonrpc::GetHandle( &yaodaq::Module::release, *this ) );
     Add( "relink", jsonrpc::GetHandle( &yaodaq::Module::relink, *this ) );
     Add( "getState", jsonrpc::GetHandle( &yaodaq::Module::getStateStr, *this ) );
+    Add( "connect", jsonrpc::GetHandle( &yaodaq::Module::connect, *this ) );
+    Add( "disconnect", jsonrpc::GetHandle( &yaodaq::Module::disconnect, *this ) );
   }
-  Module( const Module& )               = delete;
-  Module& operator=( const Module& )    = delete;
-  Module( Module&& )                    = delete;
-  Module&         operator=( Module&& ) = delete;
+  Module( const Module& )            = delete;
+  Module& operator=( const Module& ) = delete;
+  Module( Module&& )                 = delete;
+  Module& operator=( Module&& )      = delete;
+
+  YAODAQ_API virtual bool connect()
+  {
+    m_State.setId( State::ID::Connected );
+    return true;
+  }
+  YAODAQ_API virtual bool disconnect()
+  {
+    m_State.setId( State::ID::Connected );
+    return true;
+  }
+
   // Events
   YAODAQ_API bool link()
   {
@@ -390,8 +404,6 @@ protected:
       case State::ID::Configured:
       {
         if( getState().id() == State::ID::Connected ) return Transition::allowed;
-        else if( getState().id() == State::ID::Initialized && m_identifier.component().role() != Component::Role::Board )
-          return Transition::allowed;
         else
           return Transition::refused;
       }
@@ -434,8 +446,6 @@ protected:
       case State::ID::Released:
       {
         if( getState().id() == State::ID::Disconnected ) return Transition::allowed;
-        else if( getState().id() == State::ID::Cleared && m_identifier.component().role() != Component::Role::Board )
-          return Transition::allowed;
         else
           return Transition::refused;
       }
