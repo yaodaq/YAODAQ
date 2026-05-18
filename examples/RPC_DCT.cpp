@@ -32,7 +32,7 @@ public:
     }
     do
     {
-      logger()->info( "reading and parsing {}", filePath );
+      info( "reading and parsing {}", filePath );
       try
       {
         csv::CSVReader reader( filePath.c_str() );
@@ -50,17 +50,17 @@ public:
         json["rawdata"]["words"]  = payload;
         send( json.dump() );
         std::filesystem::remove( filePath );
-        logger()->warn( "removed: {}", filePath );
+        warn( "removed: {}", filePath );
       }
       catch( const std::exception& e )
       {
-        logger()->warn( "read failed ({}), retry {}", e.what(), ++retries );
+        warn( "read failed ({}), retry {}", e.what(), ++retries );
         std::this_thread::sleep_for( std::chrono::milliseconds( 5 ) );
         continue;
       }
       catch( ... )
       {
-        logger()->warn( "read failed retry {}", ++retries );
+        warn( "read failed retry {}", ++retries );
         std::this_thread::sleep_for( std::chrono::milliseconds( 5 ) );
       }
       ++expectedIndex;
@@ -71,7 +71,7 @@ public:
   bool on_start() override
   {
     createTempDirectory();
-    logger()->info( "DCT Rawdata (csv) will be written in {}", m_temp.c_str() );
+    info( "DCT Rawdata (csv) will be written in {}", m_temp.c_str() );
     std::string   script = fmt::format( u8R"(set nEvts {}
     set inputPath {}
     # channel mask
@@ -126,7 +126,7 @@ public:
     std::ofstream script_file( std::string( m_temp.c_str() ) + std::string( "script.tcl" ) );
     script_file << script;
     script_file.close();
-    logger()->info( "Vivado script has been written and will be launched !" );
+    info( "Vivado script has been written and will be launched !" );
     //std::string path{fmt::format("export PATH=$PATH:{}",m_vivado_path)};
     //std::string command = fmt::format(
     //"{} && vivado -mode batch -source \"{}/script.tcl\"",
@@ -139,12 +139,12 @@ public:
     Term::terminal.setOptions( Term::Option::Raw, Term::Option::Cursor );
     if( result.exitCode != 0 )
     {
-      logger()->error( "Vivado failed with exit code {}", result.exitCode );
+      error( "Vivado failed with exit code {}", result.exitCode );
       return false;
     }
     else
     {
-      logger()->info( "Process terminated successfully" );
+      info( "Process terminated successfully" );
       return true;
     }
   }
@@ -161,7 +161,7 @@ private:
 
   ProcessResult runProcessCapture( const std::string& exe, const std::vector<std::string>& args )
   {
-    logger()->info( "Running : {} {}", exe, fmt::join( args, " " ) );
+    info( "Running : {} {}", exe, fmt::join( args, " " ) );
     int pipefd[2];
     pipe( pipefd );  // pipefd[0] = read, pipefd[1] = write
 
@@ -208,7 +208,7 @@ private:
         {
           if( !line.empty() )
           {
-            logger()->info( "Vivado: {}", line );
+            info( "Vivado: {}", line );
             line.clear();
           }
         }
@@ -220,7 +220,7 @@ private:
     }
 
     // flush last partial line
-    if( !line.empty() ) { logger()->info( "Vivado: {}", line ); }
+    if( !line.empty() ) { info( "Vivado: {}", line ); }
 
     ::close( pipefd[0] );
 

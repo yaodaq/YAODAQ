@@ -107,11 +107,11 @@ protected:
   YAODAQ_API void start()
   {
     m_client.start();
-    logger()->info( "trying to connect to {}", m_client.getUrl() );
+    info( "trying to connect to {}", m_client.getUrl() );
   }
   YAODAQ_API void close()
   {
-    logger()->info( "Closing {}", m_client.getUrl() );
+    info( "Closing {}", m_client.getUrl() );
     m_client.close();
   }
   virtual void     onResponse( const std::string& ) {}

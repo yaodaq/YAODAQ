@@ -66,23 +66,22 @@ void yaodaq::Client::handleMessage( const ix::WebSocketMessagePtr& msg ) noexcep
   }
   catch( const yaodaq::Exception& exception )
   {
-    logger()->error( "yaodaq::Exception: {}", exception.what() );
+    critical( "yaodaq::Exception: {}", exception.what() );
     send( Except( exception ) );
   }
   catch( const std::exception& exception )
   {
-    logger()->error( "std::exception: {}", exception.what() );
+    critical( "std::exception: {}", exception.what() );
     send( Except( exception ) );
   }
   catch( ... )
   {
-    logger()->error( "exception in handleMessage" );
+    critical( "exception in handleMessage" );
     send( Except( "exception in handleMessage" ) );
   }
 }
 
-void yaodaq::Client::onOpen( const Open& open )
-{ logger()->info( "Connected to {} (uri: {})\nheaders: {}\nprotocol: {}\n{}", open.url(), open.uri(), yaodaq::Formatter::format( open.payload()["headers"] ), open.protocol(), yaodaq::Formatter::format( open.dump() ) ); }
+void yaodaq::Client::onOpen( const Open& open ) { info( "Connected to {} (uri: {})\nheaders: {}\nprotocol: {}\n{}", open.url(), open.uri(), yaodaq::Formatter::format( open.payload()["headers"] ), open.protocol(), yaodaq::Formatter::format( open.dump() ) ); }
 
 void yaodaq::Client::onMessage( const std::string& str, const std::size_t size, const bool binary )
 {
@@ -94,17 +93,17 @@ void yaodaq::Client::onMessage( const std::string& str, const std::size_t size, 
 
 void yaodaq::Client::onClose( const std::uint16_t code, const std::string& reason, bool remote )
 {
-  if( remote ) logger()->warn( "closing by remote: {} ({})", reason, code );
+  if( remote ) warn( "closing by remote: {} ({})", reason, code );
   else
-    logger()->info( "closing: {} ({})", reason, code );
+    info( "closing: {} ({})", reason, code );
 }
 
 void yaodaq::Client::onReject( const std::uint16_t code, const std::string& reason, bool remote )
 {
   while( m_client.isAutomaticReconnectionEnabled() ) m_client.disableAutomaticReconnection();  // don't try to reconnect dude I don't want you !
-  if( remote ) logger()->error( "rejected by remote: {} ({})", reason, code );
+  if( remote ) error( "rejected by remote: {} ({})", reason, code );
   else
-    logger()->error( "rejected: {} ({})", reason, code );
+    error( "rejected: {} ({})", reason, code );
 }
 
 /**
@@ -130,14 +129,46 @@ void yaodaq::Client::onJsonRPC( const nlohmann::json& json )
 //  std::cout << retries << " " << wait_time << " " << http_status << " " << reason << " " << decompressionError << std::endl;
 //}
 
-void yaodaq::Client::onPing( const std::string& str, const std::size_t size, const bool binary ) { logger()->info( "received ping: {}", str ); }
+void yaodaq::Client::onPing( const std::string& str, const std::size_t size, const bool binary ) { info( "received ping: {}", str ); }
 
-void yaodaq::Client::onPong( const std::string& str, const std::size_t size, const bool binary ) { logger()->info( "received pong: {}", str ); }
+void yaodaq::Client::onPong( const std::string& str, const std::size_t size, const bool binary ) { info( "received pong: {}", str ); }
 
 void yaodaq::Client::onLog( const nlohmann::json& json )
 {
-  logger()->log( static_cast<spdlog::level::level_enum>( json["payload"]["level"] ),
-                 fmt::format( "{}: {}", fmt::styled( json["payload"]["logger_name"].get<std::string>(), fmt::fg( fmt::color::gray ) | fmt::emphasis::bold ), json["payload"]["message"].get<std::string>() ) );
+  switch( static_cast<spdlog::level::level_enum>( json["payload"]["level"].get<int>() ) )
+  {
+    case spdlog::level::level_enum::info:
+    {
+      info( fmt::format( "{}: {}", fmt::styled( json["payload"]["logger_name"].get<std::string>(), fmt::fg( fmt::color::gray ) | fmt::emphasis::bold ), json["payload"]["message"].get<std::string>() ) );
+      break;
+    }
+    case spdlog::level::level_enum::critical:
+    {
+      critical( fmt::format( "{}: {}", fmt::styled( json["payload"]["logger_name"].get<std::string>(), fmt::fg( fmt::color::gray ) | fmt::emphasis::bold ), json["payload"]["message"].get<std::string>() ) );
+      break;
+    }
+    case spdlog::level::level_enum::debug:
+    {
+      debug( fmt::format( "{}: {}", fmt::styled( json["payload"]["logger_name"].get<std::string>(), fmt::fg( fmt::color::gray ) | fmt::emphasis::bold ), json["payload"]["message"].get<std::string>() ) );
+      break;
+    }
+    case spdlog::level::level_enum::err:
+    {
+      error( fmt::format( "{}: {}", fmt::styled( json["payload"]["logger_name"].get<std::string>(), fmt::fg( fmt::color::gray ) | fmt::emphasis::bold ), json["payload"]["message"].get<std::string>() ) );
+      break;
+    }
+    case spdlog::level::level_enum::trace:
+    {
+      trace( fmt::format( "{}: {}", fmt::styled( json["payload"]["logger_name"].get<std::string>(), fmt::fg( fmt::color::gray ) | fmt::emphasis::bold ), json["payload"]["message"].get<std::string>() ) );
+      break;
+    }
+    case spdlog::level::level_enum::warn:
+    {
+      warn( fmt::format( "{}: {}", fmt::styled( json["payload"]["logger_name"].get<std::string>(), fmt::fg( fmt::color::gray ) | fmt::emphasis::bold ), json["payload"]["message"].get<std::string>() ) );
+      break;
+    }
+    default: break;
+  }
 }
 
 //void yaodaq::Client::onText( const std::string& text ) { std::cout << text << std::endl; }
@@ -149,14 +180,14 @@ void yaodaq::Client::send( const Message& msg, const bool callback ) noexcept
   ix::WebSocketSendInfo ret = m_client.sendUtf8Text( msg.dump(),
                                                      [this, callback]( const int current, const int total ) -> bool
                                                      {
-                                                       if( callback ) { logger()->info( "Downloaded {} bytes out of {}", current, total ); }
+                                                       if( callback ) { info( "Downloaded {} bytes out of {}", current, total ); }
                                                        return true;
                                                      } );
   if( callback )
   {
-    if( ret.success ) logger()->info( "sent {} payloadSize {} wireSize {}", ret.payloadSize, ret.wireSize );
+    if( ret.success ) info( "sent {} payloadSize {} wireSize {}", ret.payloadSize, ret.wireSize );
     else
-      logger()->error( "error sending {}\npayloadSize {} wireSize {}{}", msg.dump(), ret.payloadSize, ret.wireSize, ret.compressionError ? " compression error" : "" );
+      error( "error sending {}\npayloadSize {} wireSize {}{}", msg.dump(), ret.payloadSize, ret.wireSize, ret.compressionError ? " compression error" : "" );
   }
 }
 

@@ -41,7 +41,7 @@ public:
   // Events
   YAODAQ_API bool link()
   {
-    logger()->info( "Linking" );
+    info( "Linking" );
     yaodaq::Client::start();
     m_State.setId( State::ID::Linked );
     return true;
@@ -53,7 +53,7 @@ public:
     if( transition == Transition::alreadyDone ) return true;
     else if( transition == Transition::allowed )
     {
-      logger()->info( "Initializing" );
+      info( "Initializing" );
       bool ret = on_initialize();
       if( ret )
       {
@@ -64,7 +64,7 @@ public:
     }
     else
     {
-      logger()->warn( "{} to {} unauthorised", getStateStr(), "Initialized" );
+      warn( "{} to {} unauthorised", getStateStr(), "Initialized" );
       return false;
     }
   }
@@ -75,7 +75,7 @@ public:
     if( transition == Transition::alreadyDone ) return true;
     else if( transition == Transition::allowed )
     {
-      logger()->info( "Configuring" );
+      info( "Configuring" );
       bool ret = on_configure();
       if( ret )
       {
@@ -86,7 +86,7 @@ public:
     }
     else
     {
-      logger()->warn( "{} to {} unauthorised", getStateStr(), "Configured" );
+      warn( "{} to {} unauthorised", getStateStr(), "Configured" );
       return false;
     }
   }
@@ -97,7 +97,7 @@ public:
     if( transition == Transition::alreadyDone ) return true;
     if( transition != Transition::allowed )
     {
-      logger()->warn( "{} to {} unauthorised", getStateStr(), "Started" );
+      warn( "{} to {} unauthorised", getStateStr(), "Started" );
       return false;
     }
 
@@ -107,17 +107,17 @@ public:
 
       if( m_worker.joinable() )
       {
-        logger()->warn( "Worker thread is already running." );
+        warn( "Worker thread is already running." );
         return true;
       }
 
-      logger()->info( "Starting" );
+      info( "Starting" );
 
       if( !on_first_start() ) return false;
 
       if( !on_start() )
       {
-        logger()->error( "on_start() failed." );
+        error( "on_start() failed." );
         return false;
       }
 
@@ -145,7 +145,7 @@ public:
           {
             if( !run() )
             {
-              logger()->error( "Run failed, stopping worker thread." );
+              error( "Run failed, stopping worker thread." );
               m_worker_state.store( WorkerState::Stopped );
               break;
             }
@@ -153,13 +153,13 @@ public:
           }
           catch( const std::exception& e )
           {
-            logger()->error( "Exception in run(): {}", e.what() );
+            error( "Exception in run(): {}", e.what() );
             m_worker_state.store( WorkerState::Stopped );
             break;
           }
           catch( ... )
           {
-            logger()->error( "Unknown exception in run()" );
+            error( "Unknown exception in run()" );
             m_worker_state.store( WorkerState::Stopped );
             break;
           }
@@ -175,7 +175,7 @@ public:
     if( transition == Transition::alreadyDone ) return true;
     else if( transition == Transition::allowed )
     {
-      logger()->info( "Pausing" );
+      info( "Pausing" );
       bool ret = on_pause();
       if( ret )
       {
@@ -190,7 +190,7 @@ public:
     }
     else
     {
-      logger()->warn( "{} to {} unauthorised", getStateStr(), "Paused" );
+      warn( "{} to {} unauthorised", getStateStr(), "Paused" );
       return false;
     }
   }
@@ -201,7 +201,7 @@ public:
     if( transition == Transition::alreadyDone ) return true;
     else if( transition == Transition::allowed )
     {
-      logger()->info( "Resuming" );
+      info( "Resuming" );
       bool ret = on_resume();
       if( ret )
       {
@@ -216,7 +216,7 @@ public:
     }
     else
     {
-      logger()->warn( "{} to {} unauthorised", getStateStr(), "Started" );
+      warn( "{} to {} unauthorised", getStateStr(), "Started" );
       return false;
     }
   }
@@ -227,7 +227,7 @@ public:
     if( transition == Transition::alreadyDone ) return true;
     else if( transition == Transition::allowed )
     {
-      logger()->info( "Stopping" );
+      info( "Stopping" );
       bool ret = on_stop();
       if( ret )
       {
@@ -244,7 +244,7 @@ public:
     }
     else
     {
-      logger()->warn( "{} to {} unauthorised", getStateStr(), "Stopped" );
+      warn( "{} to {} unauthorised", getStateStr(), "Stopped" );
       return false;
     }
   }
@@ -255,7 +255,7 @@ public:
     if( transition == Transition::alreadyDone ) return true;
     else if( transition == Transition::allowed )
     {
-      logger()->info( "Clearing" );
+      info( "Clearing" );
       bool ret = on_clear();
       if( ret )
       {
@@ -266,7 +266,7 @@ public:
     }
     else
     {
-      logger()->warn( "{} to {} unauthorised", getStateStr(), "Cleared" );
+      warn( "{} to {} unauthorised", getStateStr(), "Cleared" );
       return false;
     }
   }
@@ -277,7 +277,7 @@ public:
     if( transition == Transition::alreadyDone ) return true;
     else if( transition == Transition::allowed )
     {
-      logger()->info( "Releasing" );
+      info( "Releasing" );
       bool ret = on_release();
       if( ret )
       {
@@ -288,14 +288,14 @@ public:
     }
     else
     {
-      logger()->warn( "{} to {} unauthorised", getStateStr(), "Linked" );
+      warn( "{} to {} unauthorised", getStateStr(), "Linked" );
       return false;
     }
   }
 
   YAODAQ_API bool relink()
   {
-    logger()->info( "Relinking" );
+    info( "Relinking" );
     stop();
     bool ret = link();
     if( ret )
@@ -331,7 +331,7 @@ public:
       on_stop();  // call hook for proper cleanup
       m_worker.join();
     }
-    logger()->info( "Stopping Module" );
+    info( "Stopping Module" );
   }
 
   void send( const nlohmann::json& json ) { send( json.dump() ); }
@@ -342,7 +342,7 @@ protected:
   virtual bool on_first_start() { return true; }
   virtual bool on_start()
   {
-    logger()->info( "on_start running" );
+    info( "on_start running" );
     return true;
   };
   virtual bool on_pause() { return true; };
@@ -352,7 +352,7 @@ protected:
   virtual bool on_release() { return true; };
   virtual bool run()
   {
-    logger()->info( "running... event {}", m_event_nbr.load() );
+    info( "running... event {}", m_event_nbr.load() );
     std::this_thread::sleep_for( std::chrono::seconds( 1 ) );
     return true;
   }
@@ -368,7 +368,7 @@ protected:
   {
     if( state == getState().id() )
     {
-      logger()->warn( "Already in state '{}'", m_State.str() );
+      warn( "Already in state '{}'", m_State.str() );
       return Transition::alreadyDone;
     }
     switch( state )

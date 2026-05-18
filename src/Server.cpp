@@ -20,7 +20,7 @@
 
 yaodaq::Server::~Server() noexcept
 {
-  logger()->info( "Stopping server" );
+  info( "Stopping server" );
   m_server.stop();
   ix::uninitNetSystem();
 }
@@ -117,12 +117,12 @@ YAODAQ_API yaodaq::Server::Server( const ServerConfig& cfg, const std::string_vi
 
 void yaodaq::Server::start()
 {
-  logger()->info( "server started at {}:{} ({}) with {} backlogs, {} maximum connections", m_server.getHost(), m_server.getPort(),
-                  ( m_server.getAddressFamily() == AF_INET    ? "ip4"
-                    : m_server.getAddressFamily() == AF_INET6 ? "ip6"
-                                                              : "unknown" ),
-                  m_server.getBacklog(), m_server.getMaxConnections() );
-  if( m_rejectBrowser ) logger()->warn( "All browsers will be kicked" );
+  info( "server started at {}:{} ({}) with {} backlogs, {} maximum connections", m_server.getHost(), m_server.getPort(),
+        ( m_server.getAddressFamily() == AF_INET    ? "ip4"
+          : m_server.getAddressFamily() == AF_INET6 ? "ip6"
+                                                    : "unknown" ),
+        m_server.getBacklog(), m_server.getMaxConnections() );
+  if( m_rejectBrowser ) warn( "All browsers will be kicked" );
   m_server.start();
 }
 
@@ -163,20 +163,20 @@ void yaodaq::Server::checkClient( std::shared_ptr<ix::ConnectionState> connectio
 }
 
 void yaodaq::Server::onOpen( std::shared_ptr<ix::ConnectionState> connectionState, ix::WebSocket& webSocket, const yaodaq::Open& open )
-{ logger()->info( "client {} at {} port {} connected to server:\n  {}", connectionState->getId(), connectionState->getRemoteIp(), connectionState->getRemotePort(), yaodaq::Formatter::format( open.payload() ) ); }
+{ info( "client {} at {} port {} connected to server:\n  {}", connectionState->getId(), connectionState->getRemoteIp(), connectionState->getRemotePort(), yaodaq::Formatter::format( open.payload() ) ); }
 
 void yaodaq::Server::onClose( std::shared_ptr<ix::ConnectionState> connectionState, ix::WebSocket& webSocket, const std::uint16_t code, const std::string& reason, bool remote )
 {
-  if( remote ) logger()->warn( "client {} at {} port {} disconnected to server remotelly: {}({})", connectionState->getId(), connectionState->getRemoteIp(), connectionState->getRemotePort(), reason, code );
+  if( remote ) warn( "client {} at {} port {} disconnected to server remotelly: {}({})", connectionState->getId(), connectionState->getRemoteIp(), connectionState->getRemotePort(), reason, code );
   else
-    logger()->warn( "client {} at {} port {} disconnected to server remotelly: {}({})", connectionState->getId(), connectionState->getRemoteIp(), connectionState->getRemotePort(), reason, code );
+    warn( "client {} at {} port {} disconnected to server remotelly: {}({})", connectionState->getId(), connectionState->getRemoteIp(), connectionState->getRemotePort(), reason, code );
 }
 
 void yaodaq::Server::onReject( std::shared_ptr<ix::ConnectionState> connectionState, ix::WebSocket& webSocket, const std::uint16_t code, const std::string& reason, bool remote )
 {
-  if( remote ) logger()->error( "client {} at {} port {} rejected by server remotelly: {}({})", connectionState->getId(), connectionState->getRemoteIp(), connectionState->getRemotePort(), reason, code );
+  if( remote ) error( "client {} at {} port {} rejected by server remotelly: {}({})", connectionState->getId(), connectionState->getRemoteIp(), connectionState->getRemotePort(), reason, code );
   else
-    logger()->error( "client {} at {} port {} rejected by server: {}({})", connectionState->getId(), connectionState->getRemoteIp(), connectionState->getRemotePort(), reason, code );
+    error( "client {} at {} port {} rejected by server: {}({})", connectionState->getId(), connectionState->getRemoteIp(), connectionState->getRemotePort(), reason, code );
 }
 
 void yaodaq::Server::onMessage( std::shared_ptr<ix::ConnectionState> connectionState, ix::WebSocket& webSocket, const std::string& str, const std::size_t size, const bool binary )
@@ -335,10 +335,10 @@ std::size_t yaodaq::Server::getNumberOfClients() noexcept { return m_server.getC
 //}
 
 void yaodaq::Server::onPing( std::shared_ptr<ix::ConnectionState> connectionState, ix::WebSocket& webSocket, const std::string& str, const std::size_t size, const bool binary )
-{ logger()->info( "client {} at {} port {} sent ping: {}", connectionState->getId(), connectionState->getRemoteIp(), connectionState->getRemotePort(), str ); }
+{ info( "client {} at {} port {} sent ping: {}", connectionState->getId(), connectionState->getRemoteIp(), connectionState->getRemotePort(), str ); }
 
 void yaodaq::Server::onPong( std::shared_ptr<ix::ConnectionState> connectionState, ix::WebSocket& webSocket, const std::string& str, const std::size_t size, const bool binary )
-{ logger()->info( "client {} at {} port {} sent pong: {}", connectionState->getId(), connectionState->getRemoteIp(), connectionState->getRemotePort(), str ); }
+{ info( "client {} at {} port {} sent pong: {}", connectionState->getId(), connectionState->getRemoteIp(), connectionState->getRemotePort(), str ); }
 
 void yaodaq::Server::sendExcept( const std::string& str, ix::WebSocket& webSocket )
 {
@@ -414,17 +414,17 @@ void yaodaq::Server::handleMessage( std::shared_ptr<ix::ConnectionState> connect
   }
   catch( const yaodaq::Exception& exception )
   {
-    logger()->error( "yaodaq::Exception: {}", exception.what() );
+    critical( "yaodaq::Exception: {}", exception.what() );
     sendToAll( Except( exception )().dump() );
   }
   catch( const std::exception& exception )
   {
-    logger()->error( "std::exception: {}", exception.what() );
+    critical( "std::exception: {}", exception.what() );
     sendToAll( Except( exception )().dump() );
   }
   catch( ... )
   {
-    logger()->error( "exception in handleMessage" );
+    critical( "exception in handleMessage" );
     sendToAll( Except( "exception in handleMessage" )().dump() );
   }
 }

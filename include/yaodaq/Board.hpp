@@ -29,7 +29,7 @@ public:
     if( transition == Transition::alreadyDone ) return true;
     else if( transition == Transition::allowed )
     {
-      logger()->info( "Connecting" );
+      info( "Connecting" );
       bool ret = on_connect();
       if( ret )
       {
@@ -40,7 +40,7 @@ public:
     }
     else
     {
-      logger()->warn( "{} to {} unauthorised", getStateStr(), "Connected" );
+      warn( "{} to {} unauthorised", getStateStr(), "Connected" );
       return false;
     }
   };
@@ -50,7 +50,7 @@ public:
     if( transition == Transition::alreadyDone ) return true;
     else if( transition == Transition::allowed )
     {
-      logger()->info( "Disconnecting" );
+      info( "Disconnecting" );
       bool ret = on_disconnect();
       if( ret )
       {
@@ -61,7 +61,7 @@ public:
     }
     else
     {
-      logger()->warn( "{} to {} unauthorised", getStateStr(), "Disconnected" );
+      warn( "{} to {} unauthorised", getStateStr(), "Disconnected" );
       return false;
     }
   };

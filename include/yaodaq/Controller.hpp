@@ -34,27 +34,27 @@ public:
 
   YAODAQ_API ResponseClients initialize()
   {
-    logger()->info( "Initializing" );
+    info( "Initializing" );
     return CallMethod( "initialize" );
     m_State.setId( State::ID::Initialized );
   }
 
   YAODAQ_API ResponseClients configure()
   {
-    logger()->info( "Configuring" );
+    info( "Configuring" );
     return CallMethod( "configure" );
     m_State.setId( State::ID::Configured );
   }
 
   YAODAQ_API ResponseClients start()
   {
-    logger()->info( "Starting" );
+    info( "Starting" );
     return CallMethod( "start" );
   }
 
   YAODAQ_API ResponseClients pause()
   {
-    logger()->info( "Pausing" );
+    info( "Pausing" );
     return CallMethod( "pause" );
   }
 
@@ -62,13 +62,13 @@ public:
 
   YAODAQ_API ResponseClients stop()
   {
-    logger()->info( "Stopping" );
+    info( "Stopping" );
     return CallMethod( "stop" );
   }
 
   YAODAQ_API ResponseClients clear()
   {
-    logger()->info( "Clearing" );
+    info( "Clearing" );
     return CallMethod( "clear" );
   }
 
@@ -80,7 +80,7 @@ public:
 
   YAODAQ_API bool relink()
   {
-    logger()->info( "Relinking" );
+    info( "Relinking" );
     stop();
     bool ret = link();
     m_State.setId( State::ID::Linked );
@@ -99,7 +99,7 @@ protected:
   virtual bool on_configure() { return true; };
   virtual bool on_start()
   {
-    logger()->info( "on_start running" );
+    info( "on_start running" );
     return true;
   };
   virtual bool on_pause() { return true; };
