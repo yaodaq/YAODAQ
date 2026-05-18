@@ -122,9 +122,9 @@ protected:
   void send( const nlohmann::json& json );
 
 private:
+  explicit Client() noexcept = delete;
   ix::WebSocket m_client;
   void          handleMessage( const ix::WebSocketMessagePtr& msg ) noexcept;
-  YAODAQ_API explicit Client() noexcept = delete;
 
   // Messages
   YAODAQ_API void onMessage( const std::string& str, const std::size_t size, const bool binary );
@@ -141,9 +141,6 @@ private:
   YAODAQ_API void onPing( const std::string& str, const std::size_t size, const bool binary );
   YAODAQ_API void onPong( const std::string& str, const std::size_t size, const bool binary );
   YAODAQ_API void onLog( const nlohmann::json& json );
-
-  /*YAODAQ_API void onText( const std::string& text );
-  YAODAQ_API void onJson( const nlohmann::json& json );*/
 };
 
 }  // namespace yaodaq

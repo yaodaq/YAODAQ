@@ -139,7 +139,7 @@ void yaodaq::Server::checkClient( std::shared_ptr<ix::ConnectionState> connectio
   {
     if( m_rejectBrowser ) { webSocket.stop( WebSocketCloseConstant::NoYaodaqId, WebSocketCloseConstant::NoYaodaqIdMessage ); }
     else
-      std::static_pointer_cast<yaodaq::ConnectionState>( connectionState )->setBowserID();
+      std::static_pointer_cast<yaodaq::ConnectionState>( connectionState )->setBrowserID();
   }
   else
   {
@@ -149,11 +149,8 @@ void yaodaq::Server::checkClient( std::shared_ptr<ix::ConnectionState> connectio
   {
     {
       std::lock_guard<std::mutex> lock( m_mutex );
-      if( m_clients.count( name ) == 0 )
-      {
-        m_clients.insert( name );
-        m_clientss[std::static_pointer_cast<yaodaq::ConnectionState>( connectionState )->getID().component().role()].push_back( webSocket );
-      }
+      const Component::Role       role{ std::static_pointer_cast<yaodaq::ConnectionState>( connectionState )->getID().component().role() };
+      if( m_clients[role].count( name ) == 0 ) { m_clients[role].emplace( name, std::ref( webSocket ) ); }
       else
       {
         webSocket.stop( WebSocketCloseConstant::ClientWithThisNameAlreadyConnected, WebSocketCloseConstant::ClientWithThisNameAlreadyConnectedMessage );
@@ -365,7 +362,7 @@ void yaodaq::Server::sendTo( const std::string& str, ix::WebSocket& webSocket )
 // Send to loggers
 void yaodaq::Server::sendToLoggers( const std::string& str )
 {
-  for( auto&& client: m_clientss[yaodaq::Component::Role::Logger] ) { client.get().sendUtf8Text( str.c_str() ); }
+  for( auto&& client: m_clients[yaodaq::Component::Role::Logger] ) { client.second.get().sendUtf8Text( str.c_str() ); }
 }
 
 // Send to all
@@ -378,39 +375,57 @@ void yaodaq::Server::handleMessage( std::shared_ptr<ix::ConnectionState> connect
 {
   try
   {
-    if( msg->type == ix::WebSocketMessageType::Message ) { onMessage( connectionState, webSocket, msg->str, msg->wireSize, msg->binary ); }
-    //else if( msg->type == ix::WebSocketMessageType::Fragment ) { onFragment( connectionState, webSocket, msg->str, msg->wireSize, msg->binary ); }
-    else if( msg->type == ix::WebSocketMessageType::Open )
+    switch( msg->type )
     {
-      checkClient( connectionState, webSocket, msg );
-      Open open( msg->openInfo );
-      open.setConnectionStateInfos( connectionState );
-      open.setWebsocketInfos( webSocket );
-      onOpen( connectionState, webSocket, Open( msg->openInfo ) );
-    }
-    else if( msg->type == ix::WebSocketMessageType::Close )
-    {
-      if( WebSocketCloseConstant::isRejected( msg->closeInfo.code ) ) { onReject( connectionState, webSocket, msg->closeInfo.code, msg->closeInfo.reason, msg->closeInfo.remote ); }
-      else
+      case ix::WebSocketMessageType::Message:
       {
-        auto              cs   = std::static_pointer_cast<yaodaq::ConnectionState>( connectionState );
-        const std::string name = std::string( cs->getID().name() );
+        onMessage( connectionState, webSocket, msg->str, msg->wireSize, msg->binary );
+        break;
+      }
+      case ix::WebSocketMessageType::Fragment:
+      {
+        //onFragment( connectionState, webSocket, msg->str, msg->wireSize, msg->binary );
+        break;
+      }
+      case ix::WebSocketMessageType::Open:
+      {
+        checkClient( connectionState, webSocket, msg );
+        Open open( msg->openInfo );
+        open.setConnectionStateInfos( connectionState );
+        open.setWebsocketInfos( webSocket );
+        onOpen( connectionState, webSocket, Open( msg->openInfo ) );
+        break;
+      }
+      case ix::WebSocketMessageType::Close:
+      {
+        if( WebSocketCloseConstant::isRejected( msg->closeInfo.code ) ) { onReject( connectionState, webSocket, msg->closeInfo.code, msg->closeInfo.reason, msg->closeInfo.remote ); }
+        else
         {
-          std::lock_guard<std::mutex> lock( m_mutex );
-          m_clients.erase( name );
-          auto it = m_clientss.find( cs->getID().component().role() );
-          if( it != m_clientss.end() )
           {
-            auto& vec = it->second;
-            vec.erase( std::remove_if( vec.begin(), vec.end(), [&]( std::reference_wrapper<ix::WebSocket> ref ) { return &ref.get() == &webSocket; } ), vec.end() );
+            std::lock_guard<std::mutex> lock( m_mutex );
+            const auto                  cs = std::static_pointer_cast<yaodaq::ConnectionState>( connectionState );
+            m_clients.find( cs->getID().component().role() )->second.erase( std::string( cs->getID().name() ) );
           }
+          onClose( connectionState, webSocket, msg->closeInfo.code, msg->closeInfo.reason, msg->closeInfo.remote );
         }
-        onClose( connectionState, webSocket, msg->closeInfo.code, msg->closeInfo.reason, msg->closeInfo.remote );
+        break;
+      }
+      case ix::WebSocketMessageType::Error:
+      {
+        //onError( connectionState, webSocket, msg->errorInfo.retries, msg->errorInfo.wait_time, msg->errorInfo.http_status, msg->errorInfo.reason, msg->errorInfo.decompressionError );
+        break;
+      }
+      case ix::WebSocketMessageType::Ping:
+      {
+        onPing( connectionState, webSocket, msg->str, msg->wireSize, msg->binary );
+        break;
+      }
+      case ix::WebSocketMessageType::Pong:
+      {
+        onPong( connectionState, webSocket, msg->str, msg->wireSize, msg->binary );
+        break;
       }
     }
-    //else if( msg->type == ix::WebSocketMessageType::Error ) { onError( connectionState, webSocket, msg->errorInfo.retries, msg->errorInfo.wait_time, msg->errorInfo.http_status, msg->errorInfo.reason, msg->errorInfo.decompressionError ); }
-    else if( msg->type == ix::WebSocketMessageType::Ping ) { onPing( connectionState, webSocket, msg->str, msg->wireSize, msg->binary ); }
-    else if( msg->type == ix::WebSocketMessageType::Pong ) { onPong( connectionState, webSocket, msg->str, msg->wireSize, msg->binary ); }
   }
   catch( const yaodaq::Exception& exception )
   {

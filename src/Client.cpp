@@ -46,23 +46,48 @@ void yaodaq::Client::handleMessage( const ix::WebSocketMessagePtr& msg ) noexcep
 {
   try
   {
-    if( msg->type == ix::WebSocketMessageType::Message ) { onMessage( msg->str, msg->wireSize, msg->binary ); }
-    //else if( msg->type == ix::WebSocketMessageType::Fragment ) { onFragment( msg->str, msg->wireSize, msg->binary ); }
-    else if( msg->type == ix::WebSocketMessageType::Open )
+    switch( msg->type )
     {
-      Open open( msg->openInfo );
-      open.setWebsocketInfos( m_client );
-      onOpen( open );
+      case ix::WebSocketMessageType::Message:
+      {
+        onMessage( msg->str, msg->wireSize, msg->binary );
+        break;
+      }
+      case ix::WebSocketMessageType::Fragment:
+      {
+        //onFragment( msg->str, msg->wireSize, msg->binary );
+        break;
+      }
+      case ix::WebSocketMessageType::Open:
+      {
+        Open open( msg->openInfo );
+        open.setWebsocketInfos( m_client );
+        onOpen( open );
+        break;
+      }
+      case ix::WebSocketMessageType::Close:
+      {
+        if( WebSocketCloseConstant::isRejected( msg->closeInfo.code ) ) onReject( msg->closeInfo.code, msg->closeInfo.reason, msg->closeInfo.remote );
+        else
+          onClose( msg->closeInfo.code, msg->closeInfo.reason, msg->closeInfo.remote );
+        break;
+      }
+      case ix::WebSocketMessageType::Error:
+      {
+        //onError( msg->errorInfo.retries, msg->errorInfo.wait_time, msg->errorInfo.http_status, msg->errorInfo.reason, msg->errorInfo.decompressionError );
+        break;
+      }
+      case ix::WebSocketMessageType::Ping:
+      {
+        onPing( msg->str, msg->wireSize, msg->binary );
+        break;
+      }
+      case ix::WebSocketMessageType::Pong:
+      {
+        onPong( msg->str, msg->wireSize, msg->binary );
+        break;
+      }
     }
-    else if( msg->type == ix::WebSocketMessageType::Close )
-    {
-      if( WebSocketCloseConstant::isRejected( msg->closeInfo.code ) ) onReject( msg->closeInfo.code, msg->closeInfo.reason, msg->closeInfo.remote );
-      else
-        onClose( msg->closeInfo.code, msg->closeInfo.reason, msg->closeInfo.remote );
-    }
-    //else if( msg->type == ix::WebSocketMessageType::Error ) { onError( msg->errorInfo.retries, msg->errorInfo.wait_time, msg->errorInfo.http_status, msg->errorInfo.reason, msg->errorInfo.decompressionError ); }
-    else if( msg->type == ix::WebSocketMessageType::Ping ) { onPing( msg->str, msg->wireSize, msg->binary ); }
-    else if( msg->type == ix::WebSocketMessageType::Pong ) { onPong( msg->str, msg->wireSize, msg->binary ); }
   }
   catch( const yaodaq::Exception& exception )
   {
@@ -170,10 +195,6 @@ void yaodaq::Client::onLog( const nlohmann::json& json )
     default: break;
   }
 }
-
-//void yaodaq::Client::onText( const std::string& text ) { std::cout << text << std::endl; }
-
-//void yaodaq::Client::onJson( const nlohmann::json& json ) { std::cout << json << std::endl; }
 
 void yaodaq::Client::send( const Message& msg, const bool callback ) noexcept
 {

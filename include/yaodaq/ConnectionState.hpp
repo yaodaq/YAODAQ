@@ -18,7 +18,7 @@ public:
   YAODAQ_API                                                 ConnectionState() : m_identifier( Component::Role::Client, "Unknown", "Unknown" ) { _globalId--; };
   YAODAQ_API static std::shared_ptr<yaodaq::ConnectionState> createConnectionState() { return std::make_shared<yaodaq::ConnectionState>(); }
   YAODAQ_API virtual ~ConnectionState() = default;
-  YAODAQ_API void setBowserID( std::string_view type = "Unknown" ) noexcept
+  YAODAQ_API void setBrowserID( std::string_view type = "Unknown" ) noexcept
   {
     m_identifier = Identifier( Component::Role::Browser, type, "Browser" + std::to_string( _globalId ) );
     _id          = m_identifier.id();

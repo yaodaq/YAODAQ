@@ -186,9 +186,8 @@ private:
   void sendToLoggers( const std::string& str );
 
   // Check if a client already have this name
-  std::unordered_set<std::string>                                                         m_clients;
-  std::unordered_map<Component::Role, std::vector<std::reference_wrapper<ix::WebSocket>>> m_clientss;
-  std::mutex                                                                              m_mutex;
+  std::unordered_map<Component::Role, std::unordered_map<std::string, std::reference_wrapper<ix::WebSocket>>> m_clients;
+  std::mutex                                                                                                  m_mutex;
 };
 
 }  // namespace yaodaq

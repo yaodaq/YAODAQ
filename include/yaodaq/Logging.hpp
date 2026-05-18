@@ -30,10 +30,41 @@ public:
   template<typename... Args> void critical( const std::string_view& str, Args&&... args ) const noexcept { m_logger->critical( str, std::forward<Args>( args )... ); }
 
 protected:
-  std::shared_ptr<spdlog::logger> logger_without_websocket() const noexcept
+  template<typename... Args> void trace_without_websocket( const std::string_view& str, Args&&... args ) const noexcept
   {
     m_ws_enabled = false;
-    return m_logger;
+    m_logger->trace( str, std::forward<Args>( args )... );
+    m_ws_enabled = true;
+  }
+  template<typename... Args> void debug_without_websocket( const std::string_view& str, Args&&... args ) const noexcept
+  {
+    m_ws_enabled = false;
+    m_logger->debug( str, std::forward<Args>( args )... );
+    m_ws_enabled = true;
+  }
+  template<typename... Args> void info_without_websocket( const std::string_view& str, Args&&... args ) const noexcept
+  {
+    m_ws_enabled = false;
+    m_logger->info( str, std::forward<Args>( args )... );
+    m_ws_enabled = true;
+  }
+  template<typename... Args> void warn_without_websocket( const std::string_view& str, Args&&... args ) const noexcept
+  {
+    m_ws_enabled = false;
+    m_logger->warn( str, std::forward<Args>( args )... );
+    m_ws_enabled = true;
+  }
+  template<typename... Args> void error_without_websocket( const std::string_view& str, Args&&... args ) const noexcept
+  {
+    m_ws_enabled = false;
+    m_logger->error( str, std::forward<Args>( args )... );
+    m_ws_enabled = true;
+  }
+  template<typename... Args> void critical_without_websocket( const std::string_view& str, Args&&... args ) const noexcept
+  {
+    m_ws_enabled = false;
+    m_logger->critical( str, std::forward<Args>( args )... );
+    m_ws_enabled = true;
   }
 
 private:
