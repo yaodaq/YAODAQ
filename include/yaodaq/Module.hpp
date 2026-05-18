@@ -115,70 +115,71 @@ public:
       return false;
     }
 
-    // Lock to safely check and modify shared state
+    std::unique_lock lk( m_mutex );
+
+    // If no run function is set, just update state and return
+    if( !m_onrun )
     {
-      std::unique_lock lk( m_mutex );
-
-      if( m_worker.joinable() )
-      {
-        warn( "Worker thread is already running." );
-        return true;
-      }
-
-      info( "Starting" );
-
-      if( !on_first_start() ) return false;
-
-      if( !on_start() )
-      {
-        error( "on_start() failed." );
-        return false;
-      }
-
-      // Reset state variables safely under lock
-      m_event_nbr.store( 0 );
-
-      // Update module state  under lock
+      info( "No run function set, marking module as Started without launching worker thread" );
       m_worker_state.store( WorkerState::Running );
       m_State.setId( State::ID::Started );
+      return true;
     }
 
-    // Launch worker thread outside the lock
-    m_worker = std::thread(
-      [this]()
-      {
-        while( m_worker_state.load() != WorkerState::Stopped )
+    // Start worker only if not running
+    if( !m_worker.joinable() )
+    {
+      info( "Starting Module Worker" );
+
+      m_worker_state.store( WorkerState::Running );
+      m_State.setId( State::ID::Started );
+
+      m_worker = std::thread(
+        [this]()
         {
-          std::unique_lock lk( m_mutex );
-
-          cv.wait( lk, [this]() { return m_worker_state.load() != WorkerState::Paused; } );
-          if( m_worker_state.load() == WorkerState::Stopped ) break;
-          lk.unlock();  // Release lock during run()
-
-          try
+          while( true )
           {
-            if( !run() )
+            std::unique_lock lk( m_mutex );
+            cv.wait( lk, [this]() { return m_worker_state.load() != WorkerState::Paused; } );
+
+            if( m_worker_state.load() == WorkerState::Stopped ) break;
+            lk.unlock();
+
+            try
             {
-              error( "Run failed, stopping worker thread." );
+              if( m_onrun && !m_onrun() )
+              {
+                error( "Run function returned false, stopping worker." );
+                m_worker_state.store( WorkerState::Stopped );
+                break;
+              }
+            }
+            catch( const std::exception& e )
+            {
+              error( "Exception in run(): {}", e.what() );
               m_worker_state.store( WorkerState::Stopped );
               break;
             }
-            m_event_nbr++;
+            catch( ... )
+            {
+              error( "Unknown exception in run()" );
+              m_worker_state.store( WorkerState::Stopped );
+              break;
+            }
           }
-          catch( const std::exception& e )
-          {
-            error( "Exception in run(): {}", e.what() );
-            m_worker_state.store( WorkerState::Stopped );
-            break;
-          }
-          catch( ... )
-          {
-            error( "Unknown exception in run()" );
-            m_worker_state.store( WorkerState::Stopped );
-            break;
-          }
-        }
-      } );
+
+          info( "Worker thread exiting" );
+        } );
+    }
+    else
+    {
+      // Worker already running, just resume if paused
+      if( m_worker_state.load() == WorkerState::Paused )
+      {
+        m_worker_state.store( WorkerState::Running );
+        cv.notify_all();
+      }
+    }
 
     return true;
   }
@@ -187,80 +188,84 @@ public:
   {
     Transition transition{ allowTransition( State::ID::Paused ) };
     if( transition == Transition::alreadyDone ) return true;
-    else if( transition == Transition::allowed )
-    {
-      info( "Pausing" );
-      bool ret = on_pause();
-      if( ret )
-      {
-        {
-          std::unique_lock lk( m_mutex );
-          m_State.setId( State::ID::Paused );
-          m_worker_state.store( WorkerState::Paused );
-        }
-        cv.notify_all();  // Notify the worker thread to check the pause state
-      }
-      return ret;
-    }
-    else
+    if( transition != Transition::allowed )
     {
       warn( "{} to {} unauthorised", getStateStr(), "Paused" );
       return false;
     }
+
+    info( "Pausing Module" );
+
+    // Update state safely
+    {
+      std::unique_lock lk( m_mutex );
+      m_State.setId( State::ID::Paused );
+
+      // Only pause worker thread if it exists
+      if( m_worker.joinable() ) { m_worker_state.store( WorkerState::Paused ); }
+    }
+
+    cv.notify_all();  // Notify worker if it exists
+
+    return true;
   }
 
   YAODAQ_API bool resume()
   {
     Transition transition{ allowTransition( State::ID::Started ) };
     if( transition == Transition::alreadyDone ) return true;
-    else if( transition == Transition::allowed )
-    {
-      info( "Resuming" );
-      bool ret = on_resume();
-      if( ret )
-      {
-        {
-          std::unique_lock lk( m_mutex );
-          m_worker_state.store( WorkerState::Running );
-          m_State.setId( State::ID::Started );
-        }
-        cv.notify_all();
-      }
-      return ret;
-    }
-    else
+    if( transition != Transition::allowed )
     {
       warn( "{} to {} unauthorised", getStateStr(), "Started" );
       return false;
     }
+
+    info( "Resuming Module" );
+
+    {
+      std::unique_lock lk( m_mutex );
+      m_State.setId( State::ID::Started );
+
+      // Only resume worker thread if it exists
+      if( m_worker.joinable() ) { m_worker_state.store( WorkerState::Running ); }
+    }
+
+    cv.notify_all();  // Notify worker if it exists
+
+    return true;
   }
 
   YAODAQ_API bool stop()
   {
     Transition transition{ allowTransition( State::ID::Stopped ) };
     if( transition == Transition::alreadyDone ) return true;
-    else if( transition == Transition::allowed )
-    {
-      info( "Stopping" );
-      bool ret = on_stop();
-      if( ret )
-      {
-        m_worker_state.store( WorkerState::Stopped );
-        m_event_nbr.store( 0 );
-        cv.notify_all();
-        if( m_worker.joinable() ) { m_worker.join(); }
-        {
-          std::unique_lock lk( m_mutex );
-          m_State.setId( State::ID::Stopped );
-        }
-      }
-      return ret;
-    }
-    else
+    if( transition != Transition::allowed )
     {
       warn( "{} to {} unauthorised", getStateStr(), "Stopped" );
       return false;
     }
+
+    info( "Stopping Module" );
+
+    bool ret = on_stop();  // call the hook
+    if( !ret )
+    {
+      error( "on_stop() hook failed." );
+      return false;
+    }
+
+    {
+      std::unique_lock lk( m_mutex );
+      m_worker_state.store( WorkerState::Stopped );
+      m_State.setId( State::ID::Stopped );
+    }
+
+    cv.notify_all();  // Notify the worker thread if it exists
+
+    // Join worker if it was started
+    if( m_worker.joinable() ) { m_worker.join(); }
+
+    return true;
   }
 
   YAODAQ_API bool clear()
@@ -349,6 +354,7 @@ public:
   }
 
   void send( const nlohmann::json& json ) { send( json.dump() ); }
+  void setRun( const std::function<bool()>& fun ) noexcept { m_onrun = fun; }
 
 protected:
   virtual bool on_initialize() { return true; };
@@ -364,12 +370,7 @@ protected:
   virtual bool on_stop() { return true; };
   virtual bool on_clear() { return true; };
   virtual bool on_release() { return true; };
-  virtual bool run()
-  {
-    info( "running... event {}", m_event_nbr.load() );
-    std::this_thread::sleep_for( std::chrono::seconds( 1 ) );
-    return true;
-  }
+
   State      m_State;
   std::mutex m_mutex;
   enum class Transition : int
@@ -460,10 +461,10 @@ private:
     Paused,
     Stopped
   };
-  std::atomic<WorkerState>   m_worker_state{ WorkerState::Stopped };
-  std::condition_variable    cv;
-  std::thread                m_worker;
-  std::atomic<std::uint64_t> m_event_nbr{ 0 };
+  std::atomic<WorkerState> m_worker_state{ WorkerState::Stopped };
+  std::condition_variable  cv;
+  std::thread              m_worker;
+  std::function<bool()>    m_onrun;
 };
 
 }  // namespace yaodaq
