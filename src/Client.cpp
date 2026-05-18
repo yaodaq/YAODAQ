@@ -12,6 +12,8 @@
 #include <fmt/std.h>
 #include <iostream>
 #include <ixwebsocket/IXNetSystem.h>
+#include <ixwebsocket/IXProgressCallback.h>
+#include <magic_enum/magic_enum.hpp>
 #include <string>
 #include <string_view>
 #include <thread>
@@ -25,7 +27,7 @@ yaodaq::Client::~Client() noexcept
 yaodaq::Client::Client( const Identifier& id, const ClientConfig& client_config ) : m_identifier( id ), Logging( id )
 {
   ix::initNetSystem();
-  if( m_identifier.component().role() != Component::Role::Logger ) add_websocket_callback( [this]( const Log& msg ) noexcept { m_client.sendUtf8Text( msg.dump() ); } );
+  if( m_identifier.component().role() != Component::Role::Logger ) add_websocket_callback( [this]( const Log& msg ) noexcept { send( msg ); } );
   m_client.setUrl( client_config.url() );
   if( client_config.isTLS() )
   {
@@ -67,24 +69,26 @@ void yaodaq::Client::handleMessage( const ix::WebSocketMessagePtr& msg ) noexcep
       }
       case ix::WebSocketMessageType::Close:
       {
-        if( WebSocketCloseConstant::isRejected( msg->closeInfo.code ) ) onReject( msg->closeInfo.code, msg->closeInfo.reason, msg->closeInfo.remote );
+        if( WebSocketCloseConstant::isRejected( msg->closeInfo.code ) ) { onReject( Reject( msg->closeInfo ) ); }
         else
-          onClose( msg->closeInfo.code, msg->closeInfo.reason, msg->closeInfo.remote );
+        {
+          onClose( Close( msg->closeInfo ) );
+        }
         break;
       }
       case ix::WebSocketMessageType::Error:
       {
-        //onError( msg->errorInfo.retries, msg->errorInfo.wait_time, msg->errorInfo.http_status, msg->errorInfo.reason, msg->errorInfo.decompressionError );
+        onError( Error( msg->errorInfo ) );
         break;
       }
       case ix::WebSocketMessageType::Ping:
       {
-        onPing( msg->str, msg->wireSize, msg->binary );
+        onPing( Ping( msg->str, msg->wireSize, msg->binary ) );
         break;
       }
       case ix::WebSocketMessageType::Pong:
       {
-        onPong( msg->str, msg->wireSize, msg->binary );
+        onPong( Pong( msg->str, msg->wireSize, msg->binary ) );
         break;
       }
     }
@@ -106,29 +110,45 @@ void yaodaq::Client::handleMessage( const ix::WebSocketMessagePtr& msg ) noexcep
   }
 }
 
-void yaodaq::Client::onOpen( const Open& open ) { info( "Connected to {} (uri: {})\nheaders: {}\nprotocol: {}\n{}", open.url(), open.uri(), yaodaq::Formatter::format( open.payload()["headers"] ), open.protocol(), yaodaq::Formatter::format( open.dump() ) ); }
+void yaodaq::Client::onOpen( const Open& open )
+{
+  info( "Connected to {} (uri: {})\nheaders: {}\nprotocol: {}\n{}", open.url(), open.uri(), yaodaq::Formatter::format( open.payload()["headers"] ), open.protocol(), yaodaq::Formatter::format( open() ) );
+  send( open );
+}
 
 void yaodaq::Client::onMessage( const std::string& str, const std::size_t size, const bool binary )
 {
   nlohmann::json message = nlohmann::json::parse( str, nullptr, false );
   if( !message.is_discarded() ) { onJsonRPC( message ); }
-  //else
-  //  onText( str );
 }
 
-void yaodaq::Client::onClose( const std::uint16_t code, const std::string& reason, bool remote )
+void yaodaq::Client::onClose( const Close& close )
 {
-  if( remote ) warn( "closing by remote: {} ({})", reason, code );
+  //if(m_client.getReadyState() != ix::ReadyState::Closed && m_client.getReadyState() != ix::ReadyState::Closing)
+  //{
+  send( close );
+  if( close.remote() ) warn( "closing by remote: {} ({})", close.reason(), close.code() );
   else
-    info( "closing: {} ({})", reason, code );
+    info( "closing: {} ({})", close.reason(), close.code() );
+  //}
 }
 
-void yaodaq::Client::onReject( const std::uint16_t code, const std::string& reason, bool remote )
+void yaodaq::Client::onReject( const Reject& reject )
 {
   while( m_client.isAutomaticReconnectionEnabled() ) m_client.disableAutomaticReconnection();  // don't try to reconnect dude I don't want you !
-  if( remote ) error( "rejected by remote: {} ({})", reason, code );
+                                                                                               //if(m_client.getReadyState() != ix::ReadyState::Closed && m_client.getReadyState() != ix::ReadyState::Closing)
+                                                                                               //{
+  send( reject );
+  if( reject.remote() ) error( "rejected by remote: {} ({})", reject.reason(), reject.code() );
   else
-    error( "rejected: {} ({})", reason, code );
+    error( "rejected: {} ({})", reject.reason(), reject.code() );
+  //}
+}
+
+void yaodaq::Client::onError( const Error& err )
+{
+  error( "error {} ({}), retries: {}, waiting_time: {}{}", err.reason(), err.http_status(), err.retries(), err.wait_time(), err.decompression_error() ? " (decompression error)" : "" );
+  send( err );
 }
 
 /**
@@ -143,20 +163,36 @@ void yaodaq::Client::onJsonRPC( const nlohmann::json& json )
 {
   if( json.contains( "result" ) || json.contains( "error" ) ) onResponse( json.dump() );
   else if( json.contains( "method" ) || json.contains( "notification" ) ) { m_client.sendUtf8Text( HandleRequest( json ).c_str() ); }
-  else if( json.contains( "meta" ) && json["meta"]["type"] == "Log" )
-    onLog( json );
+  else if( json.contains( "meta" ) && json["meta"].contains( "type" ) )
+  {
+    switch( magic_enum::enum_cast<Message::Type>( json["meta"]["type"].get<std::string_view>(), magic_enum::case_insensitive ).value() )
+    {
+      case Message::Type::Log:
+      {
+        onLog( json );
+        break;
+      }
+      default:
+      {
+        break;
+      }
+    }
+  }
 }
 
 //void yaodaq::Client::onFragment( const std::string& str, const std::size_t size, const bool binary ) { std::cout << str << " " << size << " " << binary << std::endl; }
 
-//void yaodaq::Client::onError( const std::uint32_t retries, const double wait_time, const int http_status, const std::string& reason, const bool decompressionError )
-//{
-//  std::cout << retries << " " << wait_time << " " << http_status << " " << reason << " " << decompressionError << std::endl;
-//}
+void yaodaq::Client::onPing( const Ping& ping )
+{
+  send( ping );
+  info( "received ping: {}", ping.message() );
+}
 
-void yaodaq::Client::onPing( const std::string& str, const std::size_t size, const bool binary ) { info( "received ping: {}", str ); }
-
-void yaodaq::Client::onPong( const std::string& str, const std::size_t size, const bool binary ) { info( "received pong: {}", str ); }
+void yaodaq::Client::onPong( const Pong& pong )
+{
+  send( pong );
+  info( "received pong: {}", pong.message() );
+}
 
 void yaodaq::Client::onLog( const nlohmann::json& json )
 {
@@ -196,20 +232,33 @@ void yaodaq::Client::onLog( const nlohmann::json& json )
   }
 }
 
-void yaodaq::Client::send( const Message& msg, const bool callback ) noexcept
+void yaodaq::Client::send( const Message& message, const send_as as ) noexcept
 {
-  ix::WebSocketSendInfo ret = m_client.sendUtf8Text( msg.dump(),
-                                                     [this, callback]( const int current, const int total ) -> bool
-                                                     {
-                                                       if( callback ) { info( "Downloaded {} bytes out of {}", current, total ); }
-                                                       return true;
-                                                     } );
-  if( callback )
+  static const ix::OnProgressCallback callback{ [this]( int current, int total ) noexcept -> bool
+                                                {
+                                                  debug_without_websocket( "sent {}/{} ({}%)", current + 1, total, ( current + 1 ) * 100.0 / total );
+                                                  return true;
+                                                } };
+  if( m_client.getReadyState() == ix::ReadyState::Closed || m_client.getReadyState() == ix::ReadyState::Closing ) return;
+  ix::WebSocketSendInfo ret;
+  switch( as )
   {
-    if( ret.success ) info( "sent {} payloadSize {} wireSize {}", ret.payloadSize, ret.wireSize );
-    else
-      error( "error sending {}\npayloadSize {} wireSize {}{}", msg.dump(), ret.payloadSize, ret.wireSize, ret.compressionError ? " compression error" : "" );
+    case send_as::utf8:
+    {
+      ret = m_client.sendUtf8Text( message.dump(), callback );
+      break;
+    }
+    case send_as::binary:
+    {
+      ret = m_client.sendBinary( message.dump(), callback );
+      break;
+    }
+  }
+  if( ret.success ) debug_without_websocket( "sent successful, payload: {}, wire_size:{}", ret.payloadSize, ret.wireSize );
+  else
+  {
+    const std::string error_message = fmt::format( "Error sending message of type '{}', payload: {}, wire_size:{}{}", message.meta()["type"].get<std::string_view>(), ret.payloadSize, ret.wireSize, ret.compressionError ? " (compression error)" : "" );
+    error_without_websocket( error_message );
+    m_client.sendUtf8Text( Log( spdlog::details::log_msg( identifier().id(), spdlog::level::err, error_message ) ).dump(), callback );
   }
 }
-
-void yaodaq::Client::send( const nlohmann::json& json ) { ix::WebSocketSendInfo ret = m_client.sendUtf8Text( json.dump() ); }

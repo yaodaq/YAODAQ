@@ -30,12 +30,18 @@ try
   yaodaq::ClientConfig cfg;
   cfg().setPort( port ).setHost( host );
   yaodaq::Module module( cfg, name );
+  module.setVerbosity( spdlog::level::level_enum::info );
   if( name == "loop" )
     module.setRun(
       [&module]() -> bool
       {
         static int event{ 0 };
-        module.info( "running... event {}", event );
+        module.trace( "trace {}", event );
+        module.debug( "debug {}", event );
+        module.info( "info {}", event );
+        module.warn( "warn {}", event );
+        module.error( "error {}", event );
+        module.critical( "critical {}", event );
         std::this_thread::sleep_for( std::chrono::seconds( 1 ) );
         ++event;
         return true;

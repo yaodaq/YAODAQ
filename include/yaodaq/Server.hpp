@@ -142,28 +142,29 @@ public:
   YAODAQ_API std::size_t getNumberOfClients() noexcept;
 
 private:
-  YAODAQ_API explicit Server() noexcept = delete;
-  ix::WebSocketServer m_server;
-  Identifier          m_identifier;
-  ThreadPool          m_threadPool;
-  void                handleMessage( std::shared_ptr<ix::ConnectionState> connectionState, ix::WebSocket& webSocket, const ix::WebSocketMessagePtr& msg ) noexcept;
-  bool                m_rejectBrowser{ false };  //< Reject the Browsers
+  YAODAQ_INTERNAL explicit Server() noexcept = delete;
+  ix::WebSocketServer  m_server;
+  Identifier           m_identifier;
+  ThreadPool           m_threadPool;
+  YAODAQ_INTERNAL void handleMessage( std::shared_ptr<ix::ConnectionState> connectionState, ix::WebSocket& webSocket, const ix::WebSocketMessagePtr& msg ) noexcept;
+  bool                 m_rejectBrowser{ false };  //< Reject the Browsers
 
-  virtual void Send( const std::string_view request ) override final;
+  virtual void         Send( const std::string_view request ) override final;
   /* Check if client has all to be an yaodaq one and if he has the authorizations */
-  void         checkClient( std::shared_ptr<ix::ConnectionState> connectionState, ix::WebSocket& webSocket, const ix::WebSocketMessagePtr& msg );
+  YAODAQ_INTERNAL void checkClient( std::shared_ptr<ix::ConnectionState> connectionState, ix::WebSocket& webSocket, const ix::WebSocketMessagePtr& msg );
 
   // Messages
-  void onMessage( std::shared_ptr<ix::ConnectionState> connectionState, ix::WebSocket& webSocket, const std::string& str, const std::size_t size, const bool binary );
-  void onJsonRPCResponse( std::shared_ptr<ix::ConnectionState> connectionState, ix::WebSocket& webSocket, nlohmann::json response );
-  void onJsonRPCRequest( std::shared_ptr<ix::ConnectionState> connectionState, ix::WebSocket& webSocket, nlohmann::json request );
-  void onLog( std::shared_ptr<ix::ConnectionState> connectionState, ix::WebSocket& webSocket, nlohmann::json request );
+  YAODAQ_INTERNAL void onMessage( std::shared_ptr<ix::ConnectionState> connectionState, ix::WebSocket& webSocket, const std::string& str, const std::size_t size, const bool binary );
+  YAODAQ_INTERNAL void onJsonRPCResponse( std::shared_ptr<ix::ConnectionState> connectionState, ix::WebSocket& webSocket, nlohmann::json response );
+  YAODAQ_INTERNAL void onJsonRPCRequest( std::shared_ptr<ix::ConnectionState> connectionState, ix::WebSocket& webSocket, nlohmann::json request );
+  YAODAQ_INTERNAL void onLog( std::shared_ptr<ix::ConnectionState> connectionState, ix::WebSocket& webSocket, nlohmann::json request );
   // Others
-  void onOpen( std::shared_ptr<ix::ConnectionState> connectionState, ix::WebSocket& webSocket, const Open& open );
-  void onClose( std::shared_ptr<ix::ConnectionState> connectionState, ix::WebSocket& webSocket, const std::uint16_t code, const std::string& reason, bool remote );
-  void onReject( std::shared_ptr<ix::ConnectionState> connectionState, ix::WebSocket& webSocket, const std::uint16_t code, const std::string& reason, bool remote );
-  void onPing( std::shared_ptr<ix::ConnectionState> connectionState, ix::WebSocket& webSocket, const std::string& str, const std::size_t size, const bool binary );
-  void onPong( std::shared_ptr<ix::ConnectionState> connectionState, ix::WebSocket& webSocket, const std::string& str, const std::size_t size, const bool binary );
+  YAODAQ_INTERNAL void onOpen( std::shared_ptr<ix::ConnectionState> connectionState, ix::WebSocket& webSocket, const Open& open );
+  YAODAQ_INTERNAL void onClose( std::shared_ptr<ix::ConnectionState> connectionState, ix::WebSocket& webSocket, const Close& close );
+  YAODAQ_INTERNAL void onReject( std::shared_ptr<ix::ConnectionState> connectionState, ix::WebSocket& webSocket, const Reject& reject );
+  YAODAQ_INTERNAL void onPing( std::shared_ptr<ix::ConnectionState> connectionState, ix::WebSocket& webSocket, const Ping& ping );
+  YAODAQ_INTERNAL void onPong( std::shared_ptr<ix::ConnectionState> connectionState, ix::WebSocket& webSocket, const Pong& pong );
+  YAODAQ_INTERNAL void onError( std::shared_ptr<ix::ConnectionState> connectionState, ix::WebSocket& webSocket, const Error& error );
 
   std::mutex                                                                m_map_mutex;
   std::unordered_map<jsonrpc::id_t, std::shared_ptr<yaodaq::ServerRequest>> m_server_construct_response;
@@ -172,18 +173,14 @@ private:
   std::mutex                                                                m_server_own_request;
   std::unordered_map<jsonrpc::id_t, std::shared_ptr<yaodaq::ServerRequest>> m_server_own_construct_response;
 
-  //
-  //void onFragment( std::shared_ptr<ix::ConnectionState> connectionState, ix::WebSocket& webSocket, const std::string& str, const std::size_t size, const bool binary );
-  //void onError( std::shared_ptr<ix::ConnectionState> connectionState, ix::WebSocket& webSocket, const std::uint32_t retries, const double wait_time, const int http_status, const std::string& reason, const bool decompressionError );
-
   // Send to all clients except webSocket
-  void sendExcept( const std::string& str, ix::WebSocket& webSocket );
+  YAODAQ_INTERNAL void sendExcept( const std::string& str, ix::WebSocket& webSocket );
   // Send only to webSocket
-  void sendTo( const std::string& str, ix::WebSocket& webSocket );
+  YAODAQ_INTERNAL void sendTo( const std::string& str, ix::WebSocket& webSocket );
   // Send to all
-  void sendToAll( const std::string_view& str ) noexcept;
+  YAODAQ_INTERNAL void sendToAll( const std::string_view& str ) noexcept;
   // Send to loggers
-  void sendToLoggers( const std::string& str );
+  YAODAQ_INTERNAL void sendToLoggers( const std::string& str );
 
   // Check if a client already have this name
   std::unordered_map<Component::Role, std::unordered_map<std::string, std::reference_wrapper<ix::WebSocket>>> m_clients;

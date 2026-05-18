@@ -14,6 +14,7 @@
 #include <iostream>
 #include <ixwebsocket/IXNetSystem.h>
 #include <ixwebsocket/IXWebSocketServer.h>
+#include <magic_enum/magic_enum.hpp>
 #include <memory>
 #include <string>
 #include <string_view>
@@ -162,18 +163,18 @@ void yaodaq::Server::checkClient( std::shared_ptr<ix::ConnectionState> connectio
 void yaodaq::Server::onOpen( std::shared_ptr<ix::ConnectionState> connectionState, ix::WebSocket& webSocket, const yaodaq::Open& open )
 { info( "client {} at {} port {} connected to server:\n  {}", connectionState->getId(), connectionState->getRemoteIp(), connectionState->getRemotePort(), yaodaq::Formatter::format( open.payload() ) ); }
 
-void yaodaq::Server::onClose( std::shared_ptr<ix::ConnectionState> connectionState, ix::WebSocket& webSocket, const std::uint16_t code, const std::string& reason, bool remote )
+void yaodaq::Server::onClose( std::shared_ptr<ix::ConnectionState> connectionState, ix::WebSocket& webSocket, const Close& close )
 {
-  if( remote ) warn( "client {} at {} port {} disconnected to server remotelly: {}({})", connectionState->getId(), connectionState->getRemoteIp(), connectionState->getRemotePort(), reason, code );
+  if( close.remote() ) warn( "client {} at {} port {} disconnected to server remotelly: {}({})", connectionState->getId(), connectionState->getRemoteIp(), connectionState->getRemotePort(), close.reason(), close.code() );
   else
-    warn( "client {} at {} port {} disconnected to server remotelly: {}({})", connectionState->getId(), connectionState->getRemoteIp(), connectionState->getRemotePort(), reason, code );
+    warn( "client {} at {} port {} disconnected to server remotelly: {}({})", connectionState->getId(), connectionState->getRemoteIp(), connectionState->getRemotePort(), close.reason(), close.code() );
 }
 
-void yaodaq::Server::onReject( std::shared_ptr<ix::ConnectionState> connectionState, ix::WebSocket& webSocket, const std::uint16_t code, const std::string& reason, bool remote )
+void yaodaq::Server::onReject( std::shared_ptr<ix::ConnectionState> connectionState, ix::WebSocket& webSocket, const Reject& reject )
 {
-  if( remote ) error( "client {} at {} port {} rejected by server remotelly: {}({})", connectionState->getId(), connectionState->getRemoteIp(), connectionState->getRemotePort(), reason, code );
+  if( reject.remote() ) error( "client {} at {} port {} rejected by server remotelly: {}({})", connectionState->getId(), connectionState->getRemoteIp(), connectionState->getRemotePort(), reject.reason(), reject.code() );
   else
-    error( "client {} at {} port {} rejected by server: {}({})", connectionState->getId(), connectionState->getRemoteIp(), connectionState->getRemotePort(), reason, code );
+    error( "client {} at {} port {} rejected by server: {}({})", connectionState->getId(), connectionState->getRemoteIp(), connectionState->getRemotePort(), reject.reason(), reject.code() );
 }
 
 void yaodaq::Server::onMessage( std::shared_ptr<ix::ConnectionState> connectionState, ix::WebSocket& webSocket, const std::string& str, const std::size_t size, const bool binary )
@@ -184,8 +185,23 @@ void yaodaq::Server::onMessage( std::shared_ptr<ix::ConnectionState> connectionS
     if( message.contains( "method" ) || message.contains( "notification" ) ) onJsonRPCRequest( connectionState, webSocket, message );
     else if( message.contains( "result" ) || message.contains( "error" ) )
       onJsonRPCResponse( connectionState, webSocket, message );
-    else if( message.contains( "meta" ) && message["meta"]["type"] == "Log" )
-      onLog( connectionState, webSocket, message );
+    else if( message.contains( "meta" ) && message["meta"].contains( "type" ) )
+    {
+      switch( magic_enum::enum_cast<Message::Type>( message["meta"]["type"].get<std::string_view>(), magic_enum::case_insensitive ).value() )
+      {
+        case Message::Type::Log:
+        {
+          onLog( connectionState, webSocket, message );
+          break;
+        }
+        default:
+        {
+          sendToAll( message.dump() );
+          std::cout << "DDDDDDDDDDDDDD" << std::endl;
+          break;
+        }
+      }
+    }
   }
 }
 
@@ -323,19 +339,13 @@ void yaodaq::Server::onJsonRPCResponse( std::shared_ptr<ix::ConnectionState> con
 
 std::size_t yaodaq::Server::getNumberOfClients() noexcept { return m_server.getClients().size(); }
 
-//void yaodaq::Server::onFragment( std::shared_ptr<ix::ConnectionState> connectionState, ix::WebSocket& webSocket, const std::string& str, const std::size_t size, const bool binary ) { std::cout << str << " " << size << " " << binary << std::endl; }
+void yaodaq::Server::onPing( std::shared_ptr<ix::ConnectionState> connectionState, ix::WebSocket& webSocket, const Ping& ping )
+{ info( "client {} at {} port {} sent ping: {}", connectionState->getId(), connectionState->getRemoteIp(), connectionState->getRemotePort(), ping.message() ); }
 
-//void yaodaq::Server::onError( std::shared_ptr<ix::ConnectionState> connectionState, ix::WebSocket& webSocket, const std::uint32_t retries, const double wait_time, const int http_status, const std::string& reason, const bool decompressionError )
-//{
-//  std::cout << retries << " " << wait_time << " " << http_status << " " << reason << " " << decompressionError << std::endl;
-// ;
-//}
+void yaodaq::Server::onError( std::shared_ptr<ix::ConnectionState> connectionState, ix::WebSocket& webSocket, const Error& error ) {}
 
-void yaodaq::Server::onPing( std::shared_ptr<ix::ConnectionState> connectionState, ix::WebSocket& webSocket, const std::string& str, const std::size_t size, const bool binary )
-{ info( "client {} at {} port {} sent ping: {}", connectionState->getId(), connectionState->getRemoteIp(), connectionState->getRemotePort(), str ); }
-
-void yaodaq::Server::onPong( std::shared_ptr<ix::ConnectionState> connectionState, ix::WebSocket& webSocket, const std::string& str, const std::size_t size, const bool binary )
-{ info( "client {} at {} port {} sent pong: {}", connectionState->getId(), connectionState->getRemoteIp(), connectionState->getRemotePort(), str ); }
+void yaodaq::Server::onPong( std::shared_ptr<ix::ConnectionState> connectionState, ix::WebSocket& webSocket, const Pong& pong )
+{ info( "client {} at {} port {} sent pong: {}", connectionState->getId(), connectionState->getRemoteIp(), connectionState->getRemotePort(), pong.message() ); }
 
 void yaodaq::Server::sendExcept( const std::string& str, ix::WebSocket& webSocket )
 {
@@ -398,31 +408,31 @@ void yaodaq::Server::handleMessage( std::shared_ptr<ix::ConnectionState> connect
       }
       case ix::WebSocketMessageType::Close:
       {
-        if( WebSocketCloseConstant::isRejected( msg->closeInfo.code ) ) { onReject( connectionState, webSocket, msg->closeInfo.code, msg->closeInfo.reason, msg->closeInfo.remote ); }
+        if( WebSocketCloseConstant::isRejected( msg->closeInfo.code ) ) { onReject( connectionState, webSocket, Reject( msg->closeInfo ) ); }
         else
         {
+          onClose( connectionState, webSocket, Close( msg->closeInfo ) );
           {
             std::lock_guard<std::mutex> lock( m_mutex );
             const auto                  cs = std::static_pointer_cast<yaodaq::ConnectionState>( connectionState );
             m_clients.find( cs->getID().component().role() )->second.erase( std::string( cs->getID().name() ) );
           }
-          onClose( connectionState, webSocket, msg->closeInfo.code, msg->closeInfo.reason, msg->closeInfo.remote );
         }
         break;
       }
       case ix::WebSocketMessageType::Error:
       {
-        //onError( connectionState, webSocket, msg->errorInfo.retries, msg->errorInfo.wait_time, msg->errorInfo.http_status, msg->errorInfo.reason, msg->errorInfo.decompressionError );
+        onError( connectionState, webSocket, Error( msg->errorInfo ) );
         break;
       }
       case ix::WebSocketMessageType::Ping:
       {
-        onPing( connectionState, webSocket, msg->str, msg->wireSize, msg->binary );
+        onPing( connectionState, webSocket, Ping( msg->str, msg->wireSize, msg->binary ) );
         break;
       }
       case ix::WebSocketMessageType::Pong:
       {
-        onPong( connectionState, webSocket, msg->str, msg->wireSize, msg->binary );
+        onPong( connectionState, webSocket, Pong( msg->str, msg->wireSize, msg->binary ) );
         break;
       }
     }

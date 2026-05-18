@@ -20,6 +20,8 @@ struct log_msg;
 namespace ix
 {
 struct WebSocketOpenInfo;
+struct WebSocketCloseInfo;
+struct WebSocketErrorInfo;
 class ConnectionState;
 class WebSocket;
 }  // namespace ix
@@ -34,6 +36,11 @@ public:
   {
     Log,
     Open,
+    Close,
+    Reject,
+    Error,
+    Ping,
+    Pong,
     Exception
   };
   YAODAQ_API explicit Message() noexcept = delete;
@@ -68,6 +75,68 @@ public:
   YAODAQ_API std::string uri() const noexcept { return payload()["uri"].get<std::string>(); }
   YAODAQ_API std::map<std::string, std::string> headers() const noexcept { return payload()["headers"].get<std::map<std::string, std::string>>(); }
   YAODAQ_API std::string protocol() const noexcept { return payload()["protocol"].get<std::string>(); }
+};
+
+class Close : public Message
+{
+public:
+  YAODAQ_API explicit Close() noexcept = delete;
+  YAODAQ_API explicit Close( const ix::WebSocketCloseInfo& close );
+  YAODAQ_API std::uint16_t code() const noexcept { return payload()["code"].get<std::uint16_t>(); }
+  YAODAQ_API std::string_view reason() const noexcept { return payload()["reason"].get<std::string_view>(); }
+  YAODAQ_API bool             remote() const noexcept { return payload()["remote"].get<bool>(); }
+};
+
+class Reject : public Message
+{
+public:
+  YAODAQ_API explicit Reject() noexcept = delete;
+  YAODAQ_API explicit Reject( const ix::WebSocketCloseInfo& close );
+  YAODAQ_API std::uint16_t code() const noexcept { return payload()["code"].get<std::uint16_t>(); }
+  YAODAQ_API std::string_view reason() const noexcept { return payload()["reason"].get<std::string_view>(); }
+  YAODAQ_API bool             remote() const noexcept { return payload()["remote"].get<bool>(); }
+};
+
+class Error : public Message
+{
+public:
+  YAODAQ_API explicit Error() noexcept = delete;
+  YAODAQ_API explicit Error( const ix::WebSocketErrorInfo& error );
+  YAODAQ_API std::uint32_t retries() const noexcept { return payload()["retries"].get<std::uint32_t>(); }
+  YAODAQ_API double        wait_time() const noexcept { return payload()["wait_time"].get<double>(); }
+  YAODAQ_API int           http_status() const noexcept { return payload()["http_status"].get<int>(); }
+  YAODAQ_API std::string_view reason() const noexcept { return payload()["reason"].get<std::string_view>(); }
+  YAODAQ_API bool             decompression_error() const noexcept { return payload()["decompression_error"].get<bool>(); }
+};
+
+class Ping : public Message
+{
+public:
+  YAODAQ_API explicit Ping() noexcept = delete;
+  YAODAQ_API explicit Ping( const std::string_view& message, const std::size_t size, const bool binary ) : Message( yaodaq::Message::Type::Ping )
+  {
+    payload()["message"] = message;
+    payload()["binary"]  = binary;
+    payload()["size"]    = size;
+  }
+  YAODAQ_API std::string_view message() const noexcept { return payload()["message"].get<std::string_view>(); }
+  YAODAQ_API bool             binary() const noexcept { return payload()["binary"].get<bool>(); }
+  YAODAQ_API std::size_t size() const noexcept { return payload()["size"].get<std::size_t>(); }
+};
+
+class Pong : public Message
+{
+public:
+  YAODAQ_API explicit Pong() noexcept = delete;
+  YAODAQ_API explicit Pong( const std::string_view& message, const std::size_t size, const bool binary ) : Message( yaodaq::Message::Type::Pong )
+  {
+    payload()["message"] = message;
+    payload()["binary"]  = binary;
+    payload()["size"]    = size;
+  }
+  YAODAQ_API std::string_view message() const noexcept { return payload()["message"].get<std::string_view>(); }
+  YAODAQ_API bool             binary() const noexcept { return payload()["binary"].get<bool>(); }
+  YAODAQ_API std::size_t size() const noexcept { return payload()["size"].get<std::size_t>(); }
 };
 
 class Except : public Message

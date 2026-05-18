@@ -114,33 +114,36 @@ protected:
     info( "Closing {}", m_client.getUrl() );
     m_client.close();
   }
-  virtual void     onResponse( const std::string& ) {}
-  const Identifier m_identifier;
-
-protected:
-  void send( const Message& msg, const bool callback = true ) noexcept;
-  void send( const nlohmann::json& json );
+  virtual void onResponse( const std::string& ) {}
 
 private:
+  const Identifier m_identifier;
+  ix::WebSocket    m_client;
   explicit Client() noexcept = delete;
-  ix::WebSocket m_client;
-  void          handleMessage( const ix::WebSocketMessagePtr& msg ) noexcept;
+  YAODAQ_INTERNAL void handleMessage( const ix::WebSocketMessagePtr& msg ) noexcept;
 
   // Messages
-  YAODAQ_API void onMessage( const std::string& str, const std::size_t size, const bool binary );
-  YAODAQ_API void onJsonRPC( const nlohmann::json& json );
+  YAODAQ_INTERNAL void onMessage( const std::string& str, const std::size_t size, const bool binary );
+  YAODAQ_INTERNAL void onJsonRPC( const nlohmann::json& json );
   // Others
-  YAODAQ_API void onOpen( const Open& open );
-  YAODAQ_API void onClose( const std::uint16_t code, const std::string& reason, bool remote );
-  YAODAQ_API void onReject( const std::uint16_t code, const std::string& reason, bool remote );  // Has been closed by server because of some criteria
-
+  YAODAQ_INTERNAL void onOpen( const Open& open );
+  YAODAQ_INTERNAL void onClose( const Close& close );
+  YAODAQ_INTERNAL void onReject( const Reject& reject );  // Has been closed by server because of some criteria
+  YAODAQ_INTERNAL void onError( const Error& error );
   /*YAODAQ_API void onFragment( const std::string& str, const std::size_t size, const bool binary );
 
 
   YAODAQ_API void onError( const std::uint32_t retries, const double wait_time, const int http_status, const std::string& reason, const bool decompressionError );*/
-  YAODAQ_API void onPing( const std::string& str, const std::size_t size, const bool binary );
-  YAODAQ_API void onPong( const std::string& str, const std::size_t size, const bool binary );
-  YAODAQ_API void onLog( const nlohmann::json& json );
+  YAODAQ_INTERNAL void onPing( const Ping& ping );
+  YAODAQ_INTERNAL void onPong( const Pong& pong );
+  YAODAQ_INTERNAL void onLog( const nlohmann::json& json );
+
+  enum class send_as : unsigned char
+  {
+    utf8   = 1,
+    binary = 2,
+  };
+  YAODAQ_INTERNAL void send( const Message& message, const send_as as = send_as::utf8 ) noexcept;
 };
 
 }  // namespace yaodaq

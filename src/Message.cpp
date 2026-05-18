@@ -6,6 +6,8 @@
 #include <chrono>
 #include <ixwebsocket/IXConnectionState.h>
 #include <ixwebsocket/IXWebSocket.h>
+#include <ixwebsocket/IXWebSocketCloseInfo.h>
+#include <ixwebsocket/IXWebSocketErrorInfo.h>
 #include <ixwebsocket/IXWebSocketOpenInfo.h>
 #include <magic_enum/magic_enum.hpp>
 #include <spdlog/details/log_msg.h>
@@ -49,6 +51,29 @@ yaodaq::Open::Open( const ix::WebSocketOpenInfo& open ) : Message( yaodaq::Messa
   payload()["uri"]      = open.uri;
   payload()["headers"]  = open.headers;
   payload()["protocol"] = open.protocol;
+}
+
+yaodaq::Close::Close( const ix::WebSocketCloseInfo& close ) : Message( yaodaq::Message::Type::Close )
+{
+  payload()["code"]   = close.code;
+  payload()["reason"] = close.reason;
+  payload()["remote"] = close.remote;
+}
+
+yaodaq::Reject::Reject( const ix::WebSocketCloseInfo& close ) : Message( yaodaq::Message::Type::Reject )
+{
+  payload()["code"]   = close.code;
+  payload()["reason"] = close.reason;
+  payload()["remote"] = close.remote;
+}
+
+yaodaq::Error::Error( const ix::WebSocketErrorInfo& error ) : Message( yaodaq::Message::Type::Error )
+{
+  payload()["retries"]             = error.retries;
+  payload()["wait_time"]           = error.wait_time;
+  payload()["http_status"]         = error.http_status;
+  payload()["reason"]              = error.reason;
+  payload()["decompression_error"] = error.decompressionError;
 }
 
 yaodaq::Except::Except( const Exception& exception ) : Message( yaodaq::Message::Type::Exception ) { payload()["what"] = exception.what(); }

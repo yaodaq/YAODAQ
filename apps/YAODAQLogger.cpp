@@ -30,6 +30,7 @@ try
   yaodaq::ClientConfig cfg;
   cfg().setPort( port ).setHost( host );
   yaodaq::Logger logger( cfg, name );
+  logger.setVerbosity( spdlog::level::level_enum::trace );
   logger.link();
   std::size_t nbrCTLC{ 3 };
   Term::cout << Term::color_fg( Term::Color::Name::Red ) << "Press " << std::to_string( nbrCTLC ) << " times CTRL+C to stop" << Term::color_fg( Term::Color::Name::Default ) << std::endl;
