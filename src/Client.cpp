@@ -162,7 +162,7 @@ void yaodaq::Client::onError( const Error& err )
 void yaodaq::Client::onJsonRPC( const nlohmann::json& json )
 {
   if( json.contains( "result" ) || json.contains( "error" ) ) onResponse( json.dump() );
-  else if( json.contains( "method" ) || json.contains( "notification" ) ) { m_client.sendUtf8Text( HandleRequest( json ).c_str() ); }
+  else if( json.contains( "method" ) || json.contains( "notification" ) ) { m_client.sendUtf8Text( HandleRequest( json ) ); }
   else if( json.contains( "meta" ) && json["meta"].contains( "type" ) )
   {
     switch( magic_enum::enum_cast<Message::Type>( json["meta"]["type"].get<std::string_view>(), magic_enum::case_insensitive ).value() )

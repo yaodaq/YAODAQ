@@ -1,6 +1,7 @@
 #pragma once
 #include <cxx/jsonrpc/server.hpp>
 #include <future>
+#include <iostream>
 #include <mutex>
 #include <string>
 #include <unordered_map>
@@ -8,7 +9,6 @@
 #include <yaodaq/Export.hpp>
 #include <yaodaq/Identifier.hpp>
 #include <yaodaq/Response.hpp>
-
 namespace yaodaq
 {
 

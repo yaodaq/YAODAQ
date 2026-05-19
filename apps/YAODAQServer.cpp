@@ -9,7 +9,7 @@
 #include <yaodaq/Formatter.hpp>
 #include <yaodaq/Server.hpp>
 
-int main( int argc, char** argv )
+int main( int argc, char** argv ) noexcept
 try
 {
   Term::terminal.setOptions( Term::Option::Raw, Term::Option::Cursor );
@@ -69,6 +69,11 @@ try
         {
           nbrCTLC = 3;
           std::cout << server.CallMethod( "listProcedures" ).pretty_format() << std::endl;
+        }
+        else if( key == Term::Key::n )
+        {
+          nbrCTLC = 3;
+          std::cout << server.CallMethod( "getNumberOfClients" ).pretty_format() << std::endl;
         }
         else
         {
