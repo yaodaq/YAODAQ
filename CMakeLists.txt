@@ -8,6 +8,23 @@ cmmm(VERSION 1.1 NO_CHANGELOG)
 cmmm_modules_list(URL "gh:cmake-tools/cmcm")
 
 project(YAODAQ VERSION 0.0.0.1 DESCRIPTION "Yet An Other DAQ" HOMEPAGE_URL "https://github.com/yaodaq/YAODAQ" LANGUAGES CXX)
+include(GNUInstallDirs)
+
+#
+# =========================
+# Linux RPATH
+# =========================
+#
+if(UNIX AND NOT APPLE)
+  set(CMAKE_INSTALL_RPATH "$ORIGIN/../${CMAKE_INSTALL_LIBDIR}")
+  set(CMAKE_BUILD_WITH_INSTALL_RPATH FALSE)
+  set(CMAKE_INSTALL_RPATH_USE_LINK_PATH TRUE)
+elseif(APPLE)
+  set(CMAKE_MACOSX_RPATH TRUE)
+  set(CMAKE_INSTALL_RPATH "@loader_path/../Frameworks")
+  set(CMAKE_BUILD_WITH_INSTALL_RPATH FALSE)
+  set(CMAKE_INSTALL_RPATH_USE_LINK_PATH TRUE)
+endif()
 
 get_property(GENERATOR_IS_MULTI_CONFIG GLOBAL PROPERTY GENERATOR_IS_MULTI_CONFIG)
 if(NOT GENERATOR_IS_MULTI_CONFIG)
@@ -34,5 +51,6 @@ add_subdirectory(apps)
 add_subdirectory(examples)
 
 if(YAODAQ_TESTS)
-  #include(CTest)
+  include(CTest)
 endif()
+

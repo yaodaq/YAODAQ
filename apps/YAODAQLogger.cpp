@@ -76,13 +76,13 @@ try
 }
 catch( const yaodaq::Exception& exception )
 {
-  //spdlog::error( "{}", exception.what() );
+  Term::cerr << Term::color_fg( Term::Color::Name::Red ) << exception.what() << Term::color_fg( Term::Color::Name::Default ) << std::endl;
 }
 catch( const std::exception& exception )
 {
-  //spdlog::error( "{}", exception.what() );
+  Term::cerr << Term::color_fg( Term::Color::Name::Red ) << exception.what() << Term::color_fg( Term::Color::Name::Default ) << std::endl;
 }
 catch( ... )
 {
-  //spdlog::error( "Exception thrown" );
+  Term::cerr << Term::color_fg( Term::Color::Name::Red ) << "exception thrown" << Term::color_fg( Term::Color::Name::Default ) << std::endl;
 }

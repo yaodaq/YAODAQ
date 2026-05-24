@@ -33,7 +33,6 @@ list(APPEND YAODAQ_PUBLIC_HEADERS
 "${PROJECT_SOURCE_DIR}/include/yaodaq/ConnectionState.hpp"
 "${PROJECT_SOURCE_DIR}/include/yaodaq/Exception.hpp"
 "${PROJECT_SOURCE_DIR}/include/yaodaq/Identifier.hpp"
-"${PROJECT_SOURCE_DIR}/include/yaodaq/JsonRPCHandler.hpp"
 "${PROJECT_SOURCE_DIR}/include/yaodaq/Response.hpp"
 "${PROJECT_SOURCE_DIR}/include/yaodaq/Server.hpp"
 "${PROJECT_SOURCE_DIR}/include/yaodaq/ThreadPool.hpp"
@@ -53,8 +52,7 @@ target_include_directories(yaodaq PUBLIC $<BUILD_INTERFACE:${PROJECT_SOURCE_DIR}
 target_compile_features(yaodaq PUBLIC cxx_std_17)
 add_library(yaodaq::yaodaq ALIAS yaodaq)
 
-include(GNUInstallDirs)
-install(TARGETS yaodaq spdlog fmt
+install(TARGETS yaodaq
         EXPORT YAODAQTargets
         LIBRARY DESTINATION "${CMAKE_INSTALL_LIBDIR}"
         ARCHIVE DESTINATION "${CMAKE_INSTALL_LIBDIR}"

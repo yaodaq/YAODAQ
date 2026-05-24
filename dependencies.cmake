@@ -1,5 +1,5 @@
 # CPM (https://github.com/cpm-cmake/CPM.cmake.git)
-set(CPM_TAG "v0.42.1")
+set(CPM_TAG "v0.42.3")
 set(CPM_REPOSITORY "https://github.com/cpm-cmake/CPM.cmake.git")
 
 # ZLib-ng

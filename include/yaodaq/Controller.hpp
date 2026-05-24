@@ -28,7 +28,6 @@ public:
   YAODAQ_API bool link()
   {
     yaodaq::Client::start();
-    m_State.setId( State::ID::Linked );
     return true;
   }
 
@@ -36,14 +35,12 @@ public:
   {
     info( "Initializing" );
     return CallMethod( "initialize" );
-    m_State.setId( State::ID::Initialized );
   }
 
   YAODAQ_API ResponseClients configure()
   {
     info( "Configuring" );
     return CallMethod( "configure" );
-    m_State.setId( State::ID::Configured );
   }
 
   YAODAQ_API ResponseClients start()
@@ -58,7 +55,11 @@ public:
     return CallMethod( "pause" );
   }
 
-  YAODAQ_API ResponseClients resume() { return CallMethod( "resume" ); }
+  YAODAQ_API ResponseClients resume()
+  {
+    info( "Resuming" );
+    return CallMethod( "resume" );
+  }
 
   YAODAQ_API ResponseClients stop()
   {
@@ -72,43 +73,35 @@ public:
     return CallMethod( "clear" );
   }
 
-  YAODAQ_API ResponseClients release() { return CallMethod( "release" ); }
+  YAODAQ_API ResponseClients release()
+  {
+    info( "Releasing" );
+    return CallMethod( "release" );
+  }
 
-  YAODAQ_API ResponseClients connect() { return CallMethod( "connect" ); }
+  YAODAQ_API ResponseClients connect()
+  {
+    info( "Connecting" );
+    return CallMethod( "connect" );
+  }
 
-  YAODAQ_API ResponseClients disconnect() { return CallMethod( "disconnect" ); }
+  YAODAQ_API ResponseClients disconnect()
+  {
+    info( "Disconnecting" );
+    return CallMethod( "disconnect" );
+  }
 
   YAODAQ_API bool relink()
   {
     info( "Relinking" );
     stop();
     bool ret = link();
-    m_State.setId( State::ID::Linked );
     return ret;
   }
-
-  YAODAQ_API State getState() const noexcept { return m_State; }
-
-  YAODAQ_API std::string getStateStr() { return m_State.str(); }
-
   YAODAQ_API explicit Controller() noexcept = delete;
-  YAODAQ_API virtual ~Controller() noexcept {}
+  YAODAQ_API virtual ~Controller() noexcept = default;
 
 protected:
-  virtual bool on_initialize() { return true; };
-  virtual bool on_configure() { return true; };
-  virtual bool on_start()
-  {
-    info( "on_start running" );
-    return true;
-  };
-  virtual bool on_pause() { return true; };
-  virtual bool on_resume() { return true; };
-  virtual bool on_stop() { return true; };
-  virtual bool on_clear() { return true; };
-  virtual bool on_release() { return true; };
-  State        m_State;
-
 private:
   virtual void onResponse( const std::string& ) override final;
   virtual void Send( const std::string_view request ) override final;
