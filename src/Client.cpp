@@ -29,6 +29,7 @@ yaodaq::Client::Client( const Identifier& id, const Config& config ) : m_identif
 {
   ix::initNetSystem();
   if( m_identifier.component().role() != Component::Role::Logger ) add_websocket_callback( [this]( const Log& msg ) noexcept { send( msg ); } );
+  setVerbosity( config.getVerbosity() );
   m_client.setUrl( config.url() );
   if( config.isTLS() )
   {

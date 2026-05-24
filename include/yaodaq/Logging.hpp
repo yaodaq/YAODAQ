@@ -26,6 +26,7 @@ public:
 
   void setVerbosity( const yaodaq::verbosity::level& level )
   {
+    m_verbosity = level;
     // just in case spdlog change the numbers;
     switch( level )
     {
@@ -66,6 +67,8 @@ public:
       }
     }
   }
+
+  yaodaq::verbosity::level getVerbosity() const noexcept { return m_verbosity; }
 
   template<typename... Args> void trace( const std::string_view& str, Args&&... args ) const noexcept
   {
@@ -109,6 +112,7 @@ protected:
 private:
   std::shared_ptr<spdlog::logger> m_logger{ nullptr };
   std::shared_ptr<spdlog::logger> m_logger_websocket{ nullptr };
+  yaodaq::verbosity::level        m_verbosity{ yaodaq::verbosity::level::info };
   mutable std::mutex              m_mutex;
 };
 

@@ -108,6 +108,7 @@ YAODAQ_API yaodaq::Server::Server( const ServerConfig& cfg, const std::string_vi
 {
   ix::initNetSystem();
   add_websocket_callback( [this]( const Log& msg ) noexcept { sendToLoggers( msg.dump() ); } );
+  setVerbosity( cfg.getVerbosity() );
   if( cfg.isTLS() )
   {
     ix::SocketTLSOptions m_tlsOptions;

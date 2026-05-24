@@ -1,9 +1,11 @@
 #pragma once
 #include "yaodaq/Defaults.hpp"
+#include "yaodaq/Exception.hpp"
 #include "yaodaq/Export.hpp"
 #include "yaodaq/Verbosity.hpp"
 
 #include <cstdint>
+#include <ixwebsocket/IXUrlParser.h>
 #include <string>
 #include <string_view>
 #include <sys/socket.h>
@@ -95,6 +97,7 @@ public:
   YAODAQ_API const std::string& certFile() const noexcept { return m_certFile; }
   YAODAQ_API const std::string& keyFile() const noexcept { return m_keyFile; }
   YAODAQ_API const std::string& caFile() const noexcept { return m_caFile; }
+  YAODAQ_API const yaodaq::verbosity::level getVerbosity() const noexcept { return m_verbosity; }
 
 private:
   std::string              m_host{ defaults::host };
@@ -163,7 +166,8 @@ public:
   YAODAQ_API const std::string_view getHost() const noexcept { return m_host; }
   YAODAQ_API std::uint16_t getPort() const noexcept { return m_port; }
   YAODAQ_API const std::string_view getPath() const noexcept { return m_path; }
-  YAODAQ_API bool                   isTLS() const noexcept { return m_tls; }
+  YAODAQ_API const yaodaq::verbosity::level getVerbosity() const noexcept { return m_verbosity; }
+  YAODAQ_API bool                           isTLS() const noexcept { return m_tls; }
   YAODAQ_API std::string url() const
   {
     std::string cleanHost( m_host );
@@ -179,7 +183,16 @@ public:
     else
       url += '/';
     url = m_tls ? "wss://" : "ws://" + url;
-    return url;
+
+    std::string protocol;
+    std::string host;
+    std::string path;
+    std::string query;
+    int         port;
+    bool        ret = ix::UrlParser::parse( url, protocol, host, path, query, port );
+    if( ret ) return url;
+    else
+      throw yaodaq::Exception( "url not valid" );
   }
   YAODAQ_API const std::string& certFile() const noexcept { return m_certFile; }
   YAODAQ_API const std::string& keyFile() const noexcept { return m_keyFile; }
