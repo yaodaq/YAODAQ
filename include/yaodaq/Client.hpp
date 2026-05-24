@@ -20,7 +20,7 @@ class YAODAQ_API Client : public JsonRPCResponder, public Logging  //TODO : Why 
 {
 public:
   YAODAQ_API virtual ~Client() noexcept;
-  YAODAQ_API explicit Client( const Identifier& id, const Config& config );
+  YAODAQ_API explicit Client( const Identifier& id, const Config& client_config );
 
   YAODAQ_API const Identifier& identifier() const noexcept { return m_identifier; }
 

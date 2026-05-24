@@ -18,6 +18,8 @@ try
   app.add_option( "-i,--ip", host, "IP of the server" ) /*->check( CLI::ValidIPV4 )*/;
   int port{ 8888 };
   app.add_option( "-p,--port", port, "Port to listen" )->check( CLI::Range( 0, 65535 ) );
+  yaodaq::verbosity::level verbosity{ yaodaq::verbosity::level::info };
+  app.add_option( "--verbosity", verbosity, "Verbosity" )->transform( CLI::CheckedTransformer( yaodaq::verbosity::map, CLI::ignore_case ) );
 
   try
   {
@@ -28,7 +30,7 @@ try
     return app.exit( e );
   }
   yaodaq::Config cfg;
-  cfg().setPort( port ).setHost( host );
+  cfg().setPort( port ).setHost( host ).verbosity( verbosity );
   yaodaq::Controller controller( name, cfg );
   controller.link();
   std::size_t nbrCTLC{ 3 };

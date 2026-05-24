@@ -18,6 +18,8 @@ try
   app.add_option( "-i,--ip", host, "IP of the server" ) /*->check( CLI::ValidIPV4 )*/;
   int port{ 8888 };
   app.add_option( "-p,--port", port, "Port to listen" )->check( CLI::Range( 0, 65535 ) );
+  yaodaq::verbosity::level verbosity{ yaodaq::verbosity::level::trace };
+  app.add_option( "--verbosity", verbosity, "Verbosity" )->transform( CLI::CheckedTransformer( yaodaq::verbosity::map, CLI::ignore_case ) );
 
   try
   {
@@ -28,9 +30,8 @@ try
     return app.exit( e );
   }
   yaodaq::Config cfg;
-  cfg().setPort( port ).setHost( host );
+  cfg().setPort( port ).setHost( host ).verbosity( verbosity );
   yaodaq::Logger logger( cfg, name );
-  logger.setVerbosity( spdlog::level::level_enum::trace );
   logger.link();
   std::size_t nbrCTLC{ 3 };
   Term::cout << Term::color_fg( Term::Color::Name::Red ) << "Press " << std::to_string( nbrCTLC ) << " times CTRL+C to stop" << Term::color_fg( Term::Color::Name::Default ) << std::endl;
@@ -41,31 +42,21 @@ try
     {
       case Term::Event::Type::Key:
       {
-        Term::Key key( event );
-        if( key == Term::Key::Ctrl_Q )
+        switch( Term::Key( event ) )
         {
-          --nbrCTLC;
-          if( nbrCTLC == 0 ) return 0;
-          else
-            Term::cout << Term::color_fg( Term::Color::Name::Red ) << "Press Ctrl+Q " << std::to_string( nbrCTLC ) << " times to quit" << Term::color_fg( Term::Color::Name::Default ) << std::endl;
-        }
-        else
-        {
-          nbrCTLC = 3;
-          Term::cout << "Press :" << std::endl;
-          Term::cout << "h : list procedures" << std::endl;
-          Term::cout << "s : list states" << std::endl;
-
-          Term::cout << "Ctrl+I : initialize" << std::endl;
-          Term::cout << "Ctrl+L : connect" << std::endl;
-          Term::cout << "Ctrl+C : configure" << std::endl;
-          Term::cout << "Ctrl+S : start" << std::endl;
-          Term::cout << "p : pause" << std::endl;
-          Term::cout << "r : resume" << std::endl;
-          Term::cout << "Ctrl+Q : stop" << std::endl;
-          Term::cout << "Ctrl+Z : clear" << std::endl;
-          Term::cout << "Ctrl+D : disconnect" << std::endl;
-          Term::cout << "Ctrl+R : release" << std::endl;
+          case Term::Key::Ctrl_Q:
+          {
+            --nbrCTLC;
+            if( nbrCTLC == 0 ) return 0;
+            else
+              Term::cout << Term::color_fg( Term::Color::Name::Red ) << "Press Ctrl+Q " << std::to_string( nbrCTLC ) << " times to quit" << Term::color_fg( Term::Color::Name::Default ) << std::endl;
+            break;
+          }
+          default:
+          {
+            nbrCTLC = 3;
+            break;
+          }
         }
         break;
       }

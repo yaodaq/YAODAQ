@@ -1,6 +1,7 @@
 #pragma once
 
 #include "yaodaq/Identifier.hpp"
+#include "yaodaq/Verbosity.hpp"
 
 #include <functional>
 #include <memory>
@@ -23,7 +24,48 @@ public:
 
   void add_websocket_callback( const std::function<void( const Log& msg )>& f );
 
-  void setVerbosity( const spdlog::level::level_enum& level ) { m_logger->set_level( level ); }
+  void setVerbosity( const yaodaq::verbosity::level& level )
+  {
+    // just in case spdlog change the numbers;
+    switch( level )
+    {
+      case verbosity::level::off:
+      {
+        m_logger->set_level( spdlog::level::level_enum::off );
+        break;
+      }
+      case verbosity::level::critical:
+      {
+        m_logger->set_level( spdlog::level::level_enum::critical );
+        break;
+      }
+      case verbosity::level::error:
+      {
+        m_logger->set_level( spdlog::level::level_enum::err );
+        break;
+      }
+      case verbosity::level::warning:
+      {
+        m_logger->set_level( spdlog::level::level_enum::warn );
+        break;
+      }
+      case verbosity::level::info:
+      {
+        m_logger->set_level( spdlog::level::level_enum::info );
+        break;
+      }
+      case verbosity::level::debug:
+      {
+        m_logger->set_level( spdlog::level::level_enum::debug );
+        break;
+      }
+      case verbosity::level::trace:
+      {
+        m_logger->set_level( spdlog::level::level_enum::trace );
+        break;
+      }
+    }
+  }
 
   template<typename... Args> void trace( const std::string_view& str, Args&&... args ) const noexcept
   {

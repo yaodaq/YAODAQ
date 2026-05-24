@@ -32,6 +32,8 @@ try
   app.add_option( "-f,--address_family", addressFamily, "Address family" )->check( CLI::Range( 1, ( std::numeric_limits<int>::max )() ) );
   bool rejectBrowsers{ false };
   app.add_flag( "-r", rejectBrowsers, "Reject Browsers" );
+  yaodaq::verbosity::level verbosity{ yaodaq::verbosity::level::info };
+  app.add_option( "--verbosity", verbosity, "Verbosity" )->transform( CLI::CheckedTransformer( yaodaq::verbosity::map, CLI::ignore_case ) );
   try
   {
     app.parse( argc, argv );
@@ -41,7 +43,7 @@ try
     return app.exit( e );
   }
   yaodaq::ServerConfig cfg;
-  cfg.setHost( host ).setPort( port ).setMaxConnections( maxConnections ).setHandshakeTimeoutSecs( handshakeTimeoutSecs ).setBacklog( 150 );
+  cfg.setHost( host ).setPort( port ).setMaxConnections( maxConnections ).setHandshakeTimeoutSecs( handshakeTimeoutSecs ).setBacklog( 150 ).verbosity( verbosity );
   yaodaq::Server server( cfg, name );
   if( rejectBrowsers ) server.rejectBrowsers();
   server.start();

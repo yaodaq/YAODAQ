@@ -1,4 +1,5 @@
 #pragma once
+#include "yaodaq/Config.hpp"
 #include "yaodaq/Defaults.hpp"
 #include "yaodaq/Export.hpp"
 #include "yaodaq/ICodec.hpp"
@@ -21,101 +22,6 @@
 
 namespace yaodaq
 {
-
-class ServerConfig
-{
-public:
-  YAODAQ_API explicit ServerConfig() noexcept = default;
-  YAODAQ_API ServerConfig&       operator()() noexcept { return *this; }
-  YAODAQ_API const ServerConfig& operator()() const noexcept { return *this; }
-  // Fluent setters
-  YAODAQ_API ServerConfig&       setHost( const std::string_view h )
-  {
-    m_host = std::string( h );
-    return *this;
-  }
-  YAODAQ_API ServerConfig& setPort( std::uint16_t p )
-  {
-    m_port = p;
-    return *this;
-  }
-  YAODAQ_API ServerConfig& setMaxConnections( std::size_t p )
-  {
-    m_maxConnections = p;
-    return *this;
-  }
-  YAODAQ_API ServerConfig& setHandshakeTimeoutSecs( std::size_t p )
-  {
-    m_handshakeTimeoutSecs = p;
-    return *this;
-  }
-  YAODAQ_API ServerConfig& setPingIntervalSeconds( std::size_t p )
-  {
-    m_pingIntervalSeconds = p;
-    return *this;
-  }
-  YAODAQ_API ServerConfig& setBacklog( std::size_t p )
-  {
-    m_backlog = p;
-    return *this;
-  }
-  YAODAQ_API ServerConfig& setAdressFamily( int p )
-  {
-    m_addressFamily = p;
-    return *this;
-  }
-  YAODAQ_API ServerConfig& setPath( const std::string_view p )
-  {
-    m_path = std::string( p );
-    return *this;
-  }
-  YAODAQ_API ServerConfig& enableTLS( bool t = true )
-  {
-    m_tls = t;
-    return *this;
-  }
-  YAODAQ_API ServerConfig& certFile( std::string& file )
-  {
-    m_certFile = file;
-    return *this;
-  }
-  YAODAQ_API ServerConfig& keyFile( std::string& file )
-  {
-    m_keyFile = file;
-    return *this;
-  }
-  YAODAQ_API ServerConfig& caFile( std::string& file )
-  {
-    m_caFile = file;
-    return *this;
-  }
-  YAODAQ_API const std::string_view getHost() const noexcept { return m_host; }
-  YAODAQ_API std::uint16_t getPort() const noexcept { return m_port; }
-  YAODAQ_API std::size_t getMaxConnections() const noexcept { return m_maxConnections; }
-  YAODAQ_API const std::string_view getPath() const noexcept { return m_path; }
-  YAODAQ_API std::size_t getHandshakeTimeoutSecs() const noexcept { return m_handshakeTimeoutSecs; }
-  YAODAQ_API int         getPingIntervalSeconds() const noexcept { return m_pingIntervalSeconds; }
-  YAODAQ_API std::size_t getBacklog() const noexcept { return m_backlog; }
-  YAODAQ_API int         getAddressFamily() const noexcept { return m_addressFamily; }
-  YAODAQ_API bool        isTLS() const noexcept { return m_tls; }
-  YAODAQ_API const std::string& certFile() const noexcept { return m_certFile; }
-  YAODAQ_API const std::string& keyFile() const noexcept { return m_keyFile; }
-  YAODAQ_API const std::string& caFile() const noexcept { return m_caFile; }
-
-private:
-  std::string   m_host{ defaults::host };
-  std::uint16_t m_port{ defaults::port };
-  std::size_t   m_maxConnections{ defaults::max_connections };
-  std::string   m_path{ defaults::path };
-  std::size_t   m_handshakeTimeoutSecs{ defaults::handshake_timeout };
-  int           m_pingIntervalSeconds{ defaults::ping_interval_seconds };
-  std::size_t   m_backlog{ defaults::backlog };
-  int           m_addressFamily{ defaults::ip6 ? AF_INET6 : AF_INET };
-  bool          m_tls{ false };
-  std::string   m_certFile;
-  std::string   m_keyFile;
-  std::string   m_caFile{ "SYSTEM" };
-};
 
 struct ServerRequest
 {
