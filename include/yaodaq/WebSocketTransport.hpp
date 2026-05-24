@@ -3,148 +3,112 @@
 #include "ITransport.hpp"
 #include "ThreadSafeQueue.hpp"
 
+#include <iostream>
 #include <ixwebsocket/IXNetSystem.h>
 #include <ixwebsocket/IXWebSocket.h>
-
-#include <iostream>
 
 class WebSocket final : public ITransport
 {
 public:
+  explicit WebSocket( nlohmann::json json ) : ITransport( std::move( json ) )
+  {
+    ix::initNetSystem();
+    m_client.disablePerMessageDeflate();
+    m_client.enablePong();
+    m_client.setOnMessageCallback( [this]( const ix::WebSocketMessagePtr& msg ) noexcept { onMessage( msg ); } );
+  }
 
-    explicit WebSocket(nlohmann::json json)
-        : ITransport(std::move(json))
-    {
-        ix::initNetSystem();
-        m_client.disablePerMessageDeflate();
-        m_client.enablePong();
-        m_client.setOnMessageCallback(
-            [this](const ix::WebSocketMessagePtr& msg) noexcept
-            {
-                onMessage(msg);
-            }
-        );
-    }
+  ~WebSocket() noexcept override
+  {
+    close();
 
-    ~WebSocket() noexcept override
-    {
-        close();
+    ix::uninitNetSystem();
+  }
 
-        ix::uninitNetSystem();
-    }
+  bool open() final
+  {
+    m_client.setUrl( getParameters()["url"].get<std::string>() );
 
-    bool open() final
-    {
-        m_client.setUrl(
-            getParameters()["url"]
-                .get<std::string>()
-        );
+    m_client.start();
 
-        m_client.start();
+    return true;
+  }
 
-        return true;
-    }
+  bool close() final
+  {
+    m_client.disableAutomaticReconnection();
 
-    bool close() final
-    {
-        m_client.disableAutomaticReconnection();
+    m_incoming.shutdown();
 
-        m_incoming.shutdown();
+    m_client.close();
 
-        m_client.close();
+    return true;
+  }
 
-        return true;
-    }
+  void write( const std::vector<uint8_t>& data ) final { m_client.sendBinary( ix::IXWebSocketSendData( data ) ); }
 
-    void write(
-        const std::vector<uint8_t>& data) final
-    {
+  std::optional<std::vector<uint8_t>> read() final { return m_incoming.pop(); }
 
-        m_client.sendBinary(
-            ix::IXWebSocketSendData(data)
-        );
-    }
+  bool verifyParameters() final { return getParameters().contains( "url" ); }
 
-    std::optional<std::vector<uint8_t>>
-    read() final
-    {
-        return m_incoming.pop();
-    }
-
-    bool verifyParameters() final
-    {
-        return getParameters().contains("url");
-    }
 private:
-    ix::WebSocket m_client;
+  ix::WebSocket m_client;
 
+  ThreadSafeQueue<std::vector<uint8_t>> m_incoming;
 
-    ThreadSafeQueue<
-        std::vector<uint8_t>
-    > m_incoming;
-
-    void onMessage(
-        const ix::WebSocketMessagePtr& msg
-    ) noexcept
+  void onMessage( const ix::WebSocketMessagePtr& msg ) noexcept
+  {
+    switch( msg->type )
     {
-        switch (msg->type)
-        {
-            case ix::WebSocketMessageType::Open:
-            {
-                std::cout
-                    << "WebSocket connected\n"<<msg->openInfo.uri<<" "<<msg->openInfo.protocol<<" ";
+      case ix::WebSocketMessageType::Open:
+      {
+        std::cout << "WebSocket connected\n" << msg->openInfo.uri << " " << msg->openInfo.protocol << " ";
 
-                break;
-            }
+        break;
+      }
 
-            case ix::WebSocketMessageType::Close:
-            {
-                std::cout
-                    << "WebSocket closed\n";
+      case ix::WebSocketMessageType::Close:
+      {
+        std::cout << "WebSocket closed\n";
 
-                break;
-            }
+        break;
+      }
 
-            case ix::WebSocketMessageType::Ping:
-            {
-                std::cout
-                    << "WebSocke ping\n";
+      case ix::WebSocketMessageType::Ping:
+      {
+        std::cout << "WebSocke ping\n";
 
-                break;
-            }
-            case ix::WebSocketMessageType::Pong:
-            {
-                std::cout
-                    << "WebSocke pong\n";
+        break;
+      }
+      case ix::WebSocketMessageType::Pong:
+      {
+        std::cout << "WebSocke pong\n";
 
-                break;
-            }
-            case ix::WebSocketMessageType::Error:
-            {
-                std::cout
-                    << "WebSocket error: "
-                    << msg->errorInfo.reason
-                    << '\n';
+        break;
+      }
+      case ix::WebSocketMessageType::Error:
+      {
+        std::cout << "WebSocket error: " << msg->errorInfo.reason << '\n';
 
-                break;
-            }
+        break;
+      }
 
-            case ix::WebSocketMessageType::Message:
-            {
-                std::cout<<msg->str<<std::endl;
-                //m_incoming.push(
-                //{
-                //    msg->str.begin(),
-                //    msg->str.end()
-                //});
+      case ix::WebSocketMessageType::Message:
+      {
+        std::cout << msg->str << std::endl;
+        //m_incoming.push(
+        //{
+        //    msg->str.begin(),
+        //    msg->str.end()
+        //});
 
-                break;
-            }
+        break;
+      }
 
-            default:
-            {
-                break;
-            }
-        }
+      default:
+      {
+        break;
+      }
     }
+  }
 };
