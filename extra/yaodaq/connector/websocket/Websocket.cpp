@@ -2,7 +2,7 @@
 
 #include <ixwebsocket/IXNetSystem.h>
 
-yaodaq::connector::Websocket::Websocket() : Connector( "Websocket" ) { ix::initNetSystem(); }
+yaodaq::connector::Websocket::Websocket() /*: Connector( "Websocket" ) */ { ix::initNetSystem(); }
 
 yaodaq::connector::Websocket::~Websocket() noexcept
 {

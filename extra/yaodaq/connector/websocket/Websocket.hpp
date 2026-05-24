@@ -9,7 +9,7 @@ namespace yaodaq
 namespace connector
 {
 
-class Websocket : public Connector
+class Websocket  //: public Connector
 {
 public:
   explicit Websocket();

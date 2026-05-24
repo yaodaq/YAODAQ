@@ -1,4 +1,5 @@
 #pragma once
+#include "yaodaq/Connector.hpp"
 #include "yaodaq/Defaults.hpp"
 #include "yaodaq/Exception.hpp"
 #include "yaodaq/Export.hpp"
@@ -6,6 +7,7 @@
 
 #include <cstdint>
 #include <ixwebsocket/IXUrlParser.h>
+#include <memory>
 #include <string>
 #include <string_view>
 #include <sys/socket.h>
@@ -207,6 +209,16 @@ private:
   std::string              m_caFile{ "SYSTEM" };
   bool                     m_tls{ false };
   yaodaq::verbosity::level m_verbosity{ yaodaq::verbosity::level::info };
+};
+
+class BoardConfig : public Config
+{
+public:
+  explicit BoardConfig( std::unique_ptr<Connector> connector ) : m_Connector( std::move( connector ) ) {}
+  std::unique_ptr<Connector> getConnector() const noexcept { return std::move( m_Connector ); }
+
+private:
+  mutable std::unique_ptr<Connector> m_Connector{ nullptr };
 };
 
 }  // namespace yaodaq

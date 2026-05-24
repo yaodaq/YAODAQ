@@ -69,12 +69,12 @@ try
         else if( key == Term::Key::p )
         {
           nbrCTLC = 3;
-          std::cout << server.CallMethod( "listProcedures" ).pretty_format() << std::endl;
+          Term::cout << server.CallMethod( "listProcedures" ).pretty_format() << std::endl;
         }
         else if( key == Term::Key::n )
         {
           nbrCTLC = 3;
-          std::cout << server.CallMethod( "getNumberOfClients" ).pretty_format() << std::endl;
+          Term::cout << server.CallMethod( "getNumberOfClients" ).pretty_format() << std::endl;
         }
         else
         {

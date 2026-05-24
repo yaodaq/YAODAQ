@@ -1,10 +1,13 @@
 #include "yaodaq/Message.hpp"
 
+#include "yaodaq/Clock.hpp"
 #include "yaodaq/Version.hpp"
 
 #include <algorithm>
 #include <chrono>
+#include <cstdint>
 #include <ixwebsocket/IXConnectionState.h>
+#include <ixwebsocket/IXUuid.h>
 #include <ixwebsocket/IXWebSocket.h>
 #include <ixwebsocket/IXWebSocketCloseInfo.h>
 #include <ixwebsocket/IXWebSocketErrorInfo.h>
@@ -22,6 +25,8 @@ yaodaq::Message::Message() noexcept
   meta()["yaodaq"]["version"]["minor"] = yaodaq::Version::minor();
   meta()["yaodaq"]["version"]["patch"] = yaodaq::Version::patch();
   meta()["yaodaq"]["version"]["tweak"] = yaodaq::Version::tweak();
+  meta()["uuid"]                       = ix::uuid4();
+  meta()["time"]                       = clock::utc_nanoseconds();
 }
 
 yaodaq::Message::Type yaodaq::Message::type() const noexcept { return magic_enum::enum_cast<yaodaq::Message::Type>( meta()["type"].get<std::string_view>(), magic_enum::case_insensitive ).value(); }

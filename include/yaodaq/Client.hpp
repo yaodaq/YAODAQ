@@ -1,4 +1,5 @@
 #pragma once
+
 #include "yaodaq/Config.hpp"
 #include "yaodaq/Export.hpp"
 #include "yaodaq/Identifier.hpp"

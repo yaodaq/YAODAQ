@@ -353,8 +353,8 @@ public:
     info( "Stopping Module" );
   }
 
-  void send( const nlohmann::json& json ) { send( json.dump() ); }
-  void setRun( const std::function<bool()>& fun ) noexcept { m_onrun = fun; }
+  void            send( const nlohmann::json& json ) { send( json.dump() ); }
+  YAODAQ_API void setRun( const std::function<bool()>& fun ) noexcept { m_onrun = fun; }
 
 protected:
   virtual bool on_initialize() { return true; };

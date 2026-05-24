@@ -52,81 +52,81 @@ try
         }
         else if( key == Term::Key::s )
         {
-          std::cout << controller.CallMethod( "getState" ).pretty_format() << std::endl;
+          Term::cout << controller.CallMethod( "getState" ).pretty_format() << std::endl;
           nbrCTLC = 3;
         }
         else if( key == Term::Key::Ctrl_I )
         {
-          std::cout << controller.initialize().pretty_format() << std::endl;
+          Term::cout << controller.initialize().pretty_format() << std::endl;
           nbrCTLC = 3;
         }
         else if( key == Term::Key::Ctrl_L )
         {
-          std::cout << controller.connect().pretty_format() << std::endl;
+          Term::cout << controller.connect().pretty_format() << std::endl;
           nbrCTLC = 3;
         }
         else if( key == Term::Key::Ctrl_C )
         {
-          std::cout << controller.configure().pretty_format() << std::endl;
+          Term::cout << controller.configure().pretty_format() << std::endl;
           nbrCTLC = 3;
         }
         else if( key == Term::Key::Ctrl_S )
         {
-          std::cout << controller.start().pretty_format() << std::endl;
+          Term::cout << controller.start().pretty_format() << std::endl;
           nbrCTLC = 3;
         }
         else if( key == Term::Key::p )
         {
-          std::cout << controller.pause().pretty_format() << std::endl;
+          Term::cout << controller.pause().pretty_format() << std::endl;
           nbrCTLC = 3;
         }
         else if( key == Term::Key::r )
         {
-          std::cout << controller.resume().pretty_format() << std::endl;
+          Term::cout << controller.resume().pretty_format() << std::endl;
           nbrCTLC = 3;
         }
         else if( key == Term::Key::Ctrl_K )
         {
-          std::cout << controller.stop().pretty_format() << std::endl;
+          Term::cout << controller.stop().pretty_format() << std::endl;
           nbrCTLC = 3;
         }
         else if( key == Term::Key::Ctrl_Z )
         {
-          std::cout << controller.clear().pretty_format() << std::endl;
+          Term::cout << controller.clear().pretty_format() << std::endl;
           nbrCTLC = 3;
         }
         else if( key == Term::Key::Ctrl_D )
         {
-          std::cout << controller.disconnect().pretty_format() << std::endl;
+          Term::cout << controller.disconnect().pretty_format() << std::endl;
           nbrCTLC = 3;
         }
         else if( key == Term::Key::Ctrl_R )
         {
-          std::cout << controller.release().pretty_format() << std::endl;
+          Term::cout << controller.release().pretty_format() << std::endl;
           nbrCTLC = 3;
         }
         else if( key == Term::Key::h )
         {
-          std::cout << controller.CallMethod( "listProcedures" ).pretty_format() << std::endl;
+          Term::cout << controller.CallMethod( "listProcedures" ).pretty_format() << std::endl;
           nbrCTLC = 3;
         }
         else
         {
           nbrCTLC = 3;
-          Term::cout << "Press :" << std::endl;
-          Term::cout << "h : list procedures" << std::endl;
-          Term::cout << "s : list states" << std::endl;
+          Term::cout << "Press :\n";
+          Term::cout << "h : list procedures\n";
+          Term::cout << "s : list states\n";
 
-          Term::cout << "Ctrl+I : initialize" << std::endl;
-          Term::cout << "Ctrl+L : connect" << std::endl;
-          Term::cout << "Ctrl+C : configure" << std::endl;
-          Term::cout << "Ctrl+S : start" << std::endl;
-          Term::cout << "p : pause" << std::endl;
-          Term::cout << "r : resume" << std::endl;
-          Term::cout << "Ctrl+K : stop" << std::endl;
-          Term::cout << "Ctrl+Z : clear" << std::endl;
-          Term::cout << "Ctrl+D : disconnect" << std::endl;
-          Term::cout << "Ctrl+R : release" << std::endl;
+          Term::cout << "Ctrl+I : initialize\n";
+          Term::cout << "Ctrl+L : connect\n";
+          Term::cout << "Ctrl+C : configure\n";
+          Term::cout << "Ctrl+S : start\n";
+          Term::cout << "p : pause\n";
+          Term::cout << "r : resume\n";
+          Term::cout << "Ctrl+K : stop\n";
+          Term::cout << "Ctrl+Z : clear\n";
+          Term::cout << "Ctrl+D : disconnect\n";
+          Term::cout << "Ctrl+R : release\n";
         }
         break;
       }

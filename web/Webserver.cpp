@@ -18,8 +18,6 @@ public:
     _httpServer.setOnConnectionCallback(
       [this]( HttpRequestPtr request, std::shared_ptr<ConnectionState> connectionState ) -> HttpResponsePtr
       {
-        std::cout << request->uri << " " << request->method << "  " << request->version << "  " << request->body << std::endl;
-
         // Handle GET requests based on URI
         if( request->method == "GET" )
         {

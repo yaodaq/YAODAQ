@@ -15,7 +15,6 @@ add_library(yaodaq SHARED
  Server.cpp
  Controller.cpp
  Logging.cpp
- JsonRPCAsker.cpp
  MetaInfos.cpp
  Identifier.cpp
  Response.cpp

@@ -5,6 +5,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <exception>
+#include <iostream>
 #include <map>
 #include <new>
 #include <nlohmann/json.hpp>
@@ -45,6 +46,8 @@ public:
     Unknown,
     RPCRequest,
     RPCResponse,
+    RawData,
+    Raw,
   };
   YAODAQ_API explicit Message( const nlohmann::json& json );
   YAODAQ_API std::string dump( const std::size_t i = 0 ) const { return m_data.dump( i ); }
@@ -54,13 +57,15 @@ public:
   YAODAQ_API nlohmann::json& payload() noexcept { return m_data["payload"]; }
   YAODAQ_API nlohmann::json& meta() noexcept { return m_data["meta"]; }
   YAODAQ_API Type            type() const noexcept;
+  YAODAQ_API std::string uuid() const noexcept { return meta()["uuid"]; }
+  YAODAQ_API std::int64_t time() const noexcept { return meta()["time"]; }
 
 protected:
   YAODAQ_API explicit Message( const Type type );
+  nlohmann::json m_data;
 
 private:
   YAODAQ_API explicit Message() noexcept;
-  nlohmann::json m_data;
 };
 
 class Log : public Message
@@ -150,6 +155,20 @@ public:
   YAODAQ_API explicit Except( const std::exception& exception );
   YAODAQ_API explicit Except( const std::string_view& exception );
   YAODAQ_API std::string_view what() const noexcept { return payload()["what"].get<std::string_view>(); }
+};
+
+class RawData : public Message
+{
+public:
+  YAODAQ_API explicit RawData() : Message( Message::Type::RawData ) {}
+  YAODAQ_API explicit RawData( const std::string_view message ) : Message( Message::Type::RawData ) { payload()["message"] = std::move( message ); }
+};
+
+class Raw : public Message
+{
+public:
+  YAODAQ_API explicit Raw() : Message( Message::Type::Raw ) {}
+  YAODAQ_API explicit Raw( nlohmann::json json ) : Message( Message::Type::Raw ) { m_data = std::move( json ); }
 };
 
 }  // namespace yaodaq
