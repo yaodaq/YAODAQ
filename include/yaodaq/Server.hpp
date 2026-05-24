@@ -1,6 +1,7 @@
 #pragma once
 #include "yaodaq/Defaults.hpp"
 #include "yaodaq/Export.hpp"
+#include "yaodaq/ICodec.hpp"
 #include "yaodaq/Identifier.hpp"
 #include "yaodaq/JsonRPCAsker.hpp"
 #include "yaodaq/JsonRPCResponder.hpp"

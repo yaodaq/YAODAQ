@@ -12,6 +12,7 @@ if(NOT DEFINED NLOHMANN_TAG)
 endif()
 
 CPMAddPackage(NAME nlohmann
+        GIT_SHALLOW TRUE
         GIT_REPOSITORY ${NLOHMANN_REPOSITORY}
         GIT_TAG ${NLOHMANN_TAG}
         OPTIONS "JSON_BuildTests FALSE"

@@ -27,7 +27,7 @@ try
   {
     return app.exit( e );
   }
-  yaodaq::ClientConfig cfg;
+  yaodaq::Config cfg;
   cfg().setPort( port ).setHost( host );
   yaodaq::Controller controller( name, cfg );
   controller.link();

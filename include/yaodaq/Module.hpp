@@ -21,7 +21,7 @@ namespace yaodaq
 class Module : public yaodaq::Client
 {
 public:
-  YAODAQ_API Module( ClientConfig& client_config, const std::string_view name, const std::string_view type = "yaodaq", const Component::Role role = Component::Role::Module ) : Client( Identifier( role, type, name ), client_config )
+  YAODAQ_API Module( Config& config, const std::string_view name, const std::string_view type = "yaodaq", const Component::Role role = Component::Role::Module ) : Client( Identifier( role, type, name ), config )
   {
     Add( "initialize", jsonrpc::GetHandle( &yaodaq::Module::initialize, *this ) );
     Add( "configure", jsonrpc::GetHandle( &yaodaq::Module::configure, *this ) );

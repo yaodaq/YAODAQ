@@ -16,7 +16,7 @@
 class DCT : public yaodaq::Module
 {
 public:
-  DCT( yaodaq::ClientConfig cfg, const std::string_view name ) : yaodaq::Module( cfg, "DCT", "MPI" ) {}
+  DCT( yaodaq::Config cfg, const std::string_view name ) : yaodaq::Module( cfg, "DCT", "MPI" ) {}
   virtual bool run()
   {
     std::size_t retries{ 0 };
@@ -283,7 +283,7 @@ try
   {
     return app.exit( e );
   }
-  yaodaq::ClientConfig cfg;
+  yaodaq::Config cfg;
   cfg().setPort( port ).setHost( host );
   DCT module( cfg, "DCT" );
   module.setBinaryPath( path_binary );

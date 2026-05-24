@@ -16,6 +16,7 @@
 #include <ixwebsocket/IXWebSocketServer.h>
 #include <magic_enum/magic_enum.hpp>
 #include <memory>
+#include <simdjson.h>
 #include <string>
 #include <string_view>
 
@@ -188,28 +189,30 @@ void yaodaq::Server::onReject( std::shared_ptr<ix::ConnectionState> connectionSt
 
 void yaodaq::Server::onMessage( std::shared_ptr<ix::ConnectionState> connectionState, ix::WebSocket& webSocket, const std::string& str, const std::size_t size, const bool binary )
 {
-  nlohmann::json message = nlohmann::json::parse( str, nullptr, false );
-  if( !message.is_discarded() )
+  thread_local std::unique_ptr<ICodec> codec{ nullptr };
+  if( !codec ) codec = yaodaq::make_codec();
+  Message mess = codec->decode( str );
+  switch( mess.type() )
   {
-    if( message.contains( "method" ) || message.contains( "notification" ) ) onJsonRPCRequest( connectionState, webSocket, message );
-    else if( message.contains( "result" ) || message.contains( "error" ) )
-      onJsonRPCResponse( connectionState, webSocket, message );
-    else if( message.contains( "meta" ) && message["meta"].contains( "type" ) )
+    case Message::Type::RPCRequest:
     {
-      switch( magic_enum::enum_cast<Message::Type>( message["meta"]["type"].get<std::string_view>(), magic_enum::case_insensitive ).value() )
-      {
-        case Message::Type::Log:
-        {
-          onLog( connectionState, webSocket, message );
-          break;
-        }
-        default:
-        {
-          sendToAll( message.dump() );
-          std::cout << "DDDDDDDDDDDDDD" << std::endl;
-          break;
-        }
-      }
+      onJsonRPCRequest( connectionState, webSocket, mess.payload() );
+      break;
+    }
+    case Message::Type::RPCResponse:
+    {
+      onJsonRPCResponse( connectionState, webSocket, mess.payload() );
+      break;
+    }
+    case Message::Type::Log:
+    {
+      onLog( connectionState, webSocket, mess() );
+      break;
+    }
+    default:
+    {
+      sendToAll( mess.dump() );
+      break;
     }
   }
 }
@@ -409,9 +412,6 @@ void yaodaq::Server::handleMessage( std::shared_ptr<ix::ConnectionState> connect
       case ix::WebSocketMessageType::Open:
       {
         checkClient( connectionState, webSocket, msg );
-        Open open( msg->openInfo );
-        open.setConnectionStateInfos( connectionState );
-        open.setWebsocketInfos( webSocket );
         onOpen( connectionState, webSocket, Open( msg->openInfo ) );
         break;
       }
@@ -448,17 +448,35 @@ void yaodaq::Server::handleMessage( std::shared_ptr<ix::ConnectionState> connect
   }
   catch( const yaodaq::Exception& exception )
   {
-    critical( "yaodaq::Exception: {}", exception.what() );
-    sendToAll( Except( exception )().dump() );
+    try
+    {
+      critical( "yaodaq::Exception: {}", exception.what() );
+      sendToAll( Except( exception )().dump() );
+    }
+    catch( ... )
+    {
+    }
   }
   catch( const std::exception& exception )
   {
-    critical( "std::exception: {}", exception.what() );
-    sendToAll( Except( exception )().dump() );
+    try
+    {
+      critical( "std::exception: {}", exception.what() );
+      sendToAll( Except( exception )().dump() );
+    }
+    catch( ... )
+    {
+    }
   }
   catch( ... )
   {
-    critical( "exception in handleMessage" );
-    sendToAll( Except( "exception in handleMessage" )().dump() );
+    try
+    {
+      critical( "exception in handleMessage" );
+      sendToAll( Except( "exception in handleMessage" )().dump() );
+    }
+    catch( ... )
+    {
+    }
   }
 }

@@ -22,7 +22,7 @@ namespace yaodaq
 class YAODAQ_API Logger : public yaodaq::Module
 {
 public:
-  YAODAQ_API Logger( ClientConfig& cfg, const std::string_view name, const std::string_view type = "yaodaq" ) : Module( cfg, name, type, Component::Role::Logger ) {}
+  YAODAQ_API Logger( Config& cfg, const std::string_view name, const std::string_view type = "yaodaq" ) : Module( cfg, name, type, Component::Role::Logger ) {}
 };
 
 }  // namespace yaodaq

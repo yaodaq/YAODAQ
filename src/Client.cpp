@@ -17,6 +17,7 @@
 #include <string>
 #include <string_view>
 #include <thread>
+#include <yaodaq/ICodec.hpp>
 
 yaodaq::Client::~Client() noexcept
 {
@@ -24,17 +25,17 @@ yaodaq::Client::~Client() noexcept
   ix::uninitNetSystem();
 }
 
-yaodaq::Client::Client( const Identifier& id, const ClientConfig& client_config ) : m_identifier( id ), Logging( id )
+yaodaq::Client::Client( const Identifier& id, const Config& config ) : m_identifier( id ), Logging( id )
 {
   ix::initNetSystem();
   if( m_identifier.component().role() != Component::Role::Logger ) add_websocket_callback( [this]( const Log& msg ) noexcept { send( msg ); } );
-  m_client.setUrl( client_config.url() );
-  if( client_config.isTLS() )
+  m_client.setUrl( config.url() );
+  if( config.isTLS() )
   {
     ix::SocketTLSOptions m_tlsOptions;
-    m_tlsOptions.certFile = client_config.certFile();
-    m_tlsOptions.keyFile  = client_config.keyFile();
-    m_tlsOptions.caFile   = client_config.caFile();
+    m_tlsOptions.certFile = config.certFile();
+    m_tlsOptions.keyFile  = config.keyFile();
+    m_tlsOptions.caFile   = config.caFile();
     m_tlsOptions.tls      = true;
     m_client.setTLSOptions( m_tlsOptions );
   }
@@ -63,7 +64,6 @@ void yaodaq::Client::handleMessage( const ix::WebSocketMessagePtr& msg ) noexcep
       case ix::WebSocketMessageType::Open:
       {
         Open open( msg->openInfo );
-        open.setWebsocketInfos( m_client );
         onOpen( open );
         break;
       }
@@ -95,31 +95,67 @@ void yaodaq::Client::handleMessage( const ix::WebSocketMessagePtr& msg ) noexcep
   }
   catch( const yaodaq::Exception& exception )
   {
-    critical( "yaodaq::Exception: {}", exception.what() );
-    send( Except( exception ) );
+    try
+    {
+      critical( "yaodaq::Exception: {}", exception.what() );
+      send( Except( exception ) );
+    }
+    catch( ... )
+    {
+    }
   }
   catch( const std::exception& exception )
   {
-    critical( "std::exception: {}", exception.what() );
-    send( Except( exception ) );
+    try
+    {
+      critical( "std::exception: {}", exception.what() );
+      send( Except( exception ) );
+    }
+    catch( ... )
+    {
+    }
   }
   catch( ... )
   {
-    critical( "exception in handleMessage" );
-    send( Except( "exception in handleMessage" ) );
+    try
+    {
+      critical( "exception in handleMessage" );
+      send( Except( "exception in handleMessage" ) );
+    }
+    catch( ... )
+    {
+    }
   }
 }
 
 void yaodaq::Client::onOpen( const Open& open )
 {
-  info( "Connected to {} (uri: {})\nheaders: {}\nprotocol: {}\n{}", open.url(), open.uri(), yaodaq::Formatter::format( open.payload()["headers"] ), open.protocol(), yaodaq::Formatter::format( open() ) );
+  info( "Connected (uri: {})\nheaders: {}\nprotocol: {}", open.uri(), yaodaq::Formatter::format( open.payload()["headers"] ), open.protocol() );
   send( open );
 }
 
 void yaodaq::Client::onMessage( const std::string& str, const std::size_t size, const bool binary )
 {
-  nlohmann::json message = nlohmann::json::parse( str, nullptr, false );
-  if( !message.is_discarded() ) { onJsonRPC( message ); }
+  thread_local std::unique_ptr<ICodec> codec{ nullptr };
+  if( !codec ) codec = yaodaq::make_codec();
+  Message mess = codec->decode( str );
+  switch( mess.type() )
+  {
+    case Message::Type::RPCRequest:
+    {
+      m_client.sendUtf8Text( HandleRequest( mess.payload() ) );
+      break;
+    }
+    case Message::Type::RPCResponse:
+    {
+      onResponse( mess.payload().dump() );
+      break;
+    }
+    case Message::Type::Log:
+    {
+      onLog( mess() );
+    }
+  }
 }
 
 void yaodaq::Client::onClose( const Close& close )
@@ -149,35 +185,6 @@ void yaodaq::Client::onError( const Error& err )
 {
   error( "error {} ({}), retries: {}, waiting_time: {}{}", err.reason(), err.http_status(), err.retries(), err.wait_time(), err.decompression_error() ? " (decompression error)" : "" );
   send( err );
-}
-
-/**
- * @brief
- *
- * @param json
- * If is JSONRPC :
- * 1) If it contains method or notification we handle the request and send the result to the Websocket server
- * 2) If it's a result  or error we pass it to Received function to let the client aknoledge it
- **/
-void yaodaq::Client::onJsonRPC( const nlohmann::json& json )
-{
-  if( json.contains( "result" ) || json.contains( "error" ) ) onResponse( json.dump() );
-  else if( json.contains( "method" ) || json.contains( "notification" ) ) { m_client.sendUtf8Text( HandleRequest( json ) ); }
-  else if( json.contains( "meta" ) && json["meta"].contains( "type" ) )
-  {
-    switch( magic_enum::enum_cast<Message::Type>( json["meta"]["type"].get<std::string_view>(), magic_enum::case_insensitive ).value() )
-    {
-      case Message::Type::Log:
-      {
-        onLog( json );
-        break;
-      }
-      default:
-      {
-        break;
-      }
-    }
-  }
 }
 
 //void yaodaq::Client::onFragment( const std::string& str, const std::size_t size, const bool binary ) { std::cout << str << " " << size << " " << binary << std::endl; }

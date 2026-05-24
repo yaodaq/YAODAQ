@@ -41,23 +41,26 @@ public:
     Error,
     Ping,
     Pong,
-    Exception
+    Exception,
+    Unknown,
+    RPCRequest,
+    RPCResponse,
   };
-  YAODAQ_API explicit Message() noexcept = delete;
-  YAODAQ_API explicit Message( const Type type );
+  YAODAQ_API explicit Message( const nlohmann::json& json );
   YAODAQ_API std::string dump( const std::size_t i = 0 ) const { return m_data.dump( i ); }
-  YAODAQ_API void        setConnectionStateInfos( std::shared_ptr<ix::ConnectionState>& connection );
-  YAODAQ_API void        setWebsocketInfos( ix::WebSocket& socket );
   YAODAQ_API const nlohmann::json& payload() const noexcept { return m_data["payload"]; }
   YAODAQ_API const nlohmann::json& meta() const noexcept { return m_data["meta"]; }
   YAODAQ_API const nlohmann::json& operator()() const noexcept { return m_data; }
-  YAODAQ_API std::string url() const noexcept { return meta()["url"]; }
-  YAODAQ_API std::string subprotocol() const noexcept { return meta()["sub_protocol"]; }
-
-protected:
   YAODAQ_API nlohmann::json& payload() noexcept { return m_data["payload"]; }
   YAODAQ_API nlohmann::json& meta() noexcept { return m_data["meta"]; }
-  nlohmann::json             m_data;
+  YAODAQ_API Type            type() const noexcept;
+
+protected:
+  YAODAQ_API explicit Message( const Type type );
+
+private:
+  YAODAQ_API explicit Message() noexcept;
+  nlohmann::json m_data;
 };
 
 class Log : public Message
@@ -146,6 +149,7 @@ public:
   YAODAQ_API explicit Except( const Exception& exception );
   YAODAQ_API explicit Except( const std::exception& exception );
   YAODAQ_API explicit Except( const std::string_view& exception );
+  YAODAQ_API std::string_view what() const noexcept { return payload()["what"].get<std::string_view>(); }
 };
 
 }  // namespace yaodaq

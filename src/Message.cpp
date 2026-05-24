@@ -13,27 +13,39 @@
 #include <spdlog/details/log_msg.h>
 #include <string_view>
 
-void yaodaq::Message::setConnectionStateInfos( std::shared_ptr<ix::ConnectionState>& connection )
+yaodaq::Message::Message() noexcept
 {
-  meta()["remote_ip"]   = connection->getRemoteIp();
-  meta()["remote_port"] = connection->getRemotePort();
-}
-
-void yaodaq::Message::setWebsocketInfos( ix::WebSocket& socket )
-{
-  meta()["url"]          = socket.getUrl();
-  meta()["sub_protocol"] = socket.getSubProtocols();
-}
-
-yaodaq::Message::Message( const yaodaq::Message::Type type )
-{
+  meta()                               = nlohmann::json::object();
+  payload()                            = nlohmann::json::object();
+  meta()["type"]                       = magic_enum::enum_name( Message::Type::Unknown );
   meta()["yaodaq"]["version"]["major"] = yaodaq::Version::major();
   meta()["yaodaq"]["version"]["minor"] = yaodaq::Version::minor();
   meta()["yaodaq"]["version"]["patch"] = yaodaq::Version::patch();
   meta()["yaodaq"]["version"]["tweak"] = yaodaq::Version::tweak();
-  meta()["type"]                       = std::string( magic_enum::enum_name( type ) );
-  payload()                            = nlohmann::json::object();
 }
+
+yaodaq::Message::Type yaodaq::Message::type() const noexcept { return magic_enum::enum_cast<yaodaq::Message::Type>( meta()["type"].get<std::string_view>(), magic_enum::case_insensitive ).value(); }
+
+yaodaq::Message::Message( const nlohmann::json& json ) : Message()
+{
+  if( json.contains( "method" ) || json.contains( "notification" ) )
+  {
+    meta()["type"] = magic_enum::enum_name( Message::Type::RPCRequest );
+    payload()      = json;
+  }
+  else if( json.contains( "result" ) || json.contains( "error" ) )
+  {
+    meta()["type"] = magic_enum::enum_name( Message::Type::RPCResponse );
+    payload()      = json;
+  }
+  else if( json.contains( "meta" ) && json["meta"].is_object() && json.contains( "payload" ) && json["payload"].is_object() )
+  {
+    meta()    = json["meta"];
+    payload() = json["payload"];
+  }
+}
+
+yaodaq::Message::Message( const yaodaq::Message::Type type ) : Message() { meta()["type"] = std::string( magic_enum::enum_name( type ) ); }
 
 yaodaq::Log::Log( const spdlog::details::log_msg& msg ) : Message( yaodaq::Message::Type::Log )
 {

@@ -12,15 +12,16 @@ if(NOT DEFINED FMT_TAG)
 endif()
 
 CPMAddPackage(NAME fmt
-               GIT_REPOSITORY ${FMT_REPOSITORY}
-               GIT_TAG ${FMT_TAG}
-               FETCHCONTENT_UPDATES_DISCONNECTED ${IS_OFFLINE}
-               OPTIONS "FMT_PEDANTIC OFF"
-                       "FMT_WERROR OFF"
-                       "FMT_DOC OFF"
-                       "FMT_INSTALL OFF"
-                       "FMT_FUZZ OFF"
-                       "FMT_CUDA_TEST OFF"
-                       "FMT_OS ON"
-                       "FMT_SYSTEM_HEADERS ON"
-                       "FMT_UNICODE ON")
+              GIT_SHALLOW TRUE
+              GIT_REPOSITORY ${FMT_REPOSITORY}
+              GIT_TAG ${FMT_TAG}
+              FETCHCONTENT_UPDATES_DISCONNECTED ${IS_OFFLINE}
+              OPTIONS "FMT_PEDANTIC OFF"
+                      "FMT_WERROR OFF"
+                      "FMT_DOC OFF"
+                      "FMT_INSTALL OFF"
+                      "FMT_FUZZ OFF"
+                      "FMT_CUDA_TEST OFF"
+                      "FMT_OS ON"
+                      "FMT_SYSTEM_HEADERS ON"
+                      "FMT_UNICODE ON")

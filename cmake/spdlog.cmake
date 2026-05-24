@@ -14,10 +14,11 @@ if(NOT DEFINED SPDLOG_TAG)
 endif()
 
 CPMAddPackage(NAME spdlog
+              GIT_SHALLOW TRUE
               GIT_REPOSITORY ${SPDLOG_REPOSITORY}
               GIT_TAG ${SPDLOG_TAG}
               OPTIONS "SPDLOG_BUILD_ALL OFF"
-                      "SPDLOG_BUILD_SHARED ON"
+                      "SPDLOG_BUILD_SHARED OFF"
                       "SPDLOG_BUILD_PIC ON"
                       "SPDLOG_ENABLE_PCH OFF"
                       "SPDLOG_BUILD_EXAMPLE OFF"

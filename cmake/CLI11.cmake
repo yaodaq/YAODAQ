@@ -15,6 +15,7 @@ CPMAddPackage(NAME CLI11
                GIT_REPOSITORY "${CLI11_REPOSITORY}"
                GIT_TAG "${CLI11_TAG}"
                GIT_SUBMODULES ""
+               GIT_SHALLOW TRUE
               OPTIONS "CLI11_WARNINGS_AS_ERRORS FALSE"
                       "CLI11_SINGLE_FILE FALSE"
                       "CLI11_SANITIZERS FALSE"

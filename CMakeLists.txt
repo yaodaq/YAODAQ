@@ -36,7 +36,7 @@ else()
   message("Single-configuration generator")
 endif()
 
-option(YAODAQ_TESTS "Compile the tests" OFF)
+option(YAODAQ_TESTS "Compile the tests" ON)
 
 # File with all dependencies
 include("${CMAKE_CURRENT_SOURCE_DIR}/dependencies.cmake")
@@ -52,5 +52,6 @@ add_subdirectory(examples)
 
 if(YAODAQ_TESTS)
   include(CTest)
+  add_subdirectory(tests)
 endif()
 

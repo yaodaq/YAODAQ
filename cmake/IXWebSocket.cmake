@@ -8,11 +8,12 @@ if(NOT DEFINED IXWEBSOCKET_REPOSITORY)
 endif()
 
 if(NOT DEFINED IXWEBSOCKET_TAG)
-  set(IXWEBSOCKET_TAG "v11.4.6")
+  set(IXWEBSOCKET_TAG "v12.0.0")
 endif()
 
 include(Zlib-ng)
 CPMAddPackage(NAME IXWebSocket
+              GIT_SHALLOW TRUE
               GIT_REPOSITORY "${IXWEBSOCKET_REPOSITORY}"
               GIT_TAG "${IXWEBSOCKET_TAG}"
               OPTIONS "BUILD_DEMO 0" "USE_TLS 0" "USE_ZLIB 1" "USE_WS 0")

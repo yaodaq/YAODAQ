@@ -27,7 +27,7 @@ try
     return app.exit( e );
   }
 
-  yaodaq::ClientConfig cfg;
+  yaodaq::Config cfg;
   cfg().setPort( port ).setHost( host );
   yaodaq::Module module( cfg, name );
   module.setVerbosity( spdlog::level::level_enum::info );

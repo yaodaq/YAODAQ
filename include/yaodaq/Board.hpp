@@ -18,7 +18,7 @@ namespace yaodaq
 class Board : public Module
 {
 public:
-  YAODAQ_API explicit Board( ClientConfig& cfg, const std::string_view name, const std::string_view type = "yaodaq" ) : Module( cfg, name, type, Component::Role::Board ) {}
+  YAODAQ_API explicit Board( Config& cfg, const std::string_view name, const std::string_view type = "yaodaq" ) : Module( cfg, name, type, Component::Role::Board ) {}
   bool connect() final
   {
     Transition transition{ allowTransition( State::ID::Connected ) };
