@@ -47,11 +47,8 @@ public:
 
   void write( const std::vector<uint8_t>& datd ) final
   {
-    std::string s(
-  reinterpret_cast<const char*>(datd.data()),
-  datd.size()
-);
-     m_client.send(s);
+    std::string s( reinterpret_cast<const char*>( datd.data() ), datd.size() );
+    m_client.send( s );
   }
 
   std::optional<std::vector<uint8_t>> read() final { return m_incoming.pop(); }
@@ -102,7 +99,7 @@ private:
 
       case ix::WebSocketMessageType::Message:
       {
-        m_incoming.push({msg->str.begin(),msg->str.end()});
+        m_incoming.push( { msg->str.begin(), msg->str.end() } );
 
         break;
       }

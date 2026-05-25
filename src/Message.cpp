@@ -31,7 +31,7 @@ yaodaq::Message::Message() noexcept
 
 yaodaq::Message::Message( const std::vector<std::uint8_t>& raw )
 {
-    meta()                               = nlohmann::json::object();
+  meta()                               = nlohmann::json::object();
   payload()                            = nlohmann::json::object();
   meta()["type"]                       = magic_enum::enum_name( Message::Type::Unknown );
   meta()["yaodaq"]["version"]["major"] = yaodaq::Version::major();
@@ -40,8 +40,8 @@ yaodaq::Message::Message( const std::vector<std::uint8_t>& raw )
   meta()["yaodaq"]["version"]["tweak"] = yaodaq::Version::tweak();
   meta()["uuid"]                       = ix::uuid4();
   meta()["time"]                       = clock::utc_nanoseconds();
-  std::string(reinterpret_cast<const char*>( raw.data() ), raw.size());
-  m_data["payload"]=nlohmann::json::parse(raw);
+  std::string( reinterpret_cast<const char*>( raw.data() ), raw.size() );
+  m_data["payload"] = nlohmann::json::parse( raw );
 }
 
 yaodaq::Message::Type yaodaq::Message::type() const noexcept { return magic_enum::enum_cast<yaodaq::Message::Type>( meta()["type"].get<std::string_view>(), magic_enum::case_insensitive ).value_or( Type::Unknown ); }
@@ -63,7 +63,8 @@ yaodaq::Message::Message( const nlohmann::json& json ) : Message()
     meta()    = json["meta"];
     payload() = json["payload"];
   }
-  else payload() = json;
+  else
+    payload() = json;
 }
 
 yaodaq::Message::Message( const yaodaq::Message::Type type ) : Message() { meta()["type"] = std::string( magic_enum::enum_name( type ) ); }

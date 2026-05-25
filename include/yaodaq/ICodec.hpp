@@ -37,7 +37,7 @@ public:
   {
     // zero-copy parse from view (no std::string allocation)
     auto json = nlohmann::json::parse( data.data(), data.data() + data.size(), nullptr, false );
-    return Message( json  );
+    return Message( json );
   }
 };
 

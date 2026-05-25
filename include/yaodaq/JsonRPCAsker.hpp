@@ -12,10 +12,7 @@ namespace yaodaq
 class JsonRPCAsker : public jsonrpc::IAsyncClientConnector
 {
 public:
-  YAODAQ_API JsonRPCAsker() : m_client( *this )
-  {
-    setTimeout(std::chrono::milliseconds( 5000 ));
-  }
+  YAODAQ_API JsonRPCAsker() : m_client( *this ) { setTimeout( std::chrono::milliseconds( 5000 ) ); }
   YAODAQ_API virtual ~JsonRPCAsker() noexcept {};
 
 private:

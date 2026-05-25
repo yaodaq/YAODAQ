@@ -7,17 +7,17 @@
 #include <cpp-terminal/iostream.hpp>
 #include <cpp-terminal/terminal.hpp>
 #include <ixwebsocket/IXHttpClient.h>
+#include <simdjson.h>
 #include <thread>
 #include <yaodaq/Board.hpp>
 #include <yaodaq/Exception.hpp>
-#include <simdjson.h>
 class MotorBoard : public yaodaq::Board
 {
 public:
   MotorBoard( yaodaq::BoardConfig& cfg, const std::string_view name ) : yaodaq::Board( cfg, name, "MotorBoard" ) {}
   bool on_initialize() override
   {
-    info("Finding the key");
+    info( "Finding the key" );
     ix::HttpRequestArgsPtr args = m_http.createRequest();
     args->connectTimeout        = 5;
     args->transferTimeout       = 2;
@@ -27,7 +27,7 @@ public:
     out                     = m_http.get( url, args );
     if( out->statusCode != 200 || out->body == "connection error" )
     {
-      error("error: {} ({})",out->body,out->statusCode);
+      error( "error: {} ({})", out->body, out->statusCode );
       return false;
     }
     nlohmann::json data = nlohmann::json::parse( out->body );
@@ -35,36 +35,33 @@ public:
     return true;
   }
 
-
   bool on_connect() override
   {
-
-
     std::function<bool()> fun = [this]() -> bool
     {
-      info("asking voltage/current");
+      info( "asking voltage/current" );
       std::this_thread::sleep_for( std::chrono::seconds( 2 ) );
 
-        nlohmann::json data;
-    data["i"] = m_key.c_str();
-    data["t"] = "request";
-    data["r"] = "websocket";
-    data["c"]= nlohmann::json::array();
-    data["c"][0]["c"] = "getItem";
-    data["c"][0]["p"]["i"] = "Status.currentMeasure";
-    data["c"][0]["p"]["v"] = "";
-    data["c"][0]["p"]["u"] = "";
-    data["c"][0]["p"]["p"]["l"]= "*";
-    data["c"][0]["p"]["p"]["a"]= "*";
-    data["c"][0]["p"]["p"]["c"]= "*";
+      nlohmann::json data;
+      data["i"]                   = m_key.c_str();
+      data["t"]                   = "request";
+      data["r"]                   = "websocket";
+      data["c"]                   = nlohmann::json::array();
+      data["c"][0]["c"]           = "getItem";
+      data["c"][0]["p"]["i"]      = "Status.currentMeasure";
+      data["c"][0]["p"]["v"]      = "";
+      data["c"][0]["p"]["u"]      = "";
+      data["c"][0]["p"]["p"]["l"] = "*";
+      data["c"][0]["p"]["p"]["a"] = "*";
+      data["c"][0]["p"]["p"]["c"] = "*";
 
-    data["c"][1]["c"] = "getItem";
-    data["c"][1]["p"]["i"] = "Status.voltageMeasure";
-    data["c"][1]["p"]["v"] = "";
-    data["c"][1]["p"]["u"] = "";
-    data["c"][1]["p"]["p"]["l"]= "*";
-    data["c"][1]["p"]["p"]["a"]= "*";
-    data["c"][1]["p"]["p"]["c"]= "*";
+      data["c"][1]["c"]           = "getItem";
+      data["c"][1]["p"]["i"]      = "Status.voltageMeasure";
+      data["c"][1]["p"]["v"]      = "";
+      data["c"][1]["p"]["u"]      = "";
+      data["c"][1]["p"]["p"]["l"] = "*";
+      data["c"][1]["p"]["p"]["a"] = "*";
+      data["c"][1]["p"]["p"]["c"] = "*";
       send( yaodaq::Raw( data ) );
 
       return true;
@@ -80,54 +77,42 @@ private:
   ix::HttpClient m_http;
 };
 
-
-void parse(const std::string& json)
+void parse( const std::string& json )
 {
   simdjson::ondemand::parser parser;
-  simdjson::padded_string padded(json);
+  simdjson::padded_string    padded( json );
 
-  auto doc  = parser.iterate(padded);
+  auto doc  = parser.iterate( padded );
   auto root = doc.get_array();
 
-  for (auto response : root)
+  for( auto response: root )
   {
-        auto obj = response.get_object();
+    auto obj = response.get_object();
 
-        if (obj["t"] != "response")
-            continue;
+    if( obj["t"] != "response" ) continue;
 
-        for (auto event : obj["c"])
-        {
-            auto e = event.get_object();
+    for( auto event: obj["c"] )
+    {
+      auto e = event.get_object();
 
-            if (e["e"] != "itemUpdated")
-                continue;
+      if( e["e"] != "itemUpdated" ) continue;
 
-            auto d = e["d"];
-            auto p = d["p"];
+      auto d = e["d"];
+      auto p = d["p"];
 
-            int line = std::string_view(p["l"]).empty() ? -1 : std::stoi(std::string(std::string_view(p["l"])));
-            int addr = std::stoi(std::string(std::string_view(p["a"])));
-            int chan = std::stoi(std::string(std::string_view(p["c"])));
+      int line = std::string_view( p["l"] ).empty() ? -1 : std::stoi( std::string( std::string_view( p["l"] ) ) );
+      int addr = std::stoi( std::string( std::string_view( p["a"] ) ) );
+      int chan = std::stoi( std::string( std::string_view( p["c"] ) ) );
 
-            std::string_view item = d["i"];
-            double value = std::stod(std::string(std::string_view(d["v"])));
-            std::string_view unit = d["u"];
-            std::string_view time = d["t"];
+      std::string_view item  = d["i"];
+      double           value = std::stod( std::string( std::string_view( d["v"] ) ) );
+      std::string_view unit  = d["u"];
+      std::string_view time  = d["t"];
 
-            std::cout
-                << "L:" << line
-                << " A:" << addr
-                << " C:" << chan
-                << " Item:" << item
-                << " Value:" << value
-                << " " << unit
-                << " T:" << time
-                << "\n";
-        }
+      std::cout << "L:" << line << " A:" << addr << " C:" << chan << " Item:" << item << " Value:" << value << " " << unit << " T:" << time << "\n";
     }
+  }
 }
-
 
 int main( int argc, char* argv[] )
 try
@@ -159,14 +144,14 @@ try
   cfg().setPort( port ).setHost( host ).verbosity( verbosity );
 
   MotorBoard board( cfg, name );
-  board.dispatcher().subscribeToAll([&board]( const yaodaq::Message& msg )->void
-  {
-    parse(msg.payload().dump());
-    //std::cout<<yaodaq::Formatter::format(msg())<<std::endl;
+  board.dispatcher().subscribeToAll(
+    [&board]( const yaodaq::Message& msg ) -> void
+    {
+      parse( msg.payload().dump() );
+      //std::cout<<yaodaq::Formatter::format(msg())<<std::endl;
+    }
 
-  }
-
-);
+  );
   board.link();
 
   std::size_t nbrCTLC{ 3 };
