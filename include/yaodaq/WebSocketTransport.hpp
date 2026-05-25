@@ -45,7 +45,14 @@ public:
     return true;
   }
 
-  void write( const std::vector<uint8_t>& data ) final { m_client.sendBinary( ix::IXWebSocketSendData( data ) ); }
+  void write( const std::vector<uint8_t>& datd ) final
+  {
+    std::string s(
+  reinterpret_cast<const char*>(datd.data()),
+  datd.size()
+);
+     m_client.send(s);
+  }
 
   std::optional<std::vector<uint8_t>> read() final { return m_incoming.pop(); }
 
@@ -95,12 +102,7 @@ private:
 
       case ix::WebSocketMessageType::Message:
       {
-        std::cout << msg->str << std::endl;
-        //m_incoming.push(
-        //{
-        //    msg->str.begin(),
-        //    msg->str.end()
-        //});
+        m_incoming.push({msg->str.begin(),msg->str.end()});
 
         break;
       }

@@ -101,7 +101,7 @@ private:
       {
         auto msg = m_outgoing.pop();
         if( !msg.has_value() ) break;
-        auto raw = m_codec->encode( *msg );
+        auto raw = m_codec->encode( msg.value() );
         m_transport->write( raw );
       }
     }
