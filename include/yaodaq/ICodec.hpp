@@ -26,12 +26,12 @@ public:
 class Json final : public ICodec
 {
 public:
-  virtual std::vector<std::uint8_t> encode( const yaodaq::Message& msg )
+  std::vector<std::uint8_t> encode( const yaodaq::Message& msg ) override
   {
     const std::string ret{ msg.dump() };
     return { ret.begin(), ret.end() };
   }
-  virtual yaodaq::Message decode( const std::vector<uint8_t>& data )
+  yaodaq::Message decode( const std::vector<uint8_t>& data ) override
   {
     const std::string ret{ data.begin(), data.end() };
     return Message( nlohmann::json::parse( ret, nullptr, false ) );

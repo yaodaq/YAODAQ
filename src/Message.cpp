@@ -29,7 +29,7 @@ yaodaq::Message::Message() noexcept
   meta()["time"]                       = clock::utc_nanoseconds();
 }
 
-yaodaq::Message::Type yaodaq::Message::type() const noexcept { return magic_enum::enum_cast<yaodaq::Message::Type>( meta()["type"].get<std::string_view>(), magic_enum::case_insensitive ).value(); }
+yaodaq::Message::Type yaodaq::Message::type() const noexcept { return magic_enum::enum_cast<yaodaq::Message::Type>( meta()["type"].get<std::string_view>(), magic_enum::case_insensitive ).value_or( Type::Unknown ); }
 
 yaodaq::Message::Message( const nlohmann::json& json ) : Message()
 {

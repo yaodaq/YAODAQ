@@ -20,7 +20,7 @@ namespace yaodaq
 class YAODAQ_API Client : public JsonRPCResponder, public Logging  //TODO : Why YAODAQ_API is needed here ?
 {
 public:
-  YAODAQ_API virtual ~Client() noexcept;
+  YAODAQ_API ~Client() noexcept override;
   YAODAQ_API explicit Client( const Identifier& id, const Config& client_config );
 
   YAODAQ_API const Identifier& identifier() const noexcept { return m_identifier; }
@@ -37,7 +37,7 @@ protected:
     info( "Closing {}", m_client.getUrl() );
     m_client.close();
   }
-  virtual void onResponse( const std::string& ) {}
+  virtual void onResponse( const std::string& ) { /* Standard client don't receive response !!  Only Controller has the right to ask */ }
 
 private:
   const Identifier m_identifier;

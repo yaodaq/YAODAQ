@@ -81,13 +81,13 @@ private:
   std::unordered_map<jsonrpc::id_t, std::shared_ptr<yaodaq::ServerRequest>> m_server_own_construct_response;
 
   // Send to all clients except webSocket
-  YAODAQ_INTERNAL void sendExcept( const std::string& str, ix::WebSocket& webSocket );
+  YAODAQ_INTERNAL void sendExcept( const std::string_view& str, ix::WebSocket& webSocket );
   // Send only to webSocket
-  YAODAQ_INTERNAL void sendTo( const std::string& str, ix::WebSocket& webSocket );
+  YAODAQ_INTERNAL void sendTo( const std::string_view& str, ix::WebSocket& webSocket );
   // Send to all
   YAODAQ_INTERNAL void sendToAll( const std::string_view& str ) noexcept;
   // Send to loggers
-  YAODAQ_INTERNAL void sendToLoggers( const std::string& str );
+  YAODAQ_INTERNAL void sendToLoggers( const std::string_view& str );
 
   // Check if a client already have this name
   std::unordered_map<Component::Role, std::unordered_map<std::string, std::reference_wrapper<ix::WebSocket>>> m_clients;

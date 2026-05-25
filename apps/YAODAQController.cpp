@@ -126,7 +126,7 @@ try
           Term::cout << "Ctrl+K : stop\n";
           Term::cout << "Ctrl+Z : clear\n";
           Term::cout << "Ctrl+D : disconnect\n";
-          Term::cout << "Ctrl+R : release\n";
+          Term::cout << "Ctrl+R : release\n" << std::endl;
         }
         break;
       }

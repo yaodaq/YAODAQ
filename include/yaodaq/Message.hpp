@@ -91,8 +91,8 @@ public:
   YAODAQ_API explicit Close() noexcept = delete;
   YAODAQ_API explicit Close( const ix::WebSocketCloseInfo& close );
   YAODAQ_API std::uint16_t code() const noexcept { return payload()["code"].get<std::uint16_t>(); }
-  YAODAQ_API std::string_view reason() const noexcept { return payload()["reason"].get<std::string_view>(); }
-  YAODAQ_API bool             remote() const noexcept { return payload()["remote"].get<bool>(); }
+  YAODAQ_API std::string reason() const noexcept { return payload()["reason"].get<std::string>(); }
+  YAODAQ_API bool        remote() const noexcept { return payload()["remote"].get<bool>(); }
 };
 
 class Reject : public Message
@@ -101,8 +101,8 @@ public:
   YAODAQ_API explicit Reject() noexcept = delete;
   YAODAQ_API explicit Reject( const ix::WebSocketCloseInfo& close );
   YAODAQ_API std::uint16_t code() const noexcept { return payload()["code"].get<std::uint16_t>(); }
-  YAODAQ_API std::string_view reason() const noexcept { return payload()["reason"].get<std::string_view>(); }
-  YAODAQ_API bool             remote() const noexcept { return payload()["remote"].get<bool>(); }
+  YAODAQ_API std::string reason() const noexcept { return payload()["reason"].get<std::string>(); }
+  YAODAQ_API bool        remote() const noexcept { return payload()["remote"].get<bool>(); }
 };
 
 class Error : public Message
@@ -113,8 +113,8 @@ public:
   YAODAQ_API std::uint32_t retries() const noexcept { return payload()["retries"].get<std::uint32_t>(); }
   YAODAQ_API double        wait_time() const noexcept { return payload()["wait_time"].get<double>(); }
   YAODAQ_API int           http_status() const noexcept { return payload()["http_status"].get<int>(); }
-  YAODAQ_API std::string_view reason() const noexcept { return payload()["reason"].get<std::string_view>(); }
-  YAODAQ_API bool             decompression_error() const noexcept { return payload()["decompression_error"].get<bool>(); }
+  YAODAQ_API std::string reason() const noexcept { return payload()["reason"].get<std::string>(); }
+  YAODAQ_API bool        decompression_error() const noexcept { return payload()["decompression_error"].get<bool>(); }
 };
 
 class Ping : public Message
@@ -127,8 +127,8 @@ public:
     payload()["binary"]  = binary;
     payload()["size"]    = size;
   }
-  YAODAQ_API std::string_view message() const noexcept { return payload()["message"].get<std::string_view>(); }
-  YAODAQ_API bool             binary() const noexcept { return payload()["binary"].get<bool>(); }
+  YAODAQ_API std::string message() const noexcept { return payload()["message"].get<std::string>(); }
+  YAODAQ_API bool        binary() const noexcept { return payload()["binary"].get<bool>(); }
   YAODAQ_API std::size_t size() const noexcept { return payload()["size"].get<std::size_t>(); }
 };
 
@@ -142,8 +142,8 @@ public:
     payload()["binary"]  = binary;
     payload()["size"]    = size;
   }
-  YAODAQ_API std::string_view message() const noexcept { return payload()["message"].get<std::string_view>(); }
-  YAODAQ_API bool             binary() const noexcept { return payload()["binary"].get<bool>(); }
+  YAODAQ_API std::string message() const noexcept { return payload()["message"].get<std::string>(); }
+  YAODAQ_API bool        binary() const noexcept { return payload()["binary"].get<bool>(); }
   YAODAQ_API std::size_t size() const noexcept { return payload()["size"].get<std::size_t>(); }
 };
 
@@ -154,14 +154,14 @@ public:
   YAODAQ_API explicit Except( const Exception& exception );
   YAODAQ_API explicit Except( const std::exception& exception );
   YAODAQ_API explicit Except( const std::string_view& exception );
-  YAODAQ_API std::string_view what() const noexcept { return payload()["what"].get<std::string_view>(); }
+  YAODAQ_API std::string what() const noexcept { return payload()["what"].get<std::string>(); }
 };
 
 class RawData : public Message
 {
 public:
   YAODAQ_API explicit RawData() : Message( Message::Type::RawData ) {}
-  YAODAQ_API explicit RawData( const std::string_view message ) : Message( Message::Type::RawData ) { payload()["message"] = std::move( message ); }
+  YAODAQ_API explicit RawData( const std::string_view message ) : Message( Message::Type::RawData ) { payload()["message"] = message; }
 };
 
 class Raw : public Message

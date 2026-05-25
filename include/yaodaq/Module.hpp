@@ -48,7 +48,7 @@ public:
   }
   YAODAQ_API virtual bool disconnect()
   {
-    m_State.setId( State::ID::Connected );
+    m_State.setId( State::ID::Disconnected );
     return true;
   }
 
@@ -338,7 +338,7 @@ public:
   }
 
   YAODAQ_API explicit Module() noexcept = delete;
-  YAODAQ_API virtual ~Module() noexcept
+  YAODAQ_API ~Module() noexcept override
   {
     if( m_worker.joinable() )
     {
