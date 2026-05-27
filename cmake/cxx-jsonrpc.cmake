@@ -10,7 +10,7 @@ if(NOT DEFINED CXX_JSONRPC_REPOSITORY)
 endif()
 
 if(NOT DEFINED CXX_JSONRPC_TAG)
-  set(CXX_JSONRPC_TAG "main")
+  set(CXX_JSONRPC_TAG "v0.4.1")
 endif()
 
 CPMAddPackage(NAME cxx-jsonrpc
