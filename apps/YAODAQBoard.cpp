@@ -6,32 +6,185 @@
 #include <cpp-terminal/input.hpp>
 #include <cpp-terminal/iostream.hpp>
 #include <cpp-terminal/terminal.hpp>
+#include <iostream>
 #include <ixwebsocket/IXHttpClient.h>
 #include <simdjson.h>
+#include <soci/mysql/soci-mysql.h>
+#include <soci/soci.h>
+#include <string>
 #include <thread>
+#include <unordered_map>
+#include <vector>
 #include <yaodaq/Board.hpp>
 #include <yaodaq/Exception.hpp>
+
+// -----------------------------
+// Key: (board, channel)
+// -----------------------------
+struct Key
+{
+  int crate;
+  int board;
+  int chan;
+
+  bool operator==( const Key& o ) const { return crate == o.crate && board == o.board && chan == o.chan; }
+};
+
+struct KeyHash
+{
+  size_t operator()( const Key& k ) const { return std::hash<int>()( k.crate ) ^ ( std::hash<int>()( k.board ) << 1 ) ^ ( std::hash<int>()( k.chan ) << 2 ); }
+};
+
+// -----------------------------
+// Measurement row
+// -----------------------------
+struct Row
+{
+  std::string ts;
+  long        channel_id;
+  double      voltage;
+  double      current;
+};
+
+struct Info
+{
+  std::string ts;
+  double      voltage;
+  double      current;
+  int         crate;
+  int         board;
+  int         channel;
+};
+
+struct Sample
+{
+  std::string ts;
+
+  double voltage = 0.0;
+  double current = 0.0;
+
+  bool has_v = false;
+  bool has_i = false;
+};
+
+std::unordered_map<Key, long long, KeyHash> channel_map;
+
+// -----------------------------
+// DAQ Writer
+// -----------------------------
+class HVWriter
+{
+public:
+  void          setDB( const std::string& db ) { m_db = db; }
+  void          setUser( const std::string& user ) { m_user = user; }
+  void          setPassword( const std::string& password ) { m_password = password; }
+  void          setHost( const std::string& host ) { m_host = host; }
+  void          setPort( const std::string& port ) { m_port = port; }
+  soci::session sql;
+
+  std::vector<Row> buffer;
+
+  void connect() { sql.open( soci::mysql, fmt::format( "dbname={} user={} password={} host={} port={}", m_db, m_user, m_password, m_host, m_port ) ); }
+
+  // -----------------------------
+  // PRELOAD CHANNEL MAP
+  // -----------------------------
+  void preload()
+  {
+    soci::rowset<soci::row> rs = ( sql.prepare << "SELECT ch.channel_id, c.crate_no, b.board_addr, ch.hv_chan FROM hv_channel ch JOIN hv_board b ON ch.board_id = b.board_id JOIN crate c ON b.crate_id = c.crate_id" );
+
+    for( auto it = rs.begin(); it != rs.end(); ++it )
+    {
+      soci::row const& r = *it;
+
+      long long channel_id = r.get<long long>( 0 );
+      int       crate      = r.get<int>( 1 );
+      int       board      = r.get<int>( 2 );
+      int       chan       = r.get<int>( 3 );
+      std::cout << channel_id << " " << crate << " " << board << " " << chan << std::endl;
+      channel_map[{ crate, board, chan }] = channel_id;
+    }
+  }
+
+  // -----------------------------
+  // ADD EVENT (DAQ STREAM)
+  // -----------------------------
+  void add( const std::string& ts, int crate, int board, int chan, double voltage, double current )
+  {
+    auto it = channel_map.find( { crate, board, chan } );
+    if( it == channel_map.end() ) return;
+
+    buffer.push_back( { ts, it->second, voltage, current } );
+
+    if( buffer.size() >= 1 ) { flush(); }
+  }
+
+  // -----------------------------
+  // FLUSH BATCH INSERT
+  // -----------------------------
+  void flush()
+  {
+    if( buffer.empty() ) return;
+
+    soci::statement st = ( sql.prepare << "INSERT INTO hv_measurement "
+                                          "(ts, channel_id, voltage_V, current_A) "
+                                          "VALUES (:ts, :ch, :v, :c)" );
+
+    for( auto& r: buffer )
+    {
+      st.exchange( soci::use( r.ts, "ts" ) );
+      st.exchange( soci::use( r.channel_id, "ch" ) );
+      st.exchange( soci::use( r.voltage, "v" ) );
+      st.exchange( soci::use( r.current, "c" ) );
+
+      st.define_and_bind();
+      st.execute( true );
+    }
+
+    buffer.clear();
+  }
+
+private:
+  std::string m_db;
+  std::string m_user;
+  std::string m_password;
+  std::string m_host;
+  std::string m_port;
+};
+
 class MotorBoard : public yaodaq::Board
 {
 public:
   MotorBoard( yaodaq::BoardConfig& cfg, const std::string_view name ) : yaodaq::Board( cfg, name, "MotorBoard" ) {}
   bool on_initialize() override
   {
+    writer.setDB( "hv_monitor" );
+    writer.setUser( "yaodaq" );
+    writer.setPassword( "yaodaq" );
+    writer.setHost( "192.168.50.18" );
+    writer.setPort( "3306" );
+    writer.connect();
+    writer.preload();
     info( "Finding the key" );
     ix::HttpRequestArgsPtr args = m_http.createRequest();
-    args->connectTimeout        = 5;
-    args->transferTimeout       = 2;
-    args->followRedirects       = 1;
+    args->connectTimeout        = 1;
+    args->transferTimeout       = 1;
+    args->followRedirects       = true;
     ix::HttpResponsePtr out;
-    std::string         url = "http://192.168.50.120/api/login/admin/password";
+    std::string         url = "http://192.168.50.119:8081/api/login/admin/password";
     out                     = m_http.get( url, args );
-    if( out->statusCode != 200 || out->body == "connection error" )
+    if( out->statusCode != 200 || out->body == "connection error" || out->body.empty() )
     {
       error( "error: {} ({})", out->body, out->statusCode );
       return false;
     }
+    else
+    {
+      info( "{} {} ", out->body, out->statusCode );
+    }
     nlohmann::json data = nlohmann::json::parse( out->body );
     m_key               = data["i"].get<std::string>();
+    info( "Found key {}", m_key );
     return true;
   }
 
@@ -39,7 +192,6 @@ public:
   {
     std::function<bool()> fun = [this]() -> bool
     {
-      info( "asking voltage/current" );
       std::this_thread::sleep_for( std::chrono::seconds( 2 ) );
 
       nlohmann::json data;
@@ -71,47 +223,129 @@ public:
 
     return true;
   }
+  HVWriter writer;
 
 private:
   std::string    m_key;
   ix::HttpClient m_http;
 };
 
-void parse( const std::string& json )
+std::string microsecondsToUTC( std::string s )
 {
-  simdjson::ondemand::parser parser;
-  simdjson::padded_string    padded( json );
+  s.erase( std::remove( s.begin(), s.end(), '.' ), s.end() );
+  std::cout << " val" << s << std::endl;
+  using namespace std::chrono;
+  // 1. Convert microseconds → system_clock time_point
+  system_clock::time_point tp = system_clock::time_point( microseconds( std::stoll( s ) ) );
 
-  auto doc  = parser.iterate( padded );
-  auto root = doc.get_array();
+  // 2. Convert to time_t (seconds since epoch)
+  std::time_t t = system_clock::to_time_t( tp );
+
+  // 3. Convert to UTC struct
+  std::tm utc_tm;
+
+#if defined( _WIN32 )
+  gmtime_s( &utc_tm, &t );  // Windows
+#else
+  gmtime_r( &t, &utc_tm );  // Linux / macOS
+#endif
+
+  // 4. Format output
+  std::ostringstream oss;
+  oss << std::put_time( &utc_tm, "%Y-%m-%d %H:%M:%S" );
+
+  return oss.str();
+}
+
+std::vector<Info> parse( const std::string& str )
+{
+  std::cout << str << std::endl;
+  static std::unordered_map<Key, Sample, KeyHash> sample_map;
+  std::vector<Info>                               m_infos;
+  simdjson::ondemand::parser                      parser;
+  simdjson::padded_string                         padded( str );
+  auto                                            doc  = parser.iterate( padded );
+  auto                                            root = doc.get_array();
 
   for( auto response: root )
   {
     auto obj = response.get_object();
-
     if( obj["t"] != "response" ) continue;
 
     for( auto event: obj["c"] )
     {
       auto e = event.get_object();
-
       if( e["e"] != "itemUpdated" ) continue;
 
       auto d = e["d"];
       auto p = d["p"];
 
-      int line = std::string_view( p["l"] ).empty() ? -1 : std::stoi( std::string( std::string_view( p["l"] ) ) );
-      int addr = std::stoi( std::string( std::string_view( p["a"] ) ) );
-      int chan = std::stoi( std::string( std::string_view( p["c"] ) ) );
-
+      int              crate = std::stoi( std::string( std::string_view( p["l"] ) ) );
+      int              board = std::stoi( std::string( std::string_view( p["a"] ) ) );
+      int              chan  = std::stoi( std::string( std::string_view( p["c"] ) ) );
       std::string_view item  = d["i"];
       double           value = std::stod( std::string( std::string_view( d["v"] ) ) );
-      std::string_view unit  = d["u"];
-      std::string_view time  = d["t"];
+      std::string      time  = std::string( std::string_view( d["t"] ) );
+      std::cout << time << std::endl;
+      Key key{ crate, board, chan };
 
-      std::cout << "L:" << line << " A:" << addr << " C:" << chan << " Item:" << item << " Value:" << value << " " << unit << " T:" << time << "\n";
+      // ✔ IMPORTANT: reference, not copy
+      Sample& s = sample_map[key];
+
+      s.ts = microsecondsToUTC( time );
+
+      // -----------------------------
+      // UNIT NORMALIZATION
+      // -----------------------------
+      double v = value;
+
+      std::string_view u = d["u"];
+
+      if( u == "nA" ) v *= 1e-9;
+      else if( u == "uA" )
+        v *= 1e-6;
+      else if( u == "mA" )
+        v *= 1e-3;
+      else if( u == "mV" )
+        v *= 1e-3;
+      else if( u == "uV" )
+        v *= 1e-6;
+
+      // -----------------------------
+      // MERGE
+      // -----------------------------
+      if( item == "Status.currentMeasure" )
+      {
+        s.current = v;
+        s.has_v   = true;
+      }
+      else if( item == "Status.voltageMeasure" )
+      {
+        s.voltage = v;
+        s.has_i   = true;
+      }
+
+      // -----------------------------
+      // COMPLETE SAMPLE
+      // -----------------------------
+      if( s.has_v && s.has_i )
+      {
+        Info info;
+        info.ts      = s.ts;
+        info.voltage = s.voltage;
+        info.current = s.current;
+        info.crate   = crate;
+        info.board   = board;
+        info.channel = chan;
+        std::cout << info.ts << " " << info.voltage << " " << info.current << " " << info.crate << " " << info.board << " " << info.channel << std::endl;
+        // reset AFTER extraction
+        m_infos.push_back( info );
+        s.has_v = false;
+        s.has_i = false;
+      }
     }
   }
+  return m_infos;  // no complete sample
 }
 
 int main( int argc, char* argv[] )
@@ -139,7 +373,7 @@ try
   }
 
   nlohmann::json json;
-  json["url"] = "ws://192.168.50.120:8080";
+  json["url"] = "ws://192.168.50.119:8080";
   yaodaq::BoardConfig cfg( std::make_unique<Connector>( std::make_unique<WebSocket>( json ), std::make_unique<yaodaq::Json>() ) );
   cfg().setPort( port ).setHost( host ).verbosity( verbosity );
 
@@ -147,7 +381,10 @@ try
   board.dispatcher().subscribeToAll(
     [&board]( const yaodaq::Message& msg ) -> void
     {
-      parse( msg.payload().dump() );
+      std::vector<Info> info = parse( msg.payload().dump() );
+      for( std::size_t i = 0; i != info.size(); ++i ) std::cout << fmt::format( "time: {} crate: {} board: {}, channel:{} voltage:{} current:{}", info[i].ts, info[i].crate, info[i].board, info[i].channel, info[i].voltage, info[i].current ) << std::endl;
+
+      //board.writer.add(info.ts,info.crate,info.board,info.channel,info.voltage, info.current);
       //std::cout<<yaodaq::Formatter::format(msg())<<std::endl;
     }
 

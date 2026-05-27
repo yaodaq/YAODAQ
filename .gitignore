@@ -786,3 +786,5 @@ FodyWeavers.xsd
 
 dev/
 install/
+
+.vscode
