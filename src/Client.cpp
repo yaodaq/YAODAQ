@@ -137,9 +137,11 @@ void yaodaq::Client::onOpen( const Open& open )
 
 void yaodaq::Client::onMessage( const std::string& str, const std::size_t size, const bool binary )
 {
-  thread_local std::unique_ptr<ICodec> codec{ nullptr };
-  if( !codec ) codec = yaodaq::make_codec();
-  Message mess = codec->decode( str );
+  nlohmann::json json = nlohmann::json::parse( str, nullptr, false );
+  Message        mess( json );
+  //thread_local std::unique_ptr<ICodec> codec{ nullptr };
+  //if( !codec ) codec = yaodaq::make_codec();
+  // Message mess = codec->decode( str );
   switch( mess.type() )
   {
     case Message::Type::RPCRequest:

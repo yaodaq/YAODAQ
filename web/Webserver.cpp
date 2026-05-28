@@ -11,10 +11,6 @@ class SimpleHttpServer
 public:
   SimpleHttpServer( const std::string& root, const std::string& host, int port ) : _httpServer( port, host )
   {
-    //if(!std::filesystem::is_directory(root)) std::cout<<"root must be a directory"<<std::endl;
-    //m_root = std::filesystem::absolute(root);
-    //std::cout<<m_root.string()<<std::endl;
-
     _httpServer.setOnConnectionCallback(
       [this]( HttpRequestPtr request, std::shared_ptr<ConnectionState> connectionState ) -> HttpResponsePtr
       {

@@ -64,7 +64,10 @@ yaodaq::Message::Message( const nlohmann::json& json ) : Message()
     payload() = json["payload"];
   }
   else
-    payload() = json;
+  {
+    meta()["type"] = magic_enum::enum_name( Message::Type::Unknown );
+    payload()      = json;
+  }
 }
 
 yaodaq::Message::Message( const yaodaq::Message::Type type ) : Message() { meta()["type"] = std::string( magic_enum::enum_name( type ) ); }

@@ -2,10 +2,12 @@
 
 #include "ITransport.hpp"
 #include "ThreadSafeQueue.hpp"
+#include "nlohmann/json.hpp"
 
 #include <iostream>
 #include <ixwebsocket/IXNetSystem.h>
 #include <ixwebsocket/IXWebSocket.h>
+#include <ixwebsocket/IXWebSocketSendData.h>
 
 class WebSocket final : public ITransport
 {
@@ -47,8 +49,9 @@ public:
 
   void write( const std::vector<uint8_t>& datd ) final
   {
-    std::string s( reinterpret_cast<const char*>( datd.data() ), datd.size() );
-    m_client.send( s );
+    //std::string s( reinterpret_cast<const char*>( datd.data() ), datd.size() );
+    //nlohmann::json json  = nlohmann::json::parse(s);
+    m_client.sendUtf8Text( ix::IXWebSocketSendData( reinterpret_cast<const char*>( datd.data() ), datd.size() ) );
   }
 
   std::optional<std::vector<uint8_t>> read() final { return m_incoming.pop(); }

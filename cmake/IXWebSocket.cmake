@@ -4,11 +4,11 @@ include(CPM)
 cpm(SYSTEM SHALLOW PROGRESS EXCLUDE_FROM_ALL)
 
 if(NOT DEFINED IXWEBSOCKET_REPOSITORY)
-  set(IXWEBSOCKET_REPOSITORY "https://github.com/machinezone/IXWebSocket")
+  set(IXWEBSOCKET_REPOSITORY "https://github.com/cxx-libs/IXWebSocket.git")
 endif()
 
 if(NOT DEFINED IXWEBSOCKET_TAG)
-  set(IXWEBSOCKET_TAG "v12.0.0")
+  set(IXWEBSOCKET_TAG "accept_n_only_headers")
 endif()
 
 include(Zlib-ng)

@@ -18,5 +18,5 @@ target_link_libraries(YAODAQServer PRIVATE yaodaq::yaodaq CLI11::CLI11 cpp-termi
 install(TARGETS YAODAQServer RUNTIME DESTINATION bin)
 
 add_executable(YAODAQBoard YAODAQBoard.cpp)
-target_link_libraries(YAODAQBoard PRIVATE yaodaq::yaodaq CLI11::CLI11 cpp-terminal::cpp-terminal spdlog::spdlog)
+target_link_libraries(YAODAQBoard PRIVATE SOCI::SOCI yaodaq::yaodaq CLI11::CLI11 cpp-terminal::cpp-terminal spdlog::spdlog)
 install(TARGETS YAODAQBoard RUNTIME DESTINATION bin)

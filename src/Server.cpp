@@ -4,7 +4,6 @@
 #include "yaodaq/Exception.hpp"
 #include "yaodaq/Formatter.hpp"
 #include "yaodaq/Message.hpp"
-#include "yaodaq/MetaInfos.hpp"
 #include "yaodaq/WebsocketCloseConstants.hpp"
 
 #include <cstddef>
@@ -174,15 +173,15 @@ void yaodaq::Server::checkClient( std::shared_ptr<ix::ConnectionState> connectio
 void yaodaq::Server::onOpen( std::shared_ptr<ix::ConnectionState> connectionState, ix::WebSocket& webSocket, const yaodaq::Open& open )
 {
   info( "client {} at {} port {} connected to server:\n  {}", connectionState->getId(), connectionState->getRemoteIp(), connectionState->getRemotePort(), yaodaq::Formatter::format( open.payload() ) );
-  sendToAll( open.dump() );
+  sendExcept( open.dump(), webSocket );
 }
 
 void yaodaq::Server::onClose( std::shared_ptr<ix::ConnectionState> connectionState, ix::WebSocket& webSocket, const Close& close )
 {
-  sendToAll( close.dump() );
   if( close.remote() ) warn( "client {} at {} port {} disconnected to server remotelly: {}({})", connectionState->getId(), connectionState->getRemoteIp(), connectionState->getRemotePort(), close.reason(), close.code() );
   else
     warn( "client {} at {} port {} disconnected to server remotelly: {}({})", connectionState->getId(), connectionState->getRemoteIp(), connectionState->getRemotePort(), close.reason(), close.code() );
+  sendExcept( close.dump(), webSocket );
 }
 
 void yaodaq::Server::onReject( std::shared_ptr<ix::ConnectionState> connectionState, ix::WebSocket& webSocket, const Reject& reject )
@@ -431,7 +430,6 @@ void yaodaq::Server::handleMessage( std::shared_ptr<ix::ConnectionState> connect
         if( WebSocketCloseConstant::isRejected( msg->closeInfo.code ) ) { onReject( connectionState, webSocket, Reject( msg->closeInfo ) ); }
         else
         {
-          onClose( connectionState, webSocket, Close( msg->closeInfo ) );
           {
             std::lock_guard<std::mutex> lock( m_mutex );
             const auto                  cs = std::static_pointer_cast<yaodaq::ConnectionState>( connectionState );
@@ -441,6 +439,7 @@ void yaodaq::Server::handleMessage( std::shared_ptr<ix::ConnectionState> connect
 
             if( it != m_clients.end() ) { it->second.erase( std::string( cs->getID().name() ) ); }
           }
+          onClose( connectionState, webSocket, Close( msg->closeInfo ) );
         }
         break;
       }

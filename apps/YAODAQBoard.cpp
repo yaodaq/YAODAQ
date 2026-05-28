@@ -17,6 +17,7 @@
 #include <vector>
 #include <yaodaq/Board.hpp>
 #include <yaodaq/Exception.hpp>
+#include <yaodaq/Formatter.hpp>
 
 // -----------------------------
 // Key: (board, channel)
@@ -75,13 +76,13 @@ std::unordered_map<Key, long long, KeyHash> channel_map;
 class HVWriter
 {
 public:
-  void          setDB( const std::string& db ) { m_db = db; }
-  void          setUser( const std::string& user ) { m_user = user; }
-  void          setPassword( const std::string& password ) { m_password = password; }
-  void          setHost( const std::string& host ) { m_host = host; }
-  void          setPort( const std::string& port ) { m_port = port; }
-  soci::session sql;
-
+  void             setDB( const std::string& db ) { m_db = db; }
+  void             setUser( const std::string& user ) { m_user = user; }
+  void             setPassword( const std::string& password ) { m_password = password; }
+  void             setHost( const std::string& host ) { m_host = host; }
+  void             setPort( const std::string& port ) { m_port = port; }
+  soci::session    sql;
+  std::mutex       m_mutex;
   std::vector<Row> buffer;
 
   void connect() { sql.open( soci::mysql, fmt::format( "dbname={} user={} password={} host={} port={}", m_db, m_user, m_password, m_host, m_port ) ); }
@@ -97,11 +98,10 @@ public:
     {
       soci::row const& r = *it;
 
-      long long channel_id = r.get<long long>( 0 );
-      int       crate      = r.get<int>( 1 );
-      int       board      = r.get<int>( 2 );
-      int       chan       = r.get<int>( 3 );
-      std::cout << channel_id << " " << crate << " " << board << " " << chan << std::endl;
+      long long channel_id                = r.get<long long>( 0 );
+      int       crate                     = r.get<int>( 1 );
+      int       board                     = r.get<int>( 2 );
+      int       chan                      = r.get<int>( 3 );
       channel_map[{ crate, board, chan }] = channel_id;
     }
   }
@@ -111,12 +111,11 @@ public:
   // -----------------------------
   void add( const std::string& ts, int crate, int board, int chan, double voltage, double current )
   {
-    auto it = channel_map.find( { crate, board, chan } );
+    std::lock_guard<std::mutex> lock( m_mutex );
+    auto                        it = channel_map.find( { crate, board, chan } );
     if( it == channel_map.end() ) return;
 
     buffer.push_back( { ts, it->second, voltage, current } );
-
-    if( buffer.size() >= 1 ) { flush(); }
   }
 
   // -----------------------------
@@ -124,9 +123,10 @@ public:
   // -----------------------------
   void flush()
   {
+    std::lock_guard<std::mutex> lock( m_mutex );
     if( buffer.empty() ) return;
 
-    soci::statement st = ( sql.prepare << "INSERT INTO hv_measurement "
+    soci::statement st = ( sql.prepare << "INSERT IGNORE INTO hv_measurement "  /// sometimes there are duplicate check why !!!!!
                                           "(ts, channel_id, voltage_V, current_A) "
                                           "VALUES (:ts, :ch, :v, :c)" );
 
@@ -182,9 +182,9 @@ public:
     {
       info( "{} {} ", out->body, out->statusCode );
     }
-    nlohmann::json data = nlohmann::json::parse( out->body );
-    m_key               = data["i"].get<std::string>();
-    info( "Found key {}", m_key );
+    out->body.erase( std::remove_if( out->body.begin(), out->body.end(), []( unsigned char c ) { return std::isspace( c ); } ), out->body.end() );
+    m_key = out->body;
+    info( "Found key *{}*", out->body );
     return true;
   }
 
@@ -192,29 +192,15 @@ public:
   {
     std::function<bool()> fun = [this]() -> bool
     {
-      std::this_thread::sleep_for( std::chrono::seconds( 2 ) );
+      std::this_thread::sleep_for( std::chrono::milliseconds( 100 ) );
 
-      nlohmann::json data;
-      data["i"]                   = m_key.c_str();
-      data["t"]                   = "request";
-      data["r"]                   = "websocket";
-      data["c"]                   = nlohmann::json::array();
-      data["c"][0]["c"]           = "getItem";
-      data["c"][0]["p"]["i"]      = "Status.currentMeasure";
-      data["c"][0]["p"]["v"]      = "";
-      data["c"][0]["p"]["u"]      = "";
-      data["c"][0]["p"]["p"]["l"] = "*";
-      data["c"][0]["p"]["p"]["a"] = "*";
-      data["c"][0]["p"]["p"]["c"] = "*";
-
-      data["c"][1]["c"]           = "getItem";
-      data["c"][1]["p"]["i"]      = "Status.voltageMeasure";
-      data["c"][1]["p"]["v"]      = "";
-      data["c"][1]["p"]["u"]      = "";
-      data["c"][1]["p"]["p"]["l"] = "*";
-      data["c"][1]["p"]["p"]["a"] = "*";
-      data["c"][1]["p"]["p"]["c"] = "*";
-      send( yaodaq::Raw( data ) );
+      nlohmann::json json{ { "i", m_key },
+                           { "t", "request" },
+                           { "c", nlohmann::json::array( { { { "c", "getItem" }, { "p", { { "p", { { "l", "0" }, { "a", "*" }, { "c", "*" } } }, { "i", "Status.currentMeasure" }, { "v", "" }, { "u", "" } } } },
+                                                           { { "c", "getItem" }, { "p", { { "p", { { "l", "0" }, { "a", "*" }, { "c", "*" } } }, { "i", "Status.voltageMeasure" }, { "v", "" }, { "u", "" } } } } } ) },
+                           { "r", "xhr" } };
+      yaodaq::Raw    raw( json );
+      send( raw );
 
       return true;
     };
@@ -230,36 +216,36 @@ private:
   ix::HttpClient m_http;
 };
 
-std::string microsecondsToUTC( std::string s )
+std::string format_utc( const std::string_view ts_str )
 {
-  s.erase( std::remove( s.begin(), s.end(), '.' ), s.end() );
-  std::cout << " val" << s << std::endl;
   using namespace std::chrono;
-  // 1. Convert microseconds → system_clock time_point
-  system_clock::time_point tp = system_clock::time_point( microseconds( std::stoll( s ) ) );
 
-  // 2. Convert to time_t (seconds since epoch)
-  std::time_t t = system_clock::to_time_t( tp );
+  // 1) parse string -> double (seconds)
+  double ts = std::stod( ts_str.data() );
 
-  // 3. Convert to UTC struct
-  std::tm utc_tm;
+  // 2) convert to microseconds
+  auto tp = time_point<system_clock, microseconds>( duration_cast<microseconds>( duration<double>( ts ) ) );
+
+  auto        sec_tp = time_point_cast<seconds>( tp );
+  std::time_t tt     = system_clock::to_time_t( sec_tp );
+
+  std::tm tm_utc;
 
 #if defined( _WIN32 )
-  gmtime_s( &utc_tm, &t );  // Windows
+  gmtime_s( &tm_utc, &tt );
 #else
-  gmtime_r( &t, &utc_tm );  // Linux / macOS
+  gmtime_r( &tt, &tm_utc );
 #endif
 
-  // 4. Format output
-  std::ostringstream oss;
-  oss << std::put_time( &utc_tm, "%Y-%m-%d %H:%M:%S" );
+  // 3) microseconds part
+  auto us = duration_cast<microseconds>( tp.time_since_epoch() ) % 1000000;
 
-  return oss.str();
+  // 4) format with fmt
+  return fmt::format( "{:04d}-{:02d}-{:02d} {:02d}:{:02d}:{:02d}.{:06d}", tm_utc.tm_year + 1900, tm_utc.tm_mon + 1, tm_utc.tm_mday, tm_utc.tm_hour, tm_utc.tm_min, tm_utc.tm_sec, (int)us.count() );
 }
 
 std::vector<Info> parse( const std::string& str )
 {
-  std::cout << str << std::endl;
   static std::unordered_map<Key, Sample, KeyHash> sample_map;
   std::vector<Info>                               m_infos;
   simdjson::ondemand::parser                      parser;
@@ -286,13 +272,12 @@ std::vector<Info> parse( const std::string& str )
       std::string_view item  = d["i"];
       double           value = std::stod( std::string( std::string_view( d["v"] ) ) );
       std::string      time  = std::string( std::string_view( d["t"] ) );
-      std::cout << time << std::endl;
-      Key key{ crate, board, chan };
+      Key              key{ crate, board, chan };
 
       // ✔ IMPORTANT: reference, not copy
       Sample& s = sample_map[key];
 
-      s.ts = microsecondsToUTC( time );
+      s.ts = format_utc( time );
 
       // -----------------------------
       // UNIT NORMALIZATION
@@ -317,12 +302,12 @@ std::vector<Info> parse( const std::string& str )
       if( item == "Status.currentMeasure" )
       {
         s.current = v;
-        s.has_v   = true;
+        s.has_i   = true;
       }
       else if( item == "Status.voltageMeasure" )
       {
         s.voltage = v;
-        s.has_i   = true;
+        s.has_v   = true;
       }
 
       // -----------------------------
@@ -337,7 +322,6 @@ std::vector<Info> parse( const std::string& str )
         info.crate   = crate;
         info.board   = board;
         info.channel = chan;
-        std::cout << info.ts << " " << info.voltage << " " << info.current << " " << info.crate << " " << info.board << " " << info.channel << std::endl;
         // reset AFTER extraction
         m_infos.push_back( info );
         s.has_v = false;
@@ -382,10 +366,12 @@ try
     [&board]( const yaodaq::Message& msg ) -> void
     {
       std::vector<Info> info = parse( msg.payload().dump() );
-      for( std::size_t i = 0; i != info.size(); ++i ) std::cout << fmt::format( "time: {} crate: {} board: {}, channel:{} voltage:{} current:{}", info[i].ts, info[i].crate, info[i].board, info[i].channel, info[i].voltage, info[i].current ) << std::endl;
-
-      //board.writer.add(info.ts,info.crate,info.board,info.channel,info.voltage, info.current);
-      //std::cout<<yaodaq::Formatter::format(msg())<<std::endl;
+      for( std::size_t i = 0; i != info.size(); ++i )
+      {
+        std::cout << fmt::format( "time: {} crate: {} board: {}, channel:{} voltage:{} current:{}", info[i].ts, info[i].crate, info[i].board, info[i].channel, info[i].voltage, info[i].current ) << std::endl;
+        board.writer.add( info[i].ts, info[i].crate, info[i].board, info[i].channel, info[i].voltage, info[i].current );
+      }
+      if( board.writer.buffer.size() >= 60 ) board.writer.flush();
     }
 
   );
