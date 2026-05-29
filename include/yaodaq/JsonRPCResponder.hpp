@@ -3,6 +3,7 @@
 #include <future>
 #include <iostream>
 #include <mutex>
+#include <simdjson.h>
 #include <string>
 #include <unordered_map>
 #include <vector>
@@ -28,7 +29,7 @@ public:
   YAODAQ_API nlohmann::json getProcedures() { return m_server.getProcedures(); }
 
 protected:
-  YAODAQ_API std::string HandleRequest( const nlohmann::json& requestString ) { return m_server.HandleRequest( requestString.dump() ); }
+  YAODAQ_API std::string HandleRequest( const std::string_view request ) { return m_server.HandleRequest( std::string( request ) ); }
 };
 
 }  // namespace yaodaq

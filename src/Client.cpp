@@ -146,7 +146,7 @@ void yaodaq::Client::onMessage( const std::string& str, const std::size_t size, 
   {
     case Message::Type::RPCRequest:
     {
-      m_client.sendUtf8Text( HandleRequest( mess.payload() ) );
+      m_client.sendUtf8Text( HandleRequest( mess.payload().dump() ) );
       break;
     }
     case Message::Type::RPCResponse:

@@ -43,7 +43,7 @@ void yaodaq::Server::Send( const std::string_view request )
   auto        task = [this, request = std::move( request_copy )]() mutable
   {
     nlohmann::json r            = nlohmann::json::parse( request );
-    std::string    ret          = HandleRequest( r );  // Server handler request
+    std::string    ret          = HandleRequest( r.dump() );  // Server handler request
     auto           answers      = std::make_shared<ServerRequest>();
     answers->expected_responses = getNumberOfClients();
 
@@ -236,7 +236,7 @@ void yaodaq::Server::onJsonRPCRequest( std::shared_ptr<ix::ConnectionState> conn
   // Capture everything by value or reference safely
   auto task = [this, connectionState, ws = &webSocket, request]() mutable
   {
-    std::string ret                  = HandleRequest( request );  // Server handler request
+    std::string ret                  = HandleRequest( request.dump() );  // Server handler request
     auto        answers              = std::make_shared<ServerRequest>();
     answers->expected_responses      = getNumberOfClients() - 1;
     answers->responses[m_identifier] = nlohmann::json::parse( ret );  // put the webserver response to the request
