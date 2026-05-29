@@ -3,6 +3,7 @@
 
 #include <CLI/CLI.hpp>
 #include <atomic>
+#include <charconv>
 #include <chrono>
 #include <condition_variable>
 #include <cpp-terminal/color.hpp>
@@ -49,31 +50,47 @@ struct Row
 {
   std::string ts;
   long long   channel_id;
-  double      voltage;
-  double      current;
+  double      v_mean;
+  double      v_sigma;
+
+  double i_mean;
+  double i_sigma;
 };
 
 struct Info
 {
   std::string ts;
 
-  double voltage;
-  double current;
+  double v_mean;
+  double v_sigma;
+
+  double i_mean;
+  double i_sigma;
 
   int crate;
   int board;
   int channel;
 };
-
-struct Sample
+constexpr size_t N = 50;
+struct Accumulator
 {
   std::string ts;
 
-  double voltage = 0.0;
-  double current = 0.0;
+  double v_sum = 0.0;
+  double i_sum = 0.0;
+
+  double v_sq_sum = 0.0;
+  double i_sq_sum = 0.0;
+
+  size_t n = 0;
 
   bool has_v = false;
   bool has_i = false;
+
+  double last_v = 0.0;
+  double last_i = 0.0;
+  double t_min  = 0;
+  double t_max  = 0;
 };
 
 std::unordered_map<Key, long long, KeyHash> channel_map;
@@ -86,18 +103,12 @@ class HVWriter
 {
 public:
   soci::session sql;
-
-  void setDB( const std::string& db ) { m_db = db; }
-
-  void setUser( const std::string& user ) { m_user = user; }
-
-  void setPassword( const std::string& password ) { m_password = password; }
-
-  void setHost( const std::string& host ) { m_host = host; }
-
-  void setPort( const std::string& port ) { m_port = port; }
-
-  void connect() { sql.open( soci::mysql, fmt::format( "dbname={} user={} password={} host={} port={}", m_db, m_user, m_password, m_host, m_port ) ); }
+  void          setDB( const std::string& db ) { m_db = db; }
+  void          setUser( const std::string& user ) { m_user = user; }
+  void          setPassword( const std::string& password ) { m_password = password; }
+  void          setHost( const std::string& host ) { m_host = host; }
+  void          setPort( const std::string& port ) { m_port = port; }
+  void          connect() { sql.open( soci::mysql, fmt::format( "dbname={} user={} password={} host={} port={}", m_db, m_user, m_password, m_host, m_port ) ); }
 
   // ========================================================
   // PRELOAD CHANNEL MAP
@@ -136,8 +147,7 @@ public:
   void start()
   {
     m_running = true;
-
-    m_thread = std::thread( [this]() { run(); } );
+    m_thread  = std::thread( [this]() { run(); } );
   }
 
   // ========================================================
@@ -147,9 +157,7 @@ public:
   void stop()
   {
     m_running = false;
-
     m_cv.notify_all();
-
     if( m_thread.joinable() ) m_thread.join();
   }
 
@@ -157,18 +165,14 @@ public:
   // ADD EVENT
   // ========================================================
 
-  void add( const std::string& ts, int crate, int board, int chan, double voltage, double current )
+  void add( const std::string& ts, int crate, int board, int chan, double voltage, double current, double sigma_v, double sigma_i )
   {
     auto it = channel_map.find( { crate, board, chan } );
-
     if( it == channel_map.end() ) return;
-
     {
       std::lock_guard<std::mutex> lock( m_mutex );
-
-      buffer.push_back( { ts, it->second, voltage, current } );
+      buffer.push_back( { ts, it->second, voltage, current, sigma_v, sigma_i } );
     }
-
     if( buffer.size() >= 6 ) m_cv.notify_one();
   }
 
@@ -183,13 +187,10 @@ private:
     {
       {
         std::unique_lock<std::mutex> lock( m_mutex );
-
         m_cv.wait_for( lock, std::chrono::seconds( 1 ), [this]() { return !buffer.empty() || !m_running; } );
       }
-
       flush();
     }
-
     flush();
   }
 
@@ -200,28 +201,23 @@ private:
   void flush()
   {
     std::vector<Row> local;
-
     {
       std::lock_guard<std::mutex> lock( m_mutex );
-
       if( buffer.empty() ) return;
-
       local.swap( buffer );
     }
-
     try
     {
       soci::statement st = ( sql.prepare << "INSERT IGNORE INTO hv_measurement "
-                                            "(ts, channel_id, voltage_V, current_A) "
+                                            "(ts, channel_id, mean_V, mean_nA) "
                                             "VALUES (:ts, :ch, :v, :c)" );
 
       for( auto& r: local )
       {
         st.exchange( soci::use( r.ts, "ts" ) );
         st.exchange( soci::use( r.channel_id, "ch" ) );
-        st.exchange( soci::use( r.voltage, "v" ) );
-        st.exchange( soci::use( r.current, "c" ) );
-
+        st.exchange( soci::use( r.v_mean, "v" ) );
+        st.exchange( soci::use( r.i_mean, "c" ) );
         st.define_and_bind();
         st.execute( true );
       }
@@ -258,7 +254,7 @@ class MotorBoard : public yaodaq::Board
 public:
   MotorBoard( yaodaq::BoardConfig& cfg, const std::string_view name ) : yaodaq::Board( cfg, name, "MotorBoard" ) {}
 
-  ~MotorBoard() { writer.stop(); }
+  ~MotorBoard() final { writer.stop(); }
 
   bool on_initialize() override
   {
@@ -304,7 +300,7 @@ public:
   {
     std::function<bool()> fun = [this]() -> bool
     {
-      std::this_thread::sleep_for( std::chrono::milliseconds( 500 ) );
+      std::this_thread::sleep_for( std::chrono::milliseconds( 50 ) );
 
       nlohmann::json json{ { "i", m_key },
                            { "t", "request" },
@@ -336,17 +332,17 @@ private:
 // FORMAT UTC
 // ============================================================
 
-std::string format_utc( const std::string_view ts_str )
+std::string format_utc( std::string_view ts_str )
 {
   using namespace std::chrono;
+  double ts = 0;
+  std::from_chars( ts_str.data(), ts_str.data() + ts_str.size(), ts );
 
-  double ts = std::stod( ts_str.data() );
+  int64_t micros = static_cast<int64_t>( ts * 1'000'000 );
 
-  auto tp = time_point<system_clock, microseconds>( duration_cast<microseconds>( duration<double>( ts ) ) );
+  system_clock::time_point tp{ microseconds( micros ) };
 
-  auto sec_tp = time_point_cast<seconds>( tp );
-
-  std::time_t tt = system_clock::to_time_t( sec_tp );
+  std::time_t tt = system_clock::to_time_t( tp );
 
   std::tm tm_utc;
 
@@ -358,9 +354,7 @@ std::string format_utc( const std::string_view ts_str )
 
   auto us = duration_cast<microseconds>( tp.time_since_epoch() ) % 1000000;
 
-  return fmt::format( "{:04d}-{:02d}-{:02d} "
-                      "{:02d}:{:02d}:{:02d}.{:06d}",
-                      tm_utc.tm_year + 1900, tm_utc.tm_mon + 1, tm_utc.tm_mday, tm_utc.tm_hour, tm_utc.tm_min, tm_utc.tm_sec, (int)us.count() );
+  return fmt::format( "{:04d}-{:02d}-{:02d} {:02d}:{:02d}:{:02d}.{:06d}", tm_utc.tm_year + 1900, tm_utc.tm_mon + 1, tm_utc.tm_mday, tm_utc.tm_hour, tm_utc.tm_min, tm_utc.tm_sec, us.count() );
 }
 
 // ============================================================
@@ -369,7 +363,7 @@ std::string format_utc( const std::string_view ts_str )
 
 std::vector<Info> parse( const std::string& str )
 {
-  static std::unordered_map<Key, Sample, KeyHash> sample_map;
+  static std::unordered_map<Key, Accumulator, KeyHash> sample_map;
 
   std::vector<Info> m_infos;
 
@@ -405,55 +399,81 @@ std::vector<Info> parse( const std::string& str )
 
       double value = std::stod( std::string( std::string_view( d["v"] ) ) );
 
-      std::string time = std::string( std::string_view( d["t"] ) );
+      double time = std::stod( std::string( std::string_view( d["t"] ) ) );
 
       Key key{ crate, board, chan };
-
-      Sample& s = sample_map[key];
-
-      s.ts = format_utc( time );
 
       double v = value;
 
       std::string_view u = d["u"];
-
-      if( u == "nA" ) v *= 1e-9;
-      else if( u == "uA" )
-        v *= 1e-6;
+      if( u == "nA" ) v *= 1;
+      else if( u == "µA" )
+        v *= 1e3;
       else if( u == "mA" )
-        v *= 1e-3;
+        v *= 1e6;
       else if( u == "mV" )
         v *= 1e-3;
       else if( u == "uV" )
         v *= 1e-6;
 
+      Accumulator& s = sample_map[key];
+
       if( item == "Status.currentMeasure" )
       {
-        s.current = v;
-        s.has_i   = true;
+        s.last_i = v;
+        s.has_i  = true;
       }
       else if( item == "Status.voltageMeasure" )
       {
-        s.voltage = v;
-        s.has_v   = true;
+        s.last_v = v;
+        s.has_v  = true;
       }
 
       if( s.has_v && s.has_i )
       {
-        Info info;
+        s.n++;
 
-        info.ts      = s.ts;
-        info.voltage = s.voltage;
-        info.current = s.current;
+        s.v_sum += s.last_v;
+        s.i_sum += s.last_i;
+
+        s.v_sq_sum += s.last_v * s.last_v;
+        s.i_sq_sum += s.last_i * s.last_i;
+
+        s.has_v = false;
+        s.has_i = false;
+      }
+      if( s.n == 0 ) { s.t_min = s.t_max = time; }
+      else
+      {
+        s.t_min = std::min( s.t_min, time );
+        s.t_max = std::max( s.t_max, time );
+      }
+      if( s.n >= N )
+      {
+        Info info;
+        info.v_mean = s.v_sum / s.n;
+        info.i_mean = s.i_sum / s.n;
+
+        auto v_var = ( s.v_sq_sum / s.n ) - ( info.v_mean * info.v_mean );
+        auto i_var = ( s.i_sq_sum / s.n ) - ( info.i_mean * info.i_mean );
+
+        info.v_sigma = std::sqrt( std::max( 0.0, v_var ) );
+        info.i_sigma = std::sqrt( std::max( 0.0, i_var ) );
 
         info.crate   = crate;
         info.board   = board;
         info.channel = chan;
-
-        m_infos.push_back( info );
-
-        s.has_v = false;
-        s.has_i = false;
+        double t_mid = 0.5 * ( s.t_min + s.t_max );
+        info.ts      = format_utc( std::to_string( t_mid ) );
+        if( std::fabsl( info.v_mean ) >= 1.0 ) m_infos.push_back( info );
+        // FULL RESET (important)
+        s.n     = 0;
+        s.v_sum = s.i_sum = 0.0;
+        s.v_sq_sum = s.i_sq_sum = 0.0;
+        s.has_v                 = false;
+        s.has_i                 = false;
+        s.last_v = s.last_i = 0.0;
+        s.t_min = s.t_max = 0;
       }
     }
   }
@@ -514,7 +534,11 @@ try
     {
       std::vector<Info> info = parse( msg.payload().dump() );
 
-      for( std::size_t i = 0; i != info.size(); ++i ) { board.writer.add( info[i].ts, info[i].crate, info[i].board, info[i].channel, info[i].voltage, info[i].current ); }
+      for( std::size_t i = 0; i != info.size(); ++i )
+      {
+        fmt::print( "time: {},crate: {},board: {},channel: {},voltage: {}V(+-{}), current: {}nA(+-{})\n", info[i].ts, info[i].crate, info[i].board, info[i].channel, info[i].v_mean, info[i].v_sigma, info[i].i_mean, info[i].i_sigma );
+        board.writer.add( info[i].ts, info[i].crate, info[i].board, info[i].channel, info[i].v_mean, info[i].i_mean, info[i].v_sigma, info[i].i_sigma );
+      }
     } );
 
   board.link();
