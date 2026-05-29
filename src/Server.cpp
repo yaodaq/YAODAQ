@@ -66,30 +66,55 @@ void yaodaq::Server::Send( const std::string_view request )
     std::unique_lock<std::mutex> lock( answers->mtx );
     answers->cv.wait_for( lock, std::chrono::seconds( 10 ), [answers, this] { return answers->received_responses == getNumberOfClients(); } );
 
-    // Build JSON response
-    nlohmann::json json;
-    json["jsonrpc"] = "2.0";
-    json["id"]      = r["id"];
-    json["result"]  = nlohmann::json::array();
-
-    // Add server's own response first
-    nlohmann::json server_response            = nlohmann::json::parse( ret );
-    server_response["yaodaq_id"]["component"] = std::string( m_identifier.component() );
-    server_response["yaodaq_id"]["type"]      = m_identifier.type();
-    server_response["yaodaq_id"]["name"]      = m_identifier.name();
-    server_response.erase( "jsonrpc" );
-    json["result"].push_back( server_response );
-
+    simdjson::builder::string_builder builder;
+    builder.start_object();
+    // "jsonrpc"
+    builder.append_key_value( "jsonrpc", "2.0" );
+    builder.append_comma();
+    // "id"
+    if( r["id"].is_string() ) builder.append_key_value( "id", r["id"].get<std::string>() );
+    else
+      builder.append_key_value( "id", r["id"].get<std::int64_t>() );
+    builder.append_comma();
+    // array of answers
+    builder.escape_and_append_with_quotes( "result" );
+    builder.append_colon();
+    builder.start_array();
     for( auto& [clientId, response]: answers->responses )
     {
-      response["yaodaq_id"]["component"] = std::string( clientId.component() );
-      response["yaodaq_id"]["type"]      = clientId.type();
-      response["yaodaq_id"]["name"]      = clientId.name();
-      response.erase( "jsonrpc" );
-      json["result"].push_back( response );
+      builder.append_raw( fmt::format( R"({{"result": {},"yaodaq_id":{{"component":"{}","type":"{}","name":"{}"}}}})", response, std::string( clientId.component() ), std::string( clientId.type() ), std::string( clientId.name() ) ) );
+      builder.append_raw( "," );
     }
+    builder.append_raw( fmt::format( R"({{"result": {},"yaodaq_id":{{"component":"{}","type":"{}","name":"{}"}}}})", ret, std::string( m_identifier.component() ), std::string( m_identifier.type() ), std::string( m_identifier.name() ) ) );
+    builder.end_array();
+    builder.end_object();
+
+    std::cout << "GGGGGGGGGGGG*" << builder.view() << "*****" << std::endl;
+
+    // Build JSON response
+    //nlohmann::json json;
+    //json["jsonrpc"] = "2.0";
+    //json["id"]      = r["id"];
+    //json["result"]  = nlohmann::json::array();
+
+    // Add server's own response first
+    //nlohmann::json server_response            = nlohmann::json::parse( ret );
+    //server_response["yaodaq_id"]["component"] = std::string( m_identifier.component() );
+    //server_response["yaodaq_id"]["type"]      = m_identifier.type();
+    //server_response["yaodaq_id"]["name"]      = m_identifier.name();
+    //server_response.erase( "jsonrpc" );
+    //json["result"].push_back( server_response );
+
+    //for( auto& [clientId, response]: answers->responses )
+    //{
+    //  response["yaodaq_id"]["component"] = std::string( clientId.component() );
+    //  response["yaodaq_id"]["type"]      = clientId.type();
+    //  response["yaodaq_id"]["name"]      = clientId.name();
+    //  response.erase( "jsonrpc" );
+    //  json["result"].push_back( response );
+    //}
     // Aend to th client that send the request
-    Receive( json.dump() );
+    Receive( builder.view() );
 
     // cleaning
     {
@@ -233,13 +258,14 @@ void yaodaq::Server::onLog( std::shared_ptr<ix::ConnectionState> connectionState
  **/
 void yaodaq::Server::onJsonRPCRequest( std::shared_ptr<ix::ConnectionState> connectionState, ix::WebSocket& webSocket, nlohmann::json request )
 {
+  std::cout << "HEREEEEEEEEE" << std::endl;
   // Capture everything by value or reference safely
   auto task = [this, connectionState, ws = &webSocket, request]() mutable
   {
     std::string ret                  = HandleRequest( request.dump() );  // Server handler request
     auto        answers              = std::make_shared<ServerRequest>();
     answers->expected_responses      = getNumberOfClients() - 1;
-    answers->responses[m_identifier] = nlohmann::json::parse( ret );  // put the webserver response to the request
+    answers->responses[m_identifier] = ret;  // put the webserver response to the request
 
     // Extract ID
     jsonrpc::id_t id;
@@ -260,22 +286,49 @@ void yaodaq::Server::onJsonRPCRequest( std::shared_ptr<ix::ConnectionState> conn
     std::unique_lock<std::mutex> lock( answers->mtx );
     answers->cv.wait( lock, [answers, this] { return answers->received_responses == m_server.getClients().size() - 1; } );
 
-    // Build JSON response
-    nlohmann::json json;
-    json["jsonrpc"] = "2.0";
-    json["id"]      = request["id"];
-    json["result"]  = nlohmann::json::array();
+    simdjson::builder::string_builder builder;
+    builder.start_object();
+    // "jsonrpc"
+    builder.append_key_value( "jsonrpc", "2.0" );
+    builder.append_comma();
+    // "id"
+    if( request["id"].is_string() ) builder.append_key_value( "id", request["id"].get<std::string>() );
+    else
+      builder.append_key_value( "id", request["id"].get<std::int64_t>() );
+    builder.append_comma();
+    // array of answers
+    builder.escape_and_append_with_quotes( "result" );
+    builder.append_colon();
+    builder.start_array();
+    bool first = true;
     for( auto& [clientId, response]: answers->responses )
     {
-      response["yaodaq_id"]["component"] = std::string( clientId.component() );
-      response["yaodaq_id"]["type"]      = clientId.type();
-      response["yaodaq_id"]["name"]      = clientId.name();
-      response.erase( "jsonrpc" );
-      json["result"].push_back( response );
+      if( !first ) builder.append_raw( "," );
+      first = false;
+      builder.append_raw( fmt::format( R"({{"result": {},"yaodaq_id":{{"component":"{}","type":"{}","name":"{}"}}}})", std::string( response ), std::string( clientId.component() ), std::string( clientId.type() ), std::string( clientId.name() ) ) );
     }
+    builder.end_array();
+    builder.end_object();
+    std::cout << "FFFFFFFFFF*" << builder.view() << "*****" << std::endl;
+    //std::cout<<"builder:"<<builder.c_str()<<"*"<<std::endl;
+    // Build JSON response
+    //nlohmann::json json;
+    //json["jsonrpc"] = "2.0";
+    //json["id"]      = request["id"];
+    //json["result"]  = nlohmann::json::array();
+    //for( auto& [clientId, response]: answers->responses )
+    //{
+
+    //  response["yaodaq_id"]["component"] = std::string( clientId.component() );
+    //  response["yaodaq_id"]["type"]      = clientId.type();
+    //  response["yaodaq_id"]["name"]      = clientId.name();
+    //  response.erase( "jsonrpc" );
+    //  json["result"].push_back( response );
+    //}
 
     // Aend to th client that send the request
-    sendTo( json.dump(), *ws );
+    //sendTo( builder.c_str().operator const char *&&(), *ws );
+    sendTo( builder.view(), *ws );
 
     // cleaning
     {
@@ -317,7 +370,7 @@ void yaodaq::Server::onJsonRPCResponse( std::shared_ptr<ix::ConnectionState> con
   {
     {
       std::lock_guard<std::mutex> lock( request->mtx );
-      request->responses[std::static_pointer_cast<yaodaq::ConnectionState>( connectionState )->getID()] = std::move( response );
+      request->responses[std::static_pointer_cast<yaodaq::ConnectionState>( connectionState )->getID()] = std::move( response.dump() );
       request->received_responses++;
     }
     request->cv.notify_one();
@@ -338,7 +391,7 @@ void yaodaq::Server::onJsonRPCResponse( std::shared_ptr<ix::ConnectionState> con
   {
     {
       std::lock_guard<std::mutex> lock( request->mtx );
-      request->responses[std::static_pointer_cast<yaodaq::ConnectionState>( connectionState )->getID()] = std::move( response );
+      request->responses[std::static_pointer_cast<yaodaq::ConnectionState>( connectionState )->getID()] = std::move( response.dump() );
       request->received_responses++;
     }
     request->cv.notify_one();

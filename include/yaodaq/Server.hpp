@@ -26,11 +26,11 @@ namespace yaodaq
 
 struct ServerRequest
 {
-  std::mutex                                             mtx;  // protect shared state
-  std::condition_variable                                cv;
-  std::unordered_map<yaodaq::Identifier, nlohmann::json> responses;
-  std::size_t                                            expected_responses{ 0 };
-  std::size_t                                            received_responses{ 0 };
+  std::mutex                                          mtx;  // protect shared state
+  std::condition_variable                             cv;
+  std::unordered_map<yaodaq::Identifier, std::string> responses;
+  std::size_t                                         expected_responses{ 0 };
+  std::size_t                                         received_responses{ 0 };
 };
 
 class Server : public JsonRPCResponder, public Logging, public JsonRPCAsker
