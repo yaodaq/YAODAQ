@@ -16,6 +16,7 @@
 #include <ixwebsocket/IXWebSocketServer.h>
 #include <memory>
 #include <mutex>
+#include <simdjson.h>
 #include <spdlog/spdlog.h>
 #include <string_view>
 #include <unordered_map>
@@ -63,9 +64,9 @@ private:
 
   // Messages
   YAODAQ_INTERNAL void onMessage( std::shared_ptr<ix::ConnectionState> connectionState, ix::WebSocket& webSocket, const std::string& str, const std::size_t size, const bool binary );
-  YAODAQ_INTERNAL void onJsonRPCResponse( std::shared_ptr<ix::ConnectionState> connectionState, ix::WebSocket& webSocket, nlohmann::json response );
-  YAODAQ_INTERNAL void onJsonRPCRequest( std::shared_ptr<ix::ConnectionState> connectionState, ix::WebSocket& webSocket, nlohmann::json request );
-  YAODAQ_INTERNAL void onLog( std::shared_ptr<ix::ConnectionState> connectionState, ix::WebSocket& webSocket, nlohmann::json request );
+  YAODAQ_INTERNAL void onJsonRPCResponse( std::shared_ptr<ix::ConnectionState> connectionState, ix::WebSocket& webSocket, const jsonrpc::id_t& parser, const std::string_view& str );
+  YAODAQ_INTERNAL void onJsonRPCRequest( std::shared_ptr<ix::ConnectionState> connectionState, ix::WebSocket& webSocket, simdjson::dom::parser&, const std::string_view& request );
+  YAODAQ_INTERNAL void onLog( std::shared_ptr<ix::ConnectionState> connectionState, ix::WebSocket& webSocket, const std::string_view& request );
   // Others
   YAODAQ_INTERNAL void onOpen( std::shared_ptr<ix::ConnectionState> connectionState, ix::WebSocket& webSocket, const Open& open );
   YAODAQ_INTERNAL void onClose( std::shared_ptr<ix::ConnectionState> connectionState, ix::WebSocket& webSocket, const Close& close );
