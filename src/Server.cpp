@@ -156,17 +156,9 @@ void yaodaq::Server::checkClient( std::shared_ptr<ix::ConnectionState> connectio
   {
     std::static_pointer_cast<yaodaq::ConnectionState>( connectionState )->setID( Identifier::createFromstring( msg->openInfo.headers["Yaodaq-Id"] ) );
   }
-  const std::string name = std::string( std::static_pointer_cast<yaodaq::ConnectionState>( connectionState )->getID().name() );
+  if( !m_registry.add( std::static_pointer_cast<yaodaq::ConnectionState>( connectionState )->getID(), &webSocket ) )
   {
-    {
-      std::lock_guard<std::mutex> lock( m_mutex );
-      const Component::Role       role{ std::static_pointer_cast<yaodaq::ConnectionState>( connectionState )->getID().component().role() };
-      if( m_clients[role].count( name ) == 0 ) { m_clients[role].emplace( name, std::ref( webSocket ) ); }
-      else
-      {
-        webSocket.stop( WebSocketCloseConstant::ClientWithThisNameAlreadyConnected, WebSocketCloseConstant::ClientWithThisNameAlreadyConnectedMessage );
-      }
-    }
+    webSocket.stop( WebSocketCloseConstant::ClientWithThisNameAlreadyConnected, WebSocketCloseConstant::ClientWithThisNameAlreadyConnectedMessage );
   }
 }
 
@@ -389,12 +381,15 @@ void yaodaq::Server::sendTo( const std::string_view& str, ix::WebSocket& webSock
 // Send to loggers
 void yaodaq::Server::sendToLoggers( const std::string_view& str )
 {
+  std::string                 val{ str };
   std::lock_guard<std::mutex> lock( m_mutex );
 
-  auto it = m_clients.find( yaodaq::Component::Role::Logger );
-  if( it == m_clients.end() ) return;
+  //auto it = m_clients.find( yaodaq::Component::Role::Logger );
 
-  for( auto& client: it->second ) { client.second.get().sendUtf8Text( std::string( str ) ); }
+  for( auto&& client: m_registry.get() )
+  {
+    if( client.first.component().role() == yaodaq::Component::Role::Logger ) { client.second->sendUtf8Text( val ); }
+  }
 }
 
 // Send to all
@@ -430,15 +425,7 @@ void yaodaq::Server::handleMessage( std::shared_ptr<ix::ConnectionState> connect
         if( WebSocketCloseConstant::isRejected( msg->closeInfo.code ) ) { onReject( connectionState, webSocket, Reject( msg->closeInfo ) ); }
         else
         {
-          {
-            std::lock_guard<std::mutex> lock( m_mutex );
-            const auto                  cs = std::static_pointer_cast<yaodaq::ConnectionState>( connectionState );
-
-            const auto role = cs->getID().component().role();
-            auto       it   = m_clients.find( role );
-
-            if( it != m_clients.end() ) { it->second.erase( std::string( cs->getID().name() ) ); }
-          }
+          m_registry.erase( std::static_pointer_cast<yaodaq::ConnectionState>( connectionState )->getID() );
           onClose( connectionState, webSocket, Close( msg->closeInfo ) );
         }
         break;

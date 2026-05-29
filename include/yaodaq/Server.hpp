@@ -1,4 +1,5 @@
 #pragma once
+#include "yaodaq/ClientRegistry.hpp"
 #include "yaodaq/Config.hpp"
 #include "yaodaq/Defaults.hpp"
 #include "yaodaq/Export.hpp"
@@ -90,8 +91,9 @@ private:
   YAODAQ_INTERNAL void sendToLoggers( const std::string_view& str );
 
   // Check if a client already have this name
-  std::unordered_map<Component::Role, std::unordered_map<std::string, std::reference_wrapper<ix::WebSocket>>> m_clients;
-  std::mutex                                                                                                  m_mutex;
+  //std::unordered_map<Component::Role, std::unordered_map<std::string, std::reference_wrapper<ix::WebSocket>>> m_clients;
+  std::mutex     m_mutex;
+  ClientRegistry m_registry;
 };
 
 }  // namespace yaodaq
