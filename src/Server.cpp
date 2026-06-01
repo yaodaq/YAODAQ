@@ -187,9 +187,6 @@ void yaodaq::Server::onReject( std::shared_ptr<ix::ConnectionState> connectionSt
 
 void yaodaq::Server::onMessage( std::shared_ptr<ix::ConnectionState> connectionState, ix::WebSocket& webSocket, const std::string& str, const std::size_t size, const bool binary )
 {
-  thread_local std::unique_ptr<ICodec> codec{ nullptr };
-  if( !codec ) codec = yaodaq::make_codec();
-  Message                             mess = codec->decode( str );
   thread_local simdjson::dom::parser  parser;  //to remove
   thread_local simdjson::dom::element r;
   r = parser.parse( str );  //to remove
@@ -214,7 +211,8 @@ void yaodaq::Server::onMessage( std::shared_ptr<ix::ConnectionState> connectionS
   }
   else
   {
-    switch( mess.type() )
+    yaodaq::Message::Type mess = magic_enum::enum_cast<yaodaq::Message::Type>( r["meta"]["type"].get<std::string_view>() ).value_or( yaodaq::Message::Type::Unknown );
+    switch( mess )
     {
       case Message::Type::Log:
       {
@@ -223,7 +221,7 @@ void yaodaq::Server::onMessage( std::shared_ptr<ix::ConnectionState> connectionS
       }
       default:
       {
-        sendToAll( mess.dump() );
+        sendToAll( str );
         break;
       }
     }
