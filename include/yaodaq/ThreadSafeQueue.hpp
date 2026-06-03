@@ -8,53 +8,39 @@
 template<typename T> class ThreadSafeQueue
 {
 public:
-  ThreadSafeQueue() noexcept = default;
   void push( T value )
   {
     {
-      std::lock_guard<std::mutex> lock( mutex_ );
-      if( shutdown_ ) return;
-      queue_.push( std::move( value ) );
+      std::lock_guard<std::mutex> lock( m_mutex );
+      if( m_shutdown ) return;
+      m_queue.push( std::move( value ) );
     }
-    cv_.notify_one();
+    m_cv.notify_one();
   }
 
   std::optional<T> pop()
   {
-    std::unique_lock<std::mutex> lock( mutex_ );
-
-    cv_.wait( lock, [&] { return shutdown_ || !queue_.empty(); } );
-
-    if( shutdown_ && queue_.empty() ) { return std::nullopt; }
-
-    T value = std::move( queue_.front() );
-
-    queue_.pop();
-
+    std::unique_lock<std::mutex> lock( m_mutex );
+    m_cv.wait( lock, [&] { return m_shutdown || !m_queue.empty(); } );
+    if( m_queue.empty() ) return std::nullopt;
+    T value = std::move( m_queue.front() );
+    m_queue.pop();
     return value;
   }
 
   void shutdown()
   {
     {
-      std::lock_guard<std::mutex> lock( mutex_ );
-
-      shutdown_ = true;
-
-      std::queue<T> empty;
-
-      std::swap( queue_, empty );
+      std::lock_guard<std::mutex> lock( m_mutex );
+      m_shutdown = true;
+      std::queue<T>().swap( m_queue );
     }
-
-    cv_.notify_all();
+    m_cv.notify_all();
   }
 
 private:
-  std::queue<T> queue_;
-
-  std::mutex mutex_;
-
-  std::condition_variable cv_;
-
-  bool shutdown_{ false };
+  std::queue<T>           m_queue;
+  std::mutex              m_mutex;
+  std::condition_variable m_cv;
+  bool                    m_shutdown{ false };
 };

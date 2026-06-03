@@ -40,68 +40,70 @@ void yaodaq::Server::Send( const std::string_view re )
 {
   // Capture everything by value or reference safely
   std::string request_copy( re );
-  auto        task = [this, request = std::move( request_copy )]() mutable
+  auto        answers = std::make_shared<ServerRequest>();
+  auto        task    = [this, request = std::move( request_copy ), answers]() mutable
   {
-    nlohmann::json r            = nlohmann::json::parse( request );
-    std::string    ret          = HandleRequest( request );  // Server handler request
-    auto           answers      = std::make_shared<ServerRequest>();
-    answers->expected_responses = getNumberOfClients();
-
-    // Extract ID
-
-    jsonrpc::id_t id;
-    if( r["id"].is_string() ) id = r["id"].get<std::string>();
-    else
-      id = r["id"].get<std::int64_t>();
-
-    // prepare to wait for responses from the clients
+    try
     {
-      std::lock_guard<std::mutex> lock( m_server_own_request );
-      m_server_own_construct_response[id] = answers;
+      nlohmann::json r            = nlohmann::json::parse( request );
+      std::string    ret          = HandleRequest( request );  // Server handler request
+      answers->expected_responses = getNumberOfClients();
+      // Extract ID
+      jsonrpc::id_t id;
+      if( r["id"].is_string() ) id = r["id"].get<std::string>();
+      else
+        id = r["id"].get<std::int64_t>();
+      // prepare to wait for responses from the clients
+      {
+        std::lock_guard<std::mutex> lock( m_server_own_request );
+        m_server_own_construct_response[id] = answers;
+      }
+      sendToAll( request.data() );
+
+      // Wait for all responses
+      std::unique_lock<std::mutex> lock( answers->mtx );
+      answers->cv.wait_for( lock, std::chrono::seconds( 10 ), [&] { return answers->received_responses == getNumberOfClients(); } );
+      simdjson::builder::string_builder builder;
+      builder.start_object();
+      // "jsonrpc"
+      builder.append_key_value( "jsonrpc", "2.0" );
+      builder.append_comma();
+      // "id"
+      if( r["id"].is_string() ) builder.append_key_value( "id", r["id"].get<std::string>() );
+      else
+        builder.append_key_value( "id", r["id"].get<std::int64_t>() );
+      builder.append_comma();
+      // array of answers
+      builder.escape_and_append_with_quotes( "result" );
+      builder.append_colon();
+      builder.start_array();
+      for( auto& [clientId, response]: answers->responses )
+      {
+        builder.append_raw( fmt::format( R"({{"result": {},"yaodaq_id":{{"component":"{}","type":"{}","name":"{}"}}}})", response, std::string( clientId.component() ), std::string( clientId.type() ), std::string( clientId.name() ) ) );
+        builder.append_raw( "," );
+      }
+      builder.append_raw( fmt::format( R"({{"result": {},"yaodaq_id":{{"component":"{}","type":"{}","name":"{}"}}}})", ret, std::string( m_identifier.component() ), std::string( m_identifier.type() ), std::string( m_identifier.name() ) ) );
+      builder.end_array();
+      builder.end_object();
+
+      // Aend to th client that send the request
+      Receive( builder.view() );
+
+      // cleaning
+      {
+        std::lock_guard<std::mutex> lock2( m_server_own_request );
+        m_server_own_construct_response.erase( id );
+      }
     }
-
-    sendToAll( request.data() );
-
-    // Wait for all responses
-    std::unique_lock<std::mutex> lock( answers->mtx );
-    answers->cv.wait_for( lock, std::chrono::seconds( 10 ), [answers, this] { return answers->received_responses == getNumberOfClients(); } );
-
-    simdjson::builder::string_builder builder;
-    builder.start_object();
-    // "jsonrpc"
-    builder.append_key_value( "jsonrpc", "2.0" );
-    builder.append_comma();
-    // "id"
-    if( r["id"].is_string() ) builder.append_key_value( "id", r["id"].get<std::string>() );
-    else
-      builder.append_key_value( "id", r["id"].get<std::int64_t>() );
-    builder.append_comma();
-    // array of answers
-    builder.escape_and_append_with_quotes( "result" );
-    builder.append_colon();
-    builder.start_array();
-    for( auto& [clientId, response]: answers->responses )
+    catch( ... )
     {
-      builder.append_raw( fmt::format( R"({{"result": {},"yaodaq_id":{{"component":"{}","type":"{}","name":"{}"}}}})", response, std::string( clientId.component() ), std::string( clientId.type() ), std::string( clientId.name() ) ) );
-      builder.append_raw( "," );
-    }
-    builder.append_raw( fmt::format( R"({{"result": {},"yaodaq_id":{{"component":"{}","type":"{}","name":"{}"}}}})", ret, std::string( m_identifier.component() ), std::string( m_identifier.type() ), std::string( m_identifier.name() ) ) );
-    builder.end_array();
-    builder.end_object();
-
-    std::cout << "GGGGGGGGGGGG*" << builder.view() << "*****" << std::endl;
-    // Aend to th client that send the request
-    Receive( builder.view() );
-
-    // cleaning
-    {
-      std::lock_guard<std::mutex> lock2( m_server_own_request );
-      m_server_own_construct_response.erase( id );
+      std::lock_guard<std::mutex> lock( answers->mtx );
+      answers->exceptions.push_back( std::current_exception() );
     }
   };
 
   // Enqueue the task in the thread pool
-  m_threadPool.enqueue( task );
+  m_threadPool.enqueue( std::move( task ) );
 }
 
 YAODAQ_API yaodaq::Server::Server( const ServerConfig& cfg, const std::string_view name, const std::string_view type ) :
@@ -249,73 +251,80 @@ void yaodaq::Server::onLog( std::shared_ptr<ix::ConnectionState> connectionState
 void yaodaq::Server::onJsonRPCRequest( std::shared_ptr<ix::ConnectionState> connectionState, ix::WebSocket& webSocket, simdjson::dom::parser& parser, const std::string_view& str )
 {
   simdjson::dom::element r;
-  r         = parser.parse( str );  //to remove
+  r            = parser.parse( str );  //to remove
+  auto answers = std::make_shared<ServerRequest>();
   // Capture everything by value or reference safely
-  auto task = [this, connectionState, ws = &webSocket, r]() mutable
+  auto task    = [this, connectionState, ws = &webSocket, r, answers]() mutable
   {
-    std::string str                  = simdjson::minify( r );
-    std::string ret                  = HandleRequest( str );  // Server handler request
-    auto        answers              = std::make_shared<ServerRequest>();
-    answers->expected_responses      = getNumberOfClients() - 1;
-    answers->responses[m_identifier] = ret;  // put the webserver response to the request
-    // Extract ID
-    jsonrpc::id_t id;
-    auto          id_elem = r["id"];
-    if( id_elem.type() == simdjson::dom::element_type::STRING )
+    try
     {
-      std::string_view s;
-      id_elem.get( s );
-      id = std::string( s );
-    }
-    else
-    {
-      int64_t v;
-      id_elem.get( v );
-      id = v;
-    }
-    // prepare to wait for responses from the clients
-    {
-      std::lock_guard<std::mutex> lock( m_map_mutex );
-      m_server_construct_response[id] = answers;
-    }
+      std::string str                  = simdjson::minify( r );
+      std::string ret                  = HandleRequest( str );  // Server handler request
+      answers->expected_responses      = getNumberOfClients() - 1;
+      answers->responses[m_identifier] = ret;  // put the webserver response to the request
+      // Extract ID
+      jsonrpc::id_t id;
+      auto          id_elem = r["id"];
+      if( id_elem.type() == simdjson::dom::element_type::STRING )
+      {
+        std::string_view s;
+        id_elem.get( s );
+        id = std::string( s );
+      }
+      else
+      {
+        int64_t v;
+        id_elem.get( v );
+        id = v;
+      }
+      // prepare to wait for responses from the clients
+      {
+        std::lock_guard<std::mutex> lock( m_map_mutex );
+        m_server_construct_response[id] = answers;
+      }
 
-    // send the request to the clients
-    sendExcept( str, *ws );
+      // send the request to the clients
+      sendExcept( str, *ws );
 
-    // Wait for all responses
-    std::unique_lock<std::mutex> lock( answers->mtx );
-    answers->cv.wait( lock, [answers, this] { return answers->received_responses == m_server.getClients().size() - 1; } );
+      // Wait for all responses
+      std::unique_lock<std::mutex> lock( answers->mtx );
+      answers->cv.wait( lock, [answers, this] { return answers->received_responses == m_server.getClients().size() - 1; } );
+      simdjson::builder::string_builder builder;
+      builder.start_object();
+      // "jsonrpc"
+      builder.append_key_value( "jsonrpc", "2.0" );
+      builder.append_comma();
+      // "id"
+      if( std::holds_alternative<std::string>( id ) ) builder.append_key_value( "id", std::get<std::string>( id ) );
+      else
+        builder.append_key_value( "id", std::get<std::int64_t>( id ) );
+      builder.append_comma();
+      // array of answers
+      builder.escape_and_append_with_quotes( "result" );
+      builder.append_colon();
+      builder.start_array();
+      bool first = true;
+      for( auto& [clientId, response]: answers->responses )
+      {
+        if( !first ) builder.append_raw( "," );
+        first = false;
+        builder.append_raw( fmt::format( R"({{"result": {},"yaodaq_id":{{"component":"{}","type":"{}","name":"{}"}}}})", std::string( response ), std::string( clientId.component() ), std::string( clientId.type() ), std::string( clientId.name() ) ) );
+      }
+      builder.end_array();
+      builder.end_object();
+      // Send to th client that send the request
+      sendTo( builder.view(), *ws );
 
-    simdjson::builder::string_builder builder;
-    builder.start_object();
-    // "jsonrpc"
-    builder.append_key_value( "jsonrpc", "2.0" );
-    builder.append_comma();
-    // "id"
-    if( std::holds_alternative<std::string>( id ) ) builder.append_key_value( "id", std::get<std::string>( id ) );
-    else
-      builder.append_key_value( "id", std::get<std::int64_t>( id ) );
-    builder.append_comma();
-    // array of answers
-    builder.escape_and_append_with_quotes( "result" );
-    builder.append_colon();
-    builder.start_array();
-    bool first = true;
-    for( auto& [clientId, response]: answers->responses )
-    {
-      if( !first ) builder.append_raw( "," );
-      first = false;
-      builder.append_raw( fmt::format( R"({{"result": {},"yaodaq_id":{{"component":"{}","type":"{}","name":"{}"}}}})", std::string( response ), std::string( clientId.component() ), std::string( clientId.type() ), std::string( clientId.name() ) ) );
+      // cleaning
+      {
+        std::lock_guard<std::mutex> lock2( m_map_mutex );
+        m_server_construct_response.erase( id );
+      }
     }
-    builder.end_array();
-    builder.end_object();
-    // Send to th client that send the request
-    sendTo( builder.view(), *ws );
-
-    // cleaning
+    catch( ... )
     {
-      std::lock_guard<std::mutex> lock2( m_map_mutex );
-      m_server_construct_response.erase( id );
+      std::lock_guard<std::mutex> lock( answers->mtx );
+      answers->exceptions.push_back( std::current_exception() );
     }
   };
 

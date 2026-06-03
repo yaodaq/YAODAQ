@@ -30,6 +30,7 @@ struct ServerRequest
   std::mutex                                          mtx;  // protect shared state
   std::condition_variable                             cv;
   std::unordered_map<yaodaq::Identifier, std::string> responses;
+  std::vector<std::exception_ptr>                     exceptions;
   std::size_t                                         expected_responses{ 0 };
   std::size_t                                         received_responses{ 0 };
 };
