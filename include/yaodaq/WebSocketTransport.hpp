@@ -47,21 +47,19 @@ public:
     return true;
   }
 
-  void write( const std::vector<uint8_t>& datd ) final
+  void write(std::span<const std::byte> datd ) final
   {
-    //std::string s( reinterpret_cast<const char*>( datd.data() ), datd.size() );
-    //nlohmann::json json  = nlohmann::json::parse(s);
     m_client.sendUtf8Text( ix::IXWebSocketSendData( reinterpret_cast<const char*>( datd.data() ), datd.size() ) );
   }
 
-  std::optional<std::vector<uint8_t>> read() final { return m_incoming.pop(); }
+  std::optional<std::vector<std::byte>> read() final { return m_incoming.pop(); }
 
   bool verifyParameters() final { return getParameters().contains( "url" ); }
 
 private:
   ix::WebSocket m_client;
 
-  ThreadSafeQueue<std::vector<uint8_t>> m_incoming;
+  ThreadSafeQueue<std::vector<std::byte>> m_incoming;
 
   void onMessage( const ix::WebSocketMessagePtr& msg ) noexcept
   {
@@ -102,7 +100,8 @@ private:
 
       case ix::WebSocketMessageType::Message:
       {
-        m_incoming.push( { msg->str.begin(), msg->str.end() } );
+        auto* data = reinterpret_cast<const std::byte*>(msg->str.data());
+        m_incoming.push(std::vector<std::byte>(data, data + msg->str.size()));
 
         break;
       }

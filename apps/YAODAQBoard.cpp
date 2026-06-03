@@ -189,9 +189,9 @@ private:
         std::unique_lock<std::mutex> lock( m_mutex );
         m_cv.wait_for( lock, std::chrono::seconds( 1 ), [this]() { return !buffer.empty() || !m_running; } );
       }
-      flush();
+      //flush();
     }
-    flush();
+    //flush();
   }
 
   // ========================================================
@@ -209,15 +209,17 @@ private:
     try
     {
       soci::statement st = ( sql.prepare << "INSERT IGNORE INTO hv_measurement "
-                                            "(ts, channel_id, mean_V, mean_nA) "
-                                            "VALUES (:ts, :ch, :v, :c)" );
+                                            "(ts, channel_id, mean_V, mean_nA, sigma_v, sigma_A) "
+                                            "VALUES (:ts, :ch, :v, :a, :sv, :sa)" );
 
       for( auto& r: local )
       {
         st.exchange( soci::use( r.ts, "ts" ) );
         st.exchange( soci::use( r.channel_id, "ch" ) );
         st.exchange( soci::use( r.v_mean, "v" ) );
-        st.exchange( soci::use( r.i_mean, "c" ) );
+        st.exchange( soci::use( r.i_mean, "a" ) );
+        st.exchange( soci::use( r.v_sigma, "sv" ) );
+        st.exchange( soci::use( r.i_sigma, "sa" ) );
         st.define_and_bind();
         st.execute( true );
       }

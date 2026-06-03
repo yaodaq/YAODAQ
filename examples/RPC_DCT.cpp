@@ -72,7 +72,7 @@ public:
   {
     createTempDirectory();
     info( "DCT Rawdata (csv) will be written in {}", m_temp.c_str() );
-    std::string   script = fmt::format( u8R"(set nEvts {}
+    std::string   script = fmt::format( R"(set nEvts {}
     set inputPath {}
     # channel mask
     # . layer2. layer1. layer0

@@ -23,10 +23,10 @@ public:
   {
     if( !m_transport->verifyParameters() )
     {
-      if( m_logging ) m_logging->error( "Invalid connector parameters:\n{}", yaodaq::Formatter::format( m_transport->getParameters() ) );
+      if( m_logging ) m_logging->error( "Invalid connector parameters:\n{}", yaodaq::Formatter::format( m_transport->getParameters() ).data() );
       return false;
     }
-    if( m_logging ) m_logging->trace( "Parameters for connector verified:\n{}", yaodaq::Formatter::format( m_transport->getParameters() ) );
+    if( m_logging ) m_logging->trace( "Parameters for connector verified:\n{}", yaodaq::Formatter::format( m_transport->getParameters() ).data() );
     if( !m_transport->open() ) return false;
     try
     {

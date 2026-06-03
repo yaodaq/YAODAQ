@@ -1,12 +1,9 @@
 #pragma once
-
+#include "yaodaq/Export.hpp"
 #include "yaodaq/Message.hpp"
-
-#include <cstdint>
-#include <memory>
-#include <stdexcept>
-#include <string_view>
 #include <vector>
+#include <cstddef>
+#include <span>
 
 namespace yaodaq
 {
@@ -14,32 +11,48 @@ namespace yaodaq
 class ICodec
 {
 public:
-  virtual ~ICodec() = default;
-
-  virtual std::vector<std::uint8_t> encode( const yaodaq::Message& msg ) const = 0;
-
-  virtual yaodaq::Message decode( std::string_view data ) const = 0;
-
-  yaodaq::Message decode( const std::vector<std::uint8_t>& data ) const { return decode( std::string_view( reinterpret_cast<const char*>( data.data() ), data.size() ) ); }
+  ICodec() noexcept = default;
+  virtual ~ICodec() noexcept = default;
+  virtual std::vector<std::byte> encode(const yaodaq::Message& msg) const = 0;
+  virtual yaodaq::Message decode(std::span<const std::byte> data) const = 0;
 };
 
 class Json final : public ICodec
 {
 public:
-  std::vector<std::uint8_t> encode( const yaodaq::Message& msg ) const override
+  std::vector<std::byte>
+  encode(const yaodaq::Message& msg) const override
   {
-    const auto& j = msg.dump();  // assume std::string or json convertible string
+    const std::string j = msg.dump();
 
-    return std::vector<std::uint8_t>( j.begin(), j.end() );
+    std::vector<std::byte> out;
+    out.reserve(j.size());
+
+    for (unsigned char c : j)
+      out.push_back(static_cast<std::byte>(c));
+
+    return out;
   }
 
-  yaodaq::Message decode( std::string_view data ) const override
+  yaodaq::Message
+  decode(std::span<const std::byte> data) const override
   {
-    // zero-copy parse from view (no std::string allocation)
-    auto json = nlohmann::json::parse( data.data(), data.data() + data.size(), nullptr, false );
+    if (data.empty())
+      throw std::runtime_error("Empty payload");
 
-    Message message( json );
-    return message;
+    const auto* begin =
+      reinterpret_cast<const char*>(data.data());
+
+    const auto* end = begin + data.size();
+
+    nlohmann::json json = nlohmann::json::parse(
+      begin,
+      end,
+      nullptr,
+      true  // throw on error
+    );
+
+    return yaodaq::Message(json);
   }
 };
 

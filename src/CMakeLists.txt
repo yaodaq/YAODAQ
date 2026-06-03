@@ -41,7 +41,7 @@ list(APPEND YAODAQ_PUBLIC_HEADERS
 set_target_properties(yaodaq PROPERTIES
                              PUBLIC_HEADER "${YAODAQ_PUBLIC_HEADERS}"
                              CXX_EXTENSIONS FALSE
-                             CXX_STANDARD 17
+                             CXX_STANDARD 20
                              CXX_STANDARD_REQUIRED TRUE
                              CXX_VISIBILITY_PRESET "hidden"
                              VISIBILITY_INLINES_HIDDEN TRUE
@@ -49,7 +49,7 @@ set_target_properties(yaodaq PROPERTIES
 target_link_libraries(yaodaq PUBLIC  ixwebsocket::ixwebsocket cxx-jsonrpc::cxx-jsonrpc PRIVATE SOCI::SOCI simdjson::simdjson fmt::fmt spdlog::spdlog magic_enum::magic_enum cpp-terminal::cpp-terminal nlohmann_json::nlohmann_json)
 target_compile_definitions(yaodaq PRIVATE $<$<STREQUAL:$<TARGET_PROPERTY:yaodaq,TYPE>,SHARED_LIBRARY>:YAODAQ_BUILD_DLL=1> $<$<STREQUAL:$<TARGET_PROPERTY:yaodaq,TYPE>,SHARED_LIBRARY>:CXX_JSONRPC_BUILD_DLL=1>)
 target_include_directories(yaodaq PUBLIC $<BUILD_INTERFACE:${PROJECT_SOURCE_DIR}/include> $<BUILD_INTERFACE:${PROJECT_BINARY_DIR}/include> $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>)
-target_compile_features(yaodaq PUBLIC cxx_std_17)
+target_compile_features(yaodaq PUBLIC cxx_std_20)
 add_library(yaodaq::yaodaq ALIAS yaodaq)
 
 install(TARGETS yaodaq
