@@ -47,10 +47,7 @@ public:
     return true;
   }
 
-  void write(std::span<const std::byte> datd ) final
-  {
-    m_client.sendUtf8Text( ix::IXWebSocketSendData( reinterpret_cast<const char*>( datd.data() ), datd.size() ) );
-  }
+  void write( std::span<const std::byte> datd ) final { m_client.sendUtf8Text( ix::IXWebSocketSendData( reinterpret_cast<const char*>( datd.data() ), datd.size() ) ); }
 
   std::optional<std::vector<std::byte>> read() final { return m_incoming.pop(); }
 
@@ -100,8 +97,8 @@ private:
 
       case ix::WebSocketMessageType::Message:
       {
-        auto* data = reinterpret_cast<const std::byte*>(msg->str.data());
-        m_incoming.push(std::vector<std::byte>(data, data + msg->str.size()));
+        auto* data = reinterpret_cast<const std::byte*>( msg->str.data() );
+        m_incoming.push( std::vector<std::byte>( data, data + msg->str.size() ) );
 
         break;
       }
