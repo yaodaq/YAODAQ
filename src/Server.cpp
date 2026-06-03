@@ -45,14 +45,27 @@ void yaodaq::Server::Send( const std::string_view re )
   {
     try
     {
-      nlohmann::json r            = nlohmann::json::parse( request );
-      std::string    ret          = HandleRequest( request );  // Server handler request
-      answers->expected_responses = getNumberOfClients();
+      thread_local simdjson::dom::parser parser;
+      simdjson::dom::element             r   = parser.parse( request );
+      std::string                        ret = HandleRequest( request );  // Server handler request
+      answers->expected_responses            = getNumberOfClients();
       // Extract ID
       jsonrpc::id_t id;
-      if( r["id"].is_string() ) id = r["id"].get<std::string>();
+
+      auto id_elem = r["id"];
+
+      if( id_elem.type() == simdjson::dom::element_type::STRING )
+      {
+        std::string_view s;
+        id_elem.get( s );
+        id = std::string( s );
+      }
       else
-        id = r["id"].get<std::int64_t>();
+      {
+        int64_t v;
+        id_elem.get( v );
+        id = v;
+      }
       // prepare to wait for responses from the clients
       {
         std::lock_guard<std::mutex> lock( m_server_own_request );
@@ -69,9 +82,9 @@ void yaodaq::Server::Send( const std::string_view re )
       builder.append_key_value( "jsonrpc", "2.0" );
       builder.append_comma();
       // "id"
-      if( r["id"].is_string() ) builder.append_key_value( "id", r["id"].get<std::string>() );
+      if( std::holds_alternative<std::string>( id ) ) builder.append_key_value( "id", std::get<std::string>( id ) );
       else
-        builder.append_key_value( "id", r["id"].get<std::int64_t>() );
+        builder.append_key_value( "id", std::get<std::int64_t>( id ) );
       builder.append_comma();
       // array of answers
       builder.escape_and_append_with_quotes( "result" );
