@@ -1,6 +1,6 @@
 #pragma once
-
-#include "Message.hpp"
+#include "yaodaq/Export.hpp"
+#include "yaodaq/Message.hpp"
 
 #include <functional>
 #include <mutex>
@@ -12,19 +12,19 @@ class Dispatcher
 public:
   using Handler = std::function<void( const yaodaq::Message& )>;
 
-  void subscribe( const yaodaq::Message::Type type, Handler handler )
+  YAODAQ_API void subscribe( yaodaq::Message::Type type, Handler handler )
   {
     std::lock_guard<std::mutex> lock( m_mutex );
     m_handlers[type].push_back( std::move( handler ) );
   }
 
-  void subscribeToAll( Handler handler )
+  YAODAQ_API void subscribeToAll( Handler handler )
   {
     std::lock_guard<std::mutex> lock( m_mutex );
     m_all.push_back( std::move( handler ) );
   }
 
-  void dispatch( const yaodaq::Message& msg )
+  YAODAQ_API void dispatch( const yaodaq::Message& message ) const
   {
     std::vector<Handler> handlers;
     std::vector<Handler> all;
@@ -32,20 +32,20 @@ public:
     {
       std::lock_guard<std::mutex> lock( m_mutex );
 
-      auto it = m_handlers.find( msg.type() );
-
-      if( it != m_handlers.end() ) { handlers = it->second; }
+      if( auto it = m_handlers.find( message.type() ); it != m_handlers.end() ) { handlers = it->second; }
 
       all = m_all;
     }
 
-    for( auto& handler: handlers ) { handler( msg ); }
+    for( const auto& handler: handlers ) { handler( message ); }
 
-    for( auto& handler: all ) { handler( msg ); }
+    for( const auto& handler: all ) { handler( message ); }
   }
 
 private:
+  mutable std::mutex m_mutex;
+
   std::unordered_map<yaodaq::Message::Type, std::vector<Handler>> m_handlers;
-  std::vector<Handler>                                            m_all;
-  std::mutex                                                      m_mutex;
+
+  std::vector<Handler> m_all;
 };

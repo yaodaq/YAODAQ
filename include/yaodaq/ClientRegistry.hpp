@@ -1,4 +1,5 @@
 #pragma once
+#include "yaodaq/Export.hpp"
 
 #include <ixwebsocket/IXWebSocket.h>
 #include <mutex>

@@ -1,5 +1,4 @@
 #pragma once
-
 #include "yaodaq/Config.hpp"
 #include "yaodaq/Export.hpp"
 #include "yaodaq/Identifier.hpp"
@@ -26,8 +25,8 @@ public:
   YAODAQ_API const Identifier& identifier() const noexcept { return m_identifier; }
 
 protected:
-  ix::WebSocket&  getWebsocketClient() noexcept { return m_client; }
-  YAODAQ_API void start()
+  YAODAQ_API ix::WebSocket& getWebsocketClient() noexcept { return m_client; }
+  YAODAQ_API void           start()
   {
     m_client.start();
     info( "trying to connect to {}", m_client.getUrl() );
@@ -37,12 +36,12 @@ protected:
     info( "Closing {}", m_client.getUrl() );
     m_client.close();
   }
-  virtual void onResponse( const std::string& ) { /* Standard client don't receive response !!  Only Controller has the right to ask */ }
+  YAODAQ_API virtual void onResponse( const std::string& ) { /* Standard client don't receive response !!  Only Controller has the right to ask */ }
 
 private:
   const Identifier m_identifier;
   ix::WebSocket    m_client;
-  explicit Client() noexcept = delete;
+  YAODAQ_API explicit Client() noexcept = delete;
   YAODAQ_INTERNAL void handleMessage( const ix::WebSocketMessagePtr& msg ) noexcept;
 
   // Messages

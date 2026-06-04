@@ -1,5 +1,6 @@
 #pragma once
 #include "Module.hpp"
+#include "yaodaq/Export.hpp"
 
 #include <cstdint>
 #include <mutex>
@@ -20,7 +21,7 @@ class Board : public Module
 {
 public:
   YAODAQ_API explicit Board( BoardConfig& cfg, const std::string_view name, const std::string_view type = "yaodaq" ) : Module( cfg, name, type, Component::Role::Board ), m_connector( cfg.getConnector() ) {}
-  bool connect() final
+  YAODAQ_API bool connect() final
   {
     Transition transition{ allowTransition( State::ID::Connected ) };
     if( transition == Transition::alreadyDone ) return true;
@@ -44,7 +45,7 @@ public:
       return false;
     }
   };
-  bool disconnect() final
+  YAODAQ_API bool disconnect() final
   {
     Transition transition{ allowTransition( State::ID::Disconnected ) };
     if( transition == Transition::alreadyDone ) return true;
@@ -69,9 +70,9 @@ public:
   };
   YAODAQ_API explicit Board() noexcept = delete;
   YAODAQ_API virtual ~Board() noexcept { disconnect(); }
-  YAODAQ_API void send( const Message& msg ) { m_connector->send( msg ); }
+  YAODAQ_API void send( std::unique_ptr<Message> msg ) { m_connector->send( std::move( msg ) ); }
 
-  YAODAQ_API std::future<Message> request( const Message& msg ) { return m_connector->request( msg ); }
+  YAODAQ_API std::future<std::unique_ptr<Message>> request( std::unique_ptr<Message> msg ) { return m_connector->request( std::move( msg ) ); }
 
   YAODAQ_API Dispatcher& dispatcher() { return m_connector->dispatcher(); }
 

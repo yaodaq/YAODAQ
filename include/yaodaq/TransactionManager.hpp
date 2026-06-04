@@ -1,20 +1,24 @@
 #pragma once
-
 #include "yaodaq/Exception.hpp"
 #include "yaodaq/Export.hpp"
 #include "yaodaq/Message.hpp"
 
 #include <future>
+#include <memory>
 #include <mutex>
+#include <string>
 #include <unordered_map>
 
 class TransactionManager
 {
 public:
-  std::future<yaodaq::Message> create( std::string uuid )
+  using MessagePtr = std::unique_ptr<yaodaq::Message>;
+  using Promise    = std::promise<MessagePtr>;
+  using Future     = std::future<MessagePtr>;
+  YAODAQ_API Future create( std::string uuid )
   {
-    std::promise<yaodaq::Message> promise;
-    auto                          future = promise.get_future();
+    Promise promise;
+    auto    future = promise.get_future();
     {
       std::lock_guard<std::mutex> lock( m_mutex );
       auto [it, inserted] = m_pending.emplace( std::move( uuid ), std::move( promise ) );
@@ -23,27 +27,44 @@ public:
     return future;
   }
 
-  bool resolve( yaodaq::Message msg )
+  YAODAQ_API std::unique_ptr<yaodaq::Message> resolve( std::unique_ptr<yaodaq::Message> msg )
   {
-    std::promise<yaodaq::Message> promise;
+    if( !msg ) return nullptr;
+
+    std::promise<std::unique_ptr<yaodaq::Message>> promise;
+
     {
       std::lock_guard<std::mutex> lock( m_mutex );
-      auto                        it = m_pending.find( msg.uuid() );
-      if( it == m_pending.end() ) return false;
+
+      auto it = m_pending.find( msg->uuid() );
+
+      if( it == m_pending.end() ) return msg;  // not a response → forward it
+
       promise = std::move( it->second );
       m_pending.erase( it );
     }
+
     promise.set_value( std::move( msg ) );
-    return true;
+    return nullptr;  // consumed by transaction
   }
 
-  void shutdown()
+  YAODAQ_API void shutdown()
   {
     std::lock_guard<std::mutex> lock( m_mutex );
+    for( auto& [uuid, promise]: m_pending )
+    {
+      try
+      {
+        promise.set_exception( std::make_exception_ptr( yaodaq::Exception( "Transaction manager shutdown" ) ) );
+      }
+      catch( const std::future_error& )
+      {
+      }
+    }
     m_pending.clear();
   }
 
 private:
-  std::unordered_map<std::string, std::promise<yaodaq::Message>> m_pending;
-  std::mutex                                                     m_mutex;
+  std::unordered_map<std::string, Promise> m_pending;
+  std::mutex                               m_mutex;
 };

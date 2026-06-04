@@ -10,6 +10,7 @@ cmmm_modules_list(URL "gh:cmake-tools/cmcm")
 project(YAODAQ VERSION 0.0.0.1 DESCRIPTION "Yet An Other DAQ" HOMEPAGE_URL "https://github.com/yaodaq/YAODAQ" LANGUAGES CXX)
 include(GNUInstallDirs)
 
+set(CMAKE_POSITION_INDEPENDENT_CODE TRUE)
 #
 # =========================
 # Linux RPATH

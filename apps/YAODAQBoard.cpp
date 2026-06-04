@@ -23,6 +23,7 @@
 #include <yaodaq/Board.hpp>
 #include <yaodaq/Exception.hpp>
 #include <yaodaq/Formatter.hpp>
+#include <yaodaq/JSONCodec.hpp>
 
 // ============================================================
 // Key
@@ -310,9 +311,9 @@ public:
                                                            { { "c", "getItem" }, { "p", { { "p", { { "l", "0" }, { "a", "*" }, { "c", "*" } } }, { "i", "Status.voltageMeasure" }, { "v", "" }, { "u", "" } } } } } ) },
                            { "r", "xhr" } };
 
-      yaodaq::Raw raw( json );
+      std::unique_ptr<yaodaq::Message> raw = std::make_unique<yaodaq::Raw>( json );
 
-      send( raw );
+      send( std::move( raw ) );
 
       return true;
     };
@@ -525,7 +526,7 @@ try
 
   json["url"] = "ws://192.168.50.119:8080";
 
-  yaodaq::BoardConfig cfg( std::make_unique<Connector>( std::make_unique<WebSocket>( json ), std::make_unique<yaodaq::Json>() ) );
+  yaodaq::BoardConfig cfg( std::make_unique<Connector>( std::make_unique<WebSocket>( json ), std::make_unique<yaodaq::JSONCodec>() ) );
 
   cfg().setPort( port ).setHost( host ).verbosity( verbosity );
 

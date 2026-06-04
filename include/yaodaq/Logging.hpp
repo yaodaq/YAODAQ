@@ -1,5 +1,5 @@
 #pragma once
-
+#include "yaodaq/Export.hpp"
 #include "yaodaq/Identifier.hpp"
 #include "yaodaq/Verbosity.hpp"
 

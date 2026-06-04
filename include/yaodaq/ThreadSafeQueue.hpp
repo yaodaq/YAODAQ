@@ -1,4 +1,5 @@
 #pragma once
+#include "yaodaq/Export.hpp"
 
 #include <condition_variable>
 #include <mutex>
@@ -8,7 +9,7 @@
 template<typename T> class ThreadSafeQueue
 {
 public:
-  void push( T value )
+  YAODAQ_API void push( T value )
   {
     {
       std::lock_guard<std::mutex> lock( m_mutex );
@@ -18,7 +19,7 @@ public:
     m_cv.notify_one();
   }
 
-  std::optional<T> pop()
+  YAODAQ_API std::optional<T> pop()
   {
     std::unique_lock<std::mutex> lock( m_mutex );
     m_cv.wait( lock, [&] { return m_shutdown || !m_queue.empty(); } );
@@ -28,7 +29,7 @@ public:
     return value;
   }
 
-  void shutdown()
+  YAODAQ_API void shutdown()
   {
     {
       std::lock_guard<std::mutex> lock( m_mutex );

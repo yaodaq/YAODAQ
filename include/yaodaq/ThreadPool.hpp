@@ -1,5 +1,6 @@
 #pragma once
 #include "yaodaq/Exception.hpp"
+#include "yaodaq/Export.hpp"
 
 #include <atomic>
 #include <condition_variable>
@@ -15,7 +16,7 @@ namespace yaodaq
 class ThreadPool
 {
 public:
-  explicit ThreadPool( const std::size_t threads = std::max( 1u, std::thread::hardware_concurrency() ) )
+  YAODAQ_API explicit ThreadPool( const std::size_t threads = std::max( 1u, std::thread::hardware_concurrency() ) )
   {
     m_workers.reserve( threads );
     for( std::size_t i = 0; i < threads; ++i )
@@ -40,7 +41,7 @@ public:
     }
   }
 
-  ~ThreadPool()
+  YAODAQ_API ~ThreadPool()
   {
     {
       std::unique_lock<std::mutex> lock( m_mutex );

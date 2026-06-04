@@ -1,5 +1,3 @@
-set(CMAKE_POSITION_INDEPENDENT_CODE TRUE)
-
 include(IXWebSocket)
 include(spdlog)
 include(MagicEnum)
@@ -22,6 +20,7 @@ add_library(yaodaq SHARED
  State.cpp
  Message.cpp
  Formatter.cpp
+ JSONCodec.cpp
 )
 
 list(APPEND YAODAQ_PUBLIC_HEADERS

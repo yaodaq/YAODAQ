@@ -1,8 +1,8 @@
 #pragma once
-
 #include "ITransport.hpp"
 #include "ThreadSafeQueue.hpp"
 #include "nlohmann/json.hpp"
+#include "yaodaq/Export.hpp"
 
 #include <iostream>
 #include <ixwebsocket/IXNetSystem.h>
@@ -12,7 +12,7 @@
 class WebSocket final : public ITransport
 {
 public:
-  explicit WebSocket( nlohmann::json json ) : ITransport( std::move( json ) )
+  YAODAQ_API explicit WebSocket( nlohmann::json json ) : ITransport( std::move( json ) )
   {
     ix::initNetSystem();
     m_client.disablePerMessageDeflate();
@@ -20,14 +20,14 @@ public:
     m_client.setOnMessageCallback( [this]( const ix::WebSocketMessagePtr& msg ) noexcept { onMessage( msg ); } );
   }
 
-  ~WebSocket() noexcept override
+  YAODAQ_API ~WebSocket() noexcept override
   {
     close();
 
     ix::uninitNetSystem();
   }
 
-  bool open() final
+  YAODAQ_API bool open() final
   {
     m_client.setUrl( getParameters()["url"].get<std::string>() );
 
@@ -36,7 +36,7 @@ public:
     return true;
   }
 
-  bool close() final
+  YAODAQ_API bool close() final
   {
     m_client.disableAutomaticReconnection();
 
@@ -47,11 +47,11 @@ public:
     return true;
   }
 
-  void write( std::span<const std::byte> datd ) final { m_client.sendUtf8Text( ix::IXWebSocketSendData( reinterpret_cast<const char*>( datd.data() ), datd.size() ) ); }
+  YAODAQ_API void write( std::span<const std::byte> datd ) final { m_client.sendUtf8Text( ix::IXWebSocketSendData( reinterpret_cast<const char*>( datd.data() ), datd.size() ) ); }
 
-  std::optional<std::vector<std::byte>> read() final { return m_incoming.pop(); }
+  YAODAQ_API std::optional<std::vector<std::byte>> read() final { return m_incoming.pop(); }
 
-  bool verifyParameters() final { return getParameters().contains( "url" ); }
+  YAODAQ_API bool verifyParameters() final { return getParameters().contains( "url" ); }
 
 private:
   ix::WebSocket m_client;
