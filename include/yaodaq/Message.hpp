@@ -50,7 +50,6 @@ public:
     Raw,
   };
   YAODAQ_API explicit Message( const nlohmann::json& json );
-  YAODAQ_API explicit Message( const std::vector<std::uint8_t>& raw );
   YAODAQ_API std::string dump( const std::size_t i = 0 ) const { return m_data.dump( i ); }
   YAODAQ_API const nlohmann::json& payload() const noexcept { return m_data["payload"]; }
   YAODAQ_API const nlohmann::json& meta() const noexcept { return m_data["meta"]; }
