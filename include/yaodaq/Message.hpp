@@ -79,6 +79,16 @@ public:
   static constexpr Message::Type type = Message::Type::Log;
   YAODAQ_API explicit Log() noexcept  = delete;
   YAODAQ_API explicit Log( const spdlog::details::log_msg& msg );
+
+private:
+  std::string              m_logger_name;
+  int                      m_level{ 0 };
+  std::string              m_message;
+  std::chrono::nanoseconds m_time{ 0 };
+  std::string              m_file_name;
+  std::string              m_function_name;
+  std::uint32_t            m_line{ 0 };
+  std::uint32_t            m_column{ 0 };
 };
 
 class Open : public Message
