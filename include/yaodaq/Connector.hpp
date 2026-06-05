@@ -134,15 +134,53 @@ private:
     {
       while( m_running )
       {
-        auto raw = m_transport->read();
-        if( !raw.has_value() ) break;
-
-        auto msg = m_codec->decode( *raw );
+        std::optional<std::vector<std::byte>> raw;
+        try
+        {
+          raw = m_transport->read();
+          if( !raw.has_value() ) break;
+        }
+        catch( ... )
+        {
+          std::cout << "OUPSSSSSSSSSSSSS " << std::endl;
+          continue;
+        }
+        std::unique_ptr<yaodaq::Message> msg;
+        try
+        {
+          msg = m_codec->decode( *raw );
+        }
+        catch( const nlohmann::json::parse_error& e )
+        {
+          m_logging->warn( "JSON parse error: {}", e.what() );
+          continue;
+        }
+        catch( const std::exception& e )
+        {
+          m_logging->error( "decode failed: {}", e.what() );
+          continue;
+        }
 
         // TransactionManager consumes or returns ownership
-        msg = m_transactions.resolve( std::move( msg ) );
 
-        if( msg ) { m_dispatcher.dispatch( *msg ); }
+        try
+        {
+          if( msg ) msg = m_transactions.resolve( std::move( msg ) );
+        }
+        catch( ... )
+        {
+          std::cout << "OUPSSSS transaction" << std::endl;
+          continue;
+        }
+        try
+        {
+          if( msg ) { m_dispatcher.dispatch( *msg.get() ); }
+        }
+        catch( ... )
+        {
+          std::cout << "OUPPP dispatch" << std::endl;
+          continue;
+        }
       }
     }
     catch( const std::exception& e )

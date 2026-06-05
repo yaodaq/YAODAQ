@@ -16,6 +16,8 @@
 #include <spdlog/details/log_msg.h>
 #include <string_view>
 
+std::string_view yaodaq::Message::type_str( const Message::Type type ) noexcept { return magic_enum::enum_name( type ); }
+
 yaodaq::Message::Message() noexcept
 {
   meta()                               = nlohmann::json::object();

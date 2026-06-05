@@ -97,8 +97,7 @@ private:
 
       case ix::WebSocketMessageType::Message:
       {
-        auto* data = reinterpret_cast<const std::byte*>( msg->str.data() );
-        m_incoming.push( std::vector<std::byte>( data, data + msg->str.size() ) );
+        m_incoming.push( std::vector<std::byte>( reinterpret_cast<const std::byte*>( msg->str.data() ), reinterpret_cast<const std::byte*>( msg->str.data() ) + msg->str.size() ) );
 
         break;
       }

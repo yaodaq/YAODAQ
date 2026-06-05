@@ -9,6 +9,8 @@
 #include <map>
 #include <new>
 #include <nlohmann/json.hpp>
+#include <span>
+#include <string_view>
 
 namespace spdlog
 {
@@ -47,8 +49,9 @@ public:
     RPCRequest,
     RPCResponse,
     RawData,
-    Raw,
+    Data,
   };
+  virtual ~Message() = default;
   YAODAQ_API explicit Message( const nlohmann::json& json );
   YAODAQ_API std::string dump( const std::size_t i = 0 ) const { return m_data.dump( i ); }
   YAODAQ_API const nlohmann::json& payload() const noexcept { return m_data["payload"]; }
@@ -57,8 +60,10 @@ public:
   YAODAQ_API nlohmann::json& payload() noexcept { return m_data["payload"]; }
   YAODAQ_API nlohmann::json& meta() noexcept { return m_data["meta"]; }
   YAODAQ_API Type            type() const noexcept;
+  YAODAQ_API std::string_view type_str() const noexcept { return meta()["type"].get<std::string_view>(); };
   YAODAQ_API std::string uuid() const noexcept { return meta()["uuid"]; }
-  YAODAQ_API std::int64_t time() const noexcept { return meta()["time"]; }
+  YAODAQ_API std::int64_t            time() const noexcept { return meta()["time"]; }
+  YAODAQ_API static std::string_view type_str( const Message::Type t ) noexcept;
 
 protected:
   YAODAQ_API explicit Message( const Type type );
@@ -71,13 +76,15 @@ private:
 class Log : public Message
 {
 public:
-  YAODAQ_API explicit Log() noexcept = delete;
+  static constexpr Message::Type type = Message::Type::Log;
+  YAODAQ_API explicit Log() noexcept  = delete;
   YAODAQ_API explicit Log( const spdlog::details::log_msg& msg );
 };
 
 class Open : public Message
 {
 public:
+  static constexpr Message::Type type = Message::Type::Open;
   YAODAQ_API explicit Open() noexcept = delete;
   YAODAQ_API explicit Open( const ix::WebSocketOpenInfo& open );
   YAODAQ_API std::string uri() const noexcept { return payload()["uri"].get<std::string>(); }
@@ -88,6 +95,7 @@ public:
 class Close : public Message
 {
 public:
+  static constexpr Message::Type type  = Message::Type::Close;
   YAODAQ_API explicit Close() noexcept = delete;
   YAODAQ_API explicit Close( const ix::WebSocketCloseInfo& close );
   YAODAQ_API std::uint16_t code() const noexcept { return payload()["code"].get<std::uint16_t>(); }
@@ -98,6 +106,7 @@ public:
 class Reject : public Message
 {
 public:
+  static constexpr Message::Type type   = Message::Type::Reject;
   YAODAQ_API explicit Reject() noexcept = delete;
   YAODAQ_API explicit Reject( const ix::WebSocketCloseInfo& close );
   YAODAQ_API std::uint16_t code() const noexcept { return payload()["code"].get<std::uint16_t>(); }
@@ -108,6 +117,7 @@ public:
 class Error : public Message
 {
 public:
+  static constexpr Message::Type type  = Message::Type::Error;
   YAODAQ_API explicit Error() noexcept = delete;
   YAODAQ_API explicit Error( const ix::WebSocketErrorInfo& error );
   YAODAQ_API std::uint32_t retries() const noexcept { return payload()["retries"].get<std::uint32_t>(); }
@@ -120,6 +130,7 @@ public:
 class Ping : public Message
 {
 public:
+  static constexpr Message::Type type = Message::Type::Ping;
   YAODAQ_API explicit Ping() noexcept = delete;
   YAODAQ_API explicit Ping( const std::string_view& message, const std::size_t size, const bool binary ) : Message( yaodaq::Message::Type::Ping )
   {
@@ -135,6 +146,7 @@ public:
 class Pong : public Message
 {
 public:
+  static constexpr Message::Type type = Message::Type::Pong;
   YAODAQ_API explicit Pong() noexcept = delete;
   YAODAQ_API explicit Pong( const std::string_view& message, const std::size_t size, const bool binary ) : Message( yaodaq::Message::Type::Pong )
   {
@@ -150,6 +162,7 @@ public:
 class Except : public Message
 {
 public:
+  static constexpr Message::Type type   = Message::Type::Exception;
   YAODAQ_API explicit Except() noexcept = delete;
   YAODAQ_API explicit Except( const Exception& exception );
   YAODAQ_API explicit Except( const std::exception& exception );
@@ -157,18 +170,52 @@ public:
   YAODAQ_API std::string what() const noexcept { return payload()["what"].get<std::string>(); }
 };
 
+/*
+struct MessageMeta
+{
+  std::string codec;     // "json", "protobuf", "raw"
+  std::string version;   // "1", "2", "2026-01"
+  std::string schema;    // optional schema id
+};
+
+struct MessageMeta
+{
+  // identity / routing
+  std::string uuid;          // correlation / request-response
+  std::uint64_t timestamp;   // optional ordering
+
+  // transport + decoding
+  std::string codec;         // "json", "protobuf", "raw", "msgpack"
+  std::uint16_t version;     // protocol version (NOT schema version)
+
+  // routing (optional but very useful)
+  std::string topic;         // pub/sub routing key
+  std::string reply_to;      // RPC-style responses
+
+  // system flags
+  bool compressed = false;
+  bool encrypted  = false;
+};
+*/
+
 class RawData : public Message
 {
 public:
-  YAODAQ_API explicit RawData() : Message( Message::Type::RawData ) {}
-  YAODAQ_API explicit RawData( const std::string_view message ) : Message( Message::Type::RawData ) { payload()["message"] = message; }
+  static constexpr Message::Type type = Message::Type::RawData;
+  explicit RawData( std::string_view topic ) : Message( Message::Type::RawData ), m_topic( topic ) {}
+  explicit RawData( std::span<const std::byte> raw_data, std::string_view topic ) : Message( Message::Type::RawData ), m_topic( topic ), m_payload( raw_data.begin(), raw_data.end() ) {}
+  std::string_view           topic() const noexcept { return m_topic; }
+  std::span<const std::byte> raw() const noexcept { return m_payload; }
+
+private:
+  std::string            m_topic;
+  std::vector<std::byte> m_payload;
 };
 
-class Raw : public Message
+class RawDataBuilder
 {
 public:
-  YAODAQ_API explicit Raw() : Message( Message::Type::Raw ) {}
-  YAODAQ_API explicit Raw( nlohmann::json json ) : Message( Message::Type::Raw ) { m_data = std::move( json ); }
+  static RawData from_text( const std::string_view text, const std::string_view topic ) { return RawData( std::span<const std::byte>( reinterpret_cast<const std::byte*>( text.data() ), text.size() ), topic ); }
 };
 
 }  // namespace yaodaq

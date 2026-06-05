@@ -311,8 +311,7 @@ public:
                                                            { { "c", "getItem" }, { "p", { { "p", { { "l", "0" }, { "a", "*" }, { "c", "*" } } }, { "i", "Status.voltageMeasure" }, { "v", "" }, { "u", "" } } } } } ) },
                            { "r", "xhr" } };
 
-      std::unique_ptr<yaodaq::Message> raw = std::make_unique<yaodaq::Raw>( json );
-
+      std::unique_ptr<yaodaq::RawData> raw = std::make_unique<yaodaq::RawData>( yaodaq::RawDataBuilder::from_text( json.dump(), "iseg" ) );
       send( std::move( raw ) );
 
       return true;
@@ -364,7 +363,7 @@ std::string format_utc( std::string_view ts_str )
 // PARSE
 // ============================================================
 
-std::vector<Info> parse( const std::string& str )
+std::vector<Info> parse( const std::string_view str )
 {
   static std::unordered_map<Key, Accumulator, KeyHash> sample_map;
 
@@ -532,17 +531,30 @@ try
 
   MotorBoard board( cfg, name );
 
-  board.dispatcher().subscribeToAll(
-    [&board]( const yaodaq::Message& msg )
+  board.dispatcher().subscribe<yaodaq::RawData>(
+    [&board]( const yaodaq::RawData& msg )
     {
-      std::vector<Info> info = parse( msg.payload().dump() );
-
+      std::string_view  text( reinterpret_cast<const char*>( msg.raw().data() ), msg.raw().size() );
+      std::vector<Info> info = parse( text );
       for( std::size_t i = 0; i != info.size(); ++i )
       {
         fmt::print( "time: {},crate: {},board: {},channel: {},voltage: {}V(+-{}), current: {}nA(+-{})\n", info[i].ts, info[i].crate, info[i].board, info[i].channel, info[i].v_mean, info[i].v_sigma, info[i].i_mean, info[i].i_sigma );
         board.writer.add( info[i].ts, info[i].crate, info[i].board, info[i].channel, info[i].v_mean, info[i].i_mean, info[i].v_sigma, info[i].i_sigma );
       }
-    } );
+    },
+    [&board]( std::exception_ptr ep )
+    {
+      try
+      {
+        std::rethrow_exception( ep );
+      }
+      catch( const std::exception& e )
+      {
+        board.critical( "Handler error: {}\n", e.what() );
+      }
+    }
+
+  );
 
   board.link();
 
