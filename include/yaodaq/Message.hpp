@@ -90,6 +90,11 @@ public:
   YAODAQ_API std::string uri() const noexcept { return payload()["uri"].get<std::string>(); }
   YAODAQ_API std::map<std::string, std::string> headers() const noexcept { return payload()["headers"].get<std::map<std::string, std::string>>(); }
   YAODAQ_API std::string protocol() const noexcept { return payload()["protocol"].get<std::string>(); }
+
+private:
+  std::string                        m_uri;
+  std::map<std::string, std::string> m_headers;
+  std::string                        m_protocol;
 };
 
 class Close : public Message
@@ -101,6 +106,11 @@ public:
   YAODAQ_API std::uint16_t code() const noexcept { return payload()["code"].get<std::uint16_t>(); }
   YAODAQ_API std::string reason() const noexcept { return payload()["reason"].get<std::string>(); }
   YAODAQ_API bool        remote() const noexcept { return payload()["remote"].get<bool>(); }
+
+private:
+  std::string   m_reason;
+  std::uint16_t m_code{ 0 };
+  bool          m_remote{ false };
 };
 
 class Reject : public Message
@@ -112,6 +122,11 @@ public:
   YAODAQ_API std::uint16_t code() const noexcept { return payload()["code"].get<std::uint16_t>(); }
   YAODAQ_API std::string reason() const noexcept { return payload()["reason"].get<std::string>(); }
   YAODAQ_API bool        remote() const noexcept { return payload()["remote"].get<bool>(); }
+
+private:
+  std::string   m_reason;
+  std::uint16_t m_code{ 0 };
+  bool          m_remote{ false };
 };
 
 class Error : public Message
@@ -125,6 +140,13 @@ public:
   YAODAQ_API int           http_status() const noexcept { return payload()["http_status"].get<int>(); }
   YAODAQ_API std::string reason() const noexcept { return payload()["reason"].get<std::string>(); }
   YAODAQ_API bool        decompression_error() const noexcept { return payload()["decompression_error"].get<bool>(); }
+
+private:
+  std::string   m_reason;
+  std::uint32_t m_retries{ 0 };
+  double        m_wait_time{ .0 };
+  int           m_http_status{ 0 };
+  bool          m_decompression_error{ false };
 };
 
 class Ping : public Message
@@ -141,6 +163,11 @@ public:
   YAODAQ_API std::string message() const noexcept { return payload()["message"].get<std::string>(); }
   YAODAQ_API bool        binary() const noexcept { return payload()["binary"].get<bool>(); }
   YAODAQ_API std::size_t size() const noexcept { return payload()["size"].get<std::size_t>(); }
+
+private:
+  std::string m_message;
+  std::size_t m_size{ 0 };
+  bool        m_binary{ false };
 };
 
 class Pong : public Message
@@ -157,6 +184,11 @@ public:
   YAODAQ_API std::string message() const noexcept { return payload()["message"].get<std::string>(); }
   YAODAQ_API bool        binary() const noexcept { return payload()["binary"].get<bool>(); }
   YAODAQ_API std::size_t size() const noexcept { return payload()["size"].get<std::size_t>(); }
+
+private:
+  std::string m_message;
+  std::size_t m_size{ 0 };
+  bool        m_binary{ false };
 };
 
 class Except : public Message
@@ -168,6 +200,10 @@ public:
   YAODAQ_API explicit Except( const std::exception& exception );
   YAODAQ_API explicit Except( const std::string_view& exception );
   YAODAQ_API std::string what() const noexcept { return payload()["what"].get<std::string>(); }
+
+private:
+  std::string m_what;
+  std::string m_exception_type;
 };
 
 /*
