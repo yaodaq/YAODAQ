@@ -5,6 +5,7 @@
 #include "yaodaq/Export.hpp"
 #include "yaodaq/ICodec.hpp"
 #include "yaodaq/Identifier.hpp"
+#include "yaodaq/JSONCodec.hpp"
 #include "yaodaq/JsonRPCAsker.hpp"
 #include "yaodaq/JsonRPCResponder.hpp"
 #include "yaodaq/Logging.hpp"
@@ -56,6 +57,7 @@ private:
   ix::WebSocketServer  m_server;
   Identifier           m_identifier;
   ThreadPool           m_threadPool;
+  JSONCodec            m_json_codec;
   YAODAQ_INTERNAL void handleMessage( std::shared_ptr<ix::ConnectionState> connectionState, ix::WebSocket& webSocket, const ix::WebSocketMessagePtr& msg ) noexcept;
   bool                 m_rejectBrowser{ false };  //< Reject the Browsers
 
@@ -67,7 +69,7 @@ private:
   YAODAQ_INTERNAL void onMessage( std::shared_ptr<ix::ConnectionState> connectionState, ix::WebSocket& webSocket, const std::string& str, const std::size_t size, const bool binary );
   YAODAQ_INTERNAL void onJsonRPCResponse( std::shared_ptr<ix::ConnectionState> connectionState, ix::WebSocket& webSocket, const jsonrpc::id_t& parser, const std::string_view& str );
   YAODAQ_INTERNAL void onJsonRPCRequest( std::shared_ptr<ix::ConnectionState> connectionState, ix::WebSocket& webSocket, simdjson::dom::parser&, const std::string_view& request );
-  YAODAQ_INTERNAL void onLog( std::shared_ptr<ix::ConnectionState> connectionState, ix::WebSocket& webSocket, const std::string_view& request );
+  YAODAQ_INTERNAL void onLog( std::shared_ptr<ix::ConnectionState> connectionState, ix::WebSocket& webSocket, const Log& request );
   // Others
   YAODAQ_INTERNAL void onOpen( std::shared_ptr<ix::ConnectionState> connectionState, ix::WebSocket& webSocket, const Open& open );
   YAODAQ_INTERNAL void onClose( std::shared_ptr<ix::ConnectionState> connectionState, ix::WebSocket& webSocket, const Close& close );
@@ -89,8 +91,15 @@ private:
   YAODAQ_INTERNAL void sendTo( const std::string_view& str, ix::WebSocket& webSocket );
   // Send to all
   YAODAQ_INTERNAL void sendToAll( const std::string_view& str ) noexcept;
+
+  // Send to all clients except webSocket
+  YAODAQ_INTERNAL void sendExcept( const Message& str, ix::WebSocket& webSocket );
+  // Send only to webSocket
+  YAODAQ_INTERNAL void sendTo( const Message& str, ix::WebSocket& webSocket );
+  // Send to all
+  YAODAQ_INTERNAL void sendToAll( const Message& str ) noexcept;
   // Send to loggers
-  YAODAQ_INTERNAL void sendToLoggers( const std::string_view& str );
+  YAODAQ_INTERNAL void sendToLoggers( const Message& str );
 
   // Check if a client already have this name
   //std::unordered_map<Component::Role, std::unordered_map<std::string, std::reference_wrapper<ix::WebSocket>>> m_clients;

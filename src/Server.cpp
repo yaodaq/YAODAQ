@@ -124,7 +124,7 @@ YAODAQ_API yaodaq::Server::Server( const ServerConfig& cfg, const std::string_vi
   Logging( { Component::Role::Server, type, name } )
 {
   ix::initNetSystem();
-  add_websocket_callback( [this]( const Log& msg ) noexcept { sendToLoggers( msg.dump() ); } );
+  add_websocket_callback( [this]( const Log& msg ) noexcept { sendToLoggers( msg ); } );
   setVerbosity( cfg.getVerbosity() );
   if( cfg.isTLS() )
   {
@@ -182,7 +182,7 @@ void yaodaq::Server::checkClient( std::shared_ptr<ix::ConnectionState> connectio
 void yaodaq::Server::onOpen( std::shared_ptr<ix::ConnectionState> connectionState, ix::WebSocket& webSocket, const yaodaq::Open& open )
 {
   info( "client {} at {} port {} connected to server:\n  {}", connectionState->getId(), connectionState->getRemoteIp(), connectionState->getRemotePort(), yaodaq::Formatter::format( open.payload() ) );
-  sendExcept( open.dump(), webSocket );
+  sendExcept( open, webSocket );
 }
 
 void yaodaq::Server::onClose( std::shared_ptr<ix::ConnectionState> connectionState, ix::WebSocket& webSocket, const Close& close )
@@ -190,7 +190,7 @@ void yaodaq::Server::onClose( std::shared_ptr<ix::ConnectionState> connectionSta
   if( close.remote() ) warn( "client {} at {} port {} disconnected to server remotelly: {}({})", connectionState->getId(), connectionState->getRemoteIp(), connectionState->getRemotePort(), close.reason(), close.code() );
   else
     warn( "client {} at {} port {} disconnected to server remotelly: {}({})", connectionState->getId(), connectionState->getRemoteIp(), connectionState->getRemotePort(), close.reason(), close.code() );
-  sendExcept( close.dump(), webSocket );
+  sendExcept( close, webSocket );
 }
 
 void yaodaq::Server::onReject( std::shared_ptr<ix::ConnectionState> connectionState, ix::WebSocket& webSocket, const Reject& reject )
@@ -202,7 +202,7 @@ void yaodaq::Server::onReject( std::shared_ptr<ix::ConnectionState> connectionSt
 
 void yaodaq::Server::onMessage( std::shared_ptr<ix::ConnectionState> connectionState, ix::WebSocket& webSocket, const std::string& str, const std::size_t size, const bool binary )
 {
-  thread_local simdjson::dom::parser  parser;  //to remove
+  thread_local simdjson::dom::parser  parser;  // to remove
   thread_local simdjson::dom::element r;
   r = parser.parse( str );  //to remove
   if( !r["method"].error() || !r["notification"].error() ) onJsonRPCRequest( connectionState, webSocket, parser, str );
@@ -231,7 +231,14 @@ void yaodaq::Server::onMessage( std::shared_ptr<ix::ConnectionState> connectionS
     {
       case Message::Type::Log:
       {
-        onLog( connectionState, webSocket, str );
+        std::string_view name;
+        std::string_view message;
+        std::int64_t     level;
+        r["payload"]["logger_name"].get( name );
+        r["payload"]["message"].get( message );
+        r["payload"]["level"].get( level );
+        Log log( spdlog::details::log_msg( name, static_cast<spdlog::level::level_enum>( level ), message ) );
+        onLog( connectionState, webSocket, log );
         break;
       }
       default:
@@ -243,10 +250,10 @@ void yaodaq::Server::onMessage( std::shared_ptr<ix::ConnectionState> connectionS
   }
 }
 
-void yaodaq::Server::onLog( std::shared_ptr<ix::ConnectionState> connectionState, ix::WebSocket& webSocket, const std::string_view& str )
+void yaodaq::Server::onLog( std::shared_ptr<ix::ConnectionState> connectionState, ix::WebSocket& webSocket, const Log& log )
 {
   // Log the message with the original level, logger, and source location
-  sendToLoggers( str );
+  sendToLoggers( log );
 }
 
 /**
@@ -429,24 +436,48 @@ void yaodaq::Server::sendTo( const std::string_view& str, ix::WebSocket& webSock
   }
 }
 
-// Send to loggers
-void yaodaq::Server::sendToLoggers( const std::string_view& str )
+// Send to all
+void yaodaq::Server::sendToAll( const std::string_view& message ) noexcept
 {
-  std::string                 val{ str };
-  std::lock_guard<std::mutex> lock( m_mutex );
+  for( auto&& client: m_server.getClients() ) { client->sendUtf8Text( std::string( message ) ); }
+}
 
-  //auto it = m_clients.find( yaodaq::Component::Role::Logger );
-
-  for( auto&& client: m_registry.get() )
+void yaodaq::Server::sendExcept( const Message& message, ix::WebSocket& webSocket )
+{
+  const auto raw = m_json_codec.encode( message );
+  for( auto&& client: m_server.getClients() )
   {
-    if( client.first.component().role() == yaodaq::Component::Role::Logger ) { client.second->sendUtf8Text( val ); }
+    if( client.get() != &webSocket ) { client->sendUtf8Text( ix::IXWebSocketSendData( reinterpret_cast<const char*>( raw.data() ), raw.size() ) ); }
   }
 }
 
-// Send to all
-void yaodaq::Server::sendToAll( const std::string_view& str ) noexcept
+void yaodaq::Server::sendTo( const Message& message, ix::WebSocket& webSocket )
 {
-  for( auto&& client: m_server.getClients() ) { client->sendUtf8Text( std::string( str ) ); }
+  const auto raw = m_json_codec.encode( message );
+  for( auto&& client: m_server.getClients() )
+  {
+    if( client.get() == &webSocket )  // simple raw pointer comparison
+    {
+      client->sendUtf8Text( ix::IXWebSocketSendData( reinterpret_cast<const char*>( raw.data() ), raw.size() ) );
+    }
+  }
+}
+// Send to all
+void yaodaq::Server::sendToAll( const Message& message ) noexcept
+{
+  const auto raw = m_json_codec.encode( message );
+  for( auto&& client: m_server.getClients() ) { client->sendUtf8Text( ix::IXWebSocketSendData( reinterpret_cast<const char*>( raw.data() ), raw.size() ) ); }
+}
+
+// Send to loggers
+void yaodaq::Server::sendToLoggers( const Message& message )
+{
+  const auto                  raw = m_json_codec.encode( message );
+  std::lock_guard<std::mutex> lock( m_mutex );
+  for( auto&& client: m_registry.get() )
+  {
+    if( client.first.component().role() == yaodaq::Component::Role::Logger ) { client.second->sendUtf8Text( ix::IXWebSocketSendData( reinterpret_cast<const char*>( raw.data() ), raw.size() ) ); }
+  }
 }
 
 void yaodaq::Server::handleMessage( std::shared_ptr<ix::ConnectionState> connectionState, ix::WebSocket& webSocket, const ix::WebSocketMessagePtr& msg ) noexcept
@@ -503,7 +534,7 @@ void yaodaq::Server::handleMessage( std::shared_ptr<ix::ConnectionState> connect
     try
     {
       critical( "yaodaq::Exception: {}", exception.what() );
-      sendToAll( Except( exception )().dump() );
+      sendToAll( Except( exception ) );
     }
     catch( ... )
     {
@@ -514,7 +545,7 @@ void yaodaq::Server::handleMessage( std::shared_ptr<ix::ConnectionState> connect
     try
     {
       critical( "std::exception: {}", exception.what() );
-      sendToAll( Except( exception )().dump() );
+      sendToAll( Except( exception ) );
     }
     catch( ... )
     {
@@ -525,7 +556,7 @@ void yaodaq::Server::handleMessage( std::shared_ptr<ix::ConnectionState> connect
     try
     {
       critical( "exception in handleMessage" );
-      sendToAll( Except( "exception in handleMessage" )().dump() );
+      sendToAll( Except( "exception in handleMessage" ) );
     }
     catch( ... )
     {
