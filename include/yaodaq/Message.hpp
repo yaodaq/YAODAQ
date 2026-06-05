@@ -1,6 +1,7 @@
 #pragma once
 #include "yaodaq/Exception.hpp"
 #include "yaodaq/Export.hpp"
+#include "yaodaq/Version.hpp"
 
 #include <cstddef>
 #include <cstdint>
@@ -59,11 +60,12 @@ public:
   YAODAQ_API const nlohmann::json& operator()() const noexcept { return m_data; }
   YAODAQ_API nlohmann::json& payload() noexcept { return m_data["payload"]; }
   YAODAQ_API nlohmann::json& meta() noexcept { return m_data["meta"]; }
-  YAODAQ_API Type            type() const noexcept;
-  YAODAQ_API std::string_view type_str() const noexcept { return meta()["type"].get<std::string_view>(); };
-  YAODAQ_API std::string uuid() const noexcept { return meta()["uuid"]; }
-  YAODAQ_API std::int64_t            time() const noexcept { return meta()["time"]; }
+  YAODAQ_API Type            type() const noexcept { return m_type; };
+  YAODAQ_API std::string type_str() const noexcept { return yaodaq::Message::type_str( m_type ).data(); };
+  YAODAQ_API std::string uuid() const noexcept { return m_uuid; }
+  YAODAQ_API std::int64_t            time() const noexcept { return m_time; }
   YAODAQ_API static std::string_view type_str( const Message::Type t ) noexcept;
+  YAODAQ_API Version                 version() const noexcept { return m_version; }
 
 protected:
   YAODAQ_API explicit Message( const Type type );
@@ -71,6 +73,10 @@ protected:
 
 private:
   YAODAQ_API explicit Message() noexcept;
+  Type         m_type;
+  std::string  m_uuid;
+  std::int64_t m_time{ 0 };
+  Version      m_version;
 };
 
 class Log : public Message
@@ -79,12 +85,20 @@ public:
   static constexpr Message::Type type = Message::Type::Log;
   YAODAQ_API explicit Log() noexcept  = delete;
   YAODAQ_API explicit Log( const spdlog::details::log_msg& msg );
+  YAODAQ_API std::string name() const noexcept { return m_logger_name; }
+  YAODAQ_API int         level() const noexcept { return m_level; }
+  YAODAQ_API std::string message() const noexcept { return m_message; }
+  YAODAQ_API std::int64_t logger_time() const noexcept { return m_logger_time.count(); }
+  YAODAQ_API std::string file_name() const noexcept { return m_file_name; }
+  YAODAQ_API std::string function_name() const noexcept { return m_function_name; }
+  YAODAQ_API std::uint32_t line() const noexcept { return m_line; }
+  YAODAQ_API std::uint32_t column() const noexcept { return m_column; }
 
 private:
   std::string              m_logger_name;
   int                      m_level{ 0 };
   std::string              m_message;
-  std::chrono::nanoseconds m_time{ 0 };
+  std::chrono::nanoseconds m_logger_time{ 0 };
   std::string              m_file_name;
   std::string              m_function_name;
   std::uint32_t            m_line{ 0 };
@@ -164,7 +178,7 @@ class Ping : public Message
 public:
   static constexpr Message::Type type = Message::Type::Ping;
   YAODAQ_API explicit Ping() noexcept = delete;
-  YAODAQ_API explicit Ping( const std::string_view& message, const std::size_t size, const bool binary ) : Message( yaodaq::Message::Type::Ping )
+  YAODAQ_API explicit Ping( const std::string_view& message, const std::size_t size, const bool binary ) : Message( yaodaq::Message::Type::Ping ), m_message( message ), m_size( size ), m_binary( binary )
   {
     payload()["message"] = message;
     payload()["binary"]  = binary;
@@ -185,7 +199,7 @@ class Pong : public Message
 public:
   static constexpr Message::Type type = Message::Type::Pong;
   YAODAQ_API explicit Pong() noexcept = delete;
-  YAODAQ_API explicit Pong( const std::string_view& message, const std::size_t size, const bool binary ) : Message( yaodaq::Message::Type::Pong )
+  YAODAQ_API explicit Pong( const std::string_view& message, const std::size_t size, const bool binary ) : Message( yaodaq::Message::Type::Pong ), m_message( message ), m_size( size ), m_binary( binary )
   {
     payload()["message"] = message;
     payload()["binary"]  = binary;
@@ -210,6 +224,7 @@ public:
   YAODAQ_API explicit Except( const std::exception& exception );
   YAODAQ_API explicit Except( const std::string_view& exception );
   YAODAQ_API std::string what() const noexcept { return payload()["what"].get<std::string>(); }
+  YAODAQ_API std::string exception_type() const noexcept { return payload()["exception_type"].get<std::string>(); }
 
 private:
   std::string m_what;
@@ -262,6 +277,30 @@ class RawDataBuilder
 {
 public:
   static RawData from_text( const std::string_view text, const std::string_view topic ) { return RawData( std::span<const std::byte>( reinterpret_cast<const std::byte*>( text.data() ), text.size() ), topic ); }
+};
+
+class RPCRequest : public Message
+{
+public:
+  static constexpr Message::Type type       = Message::Type::RPCRequest;
+  YAODAQ_API explicit RPCRequest() noexcept = delete;
+  explicit RPCRequest( std::string_view payload ) : Message( Message::Type::RPCRequest ), m_payload( payload ) {}
+  std::string_view raw() const noexcept { return m_payload; }
+
+private:
+  std::string m_payload;
+};
+
+class RPCResponse : public Message
+{
+public:
+  static constexpr Message::Type type        = Message::Type::RPCResponse;
+  YAODAQ_API explicit RPCResponse() noexcept = delete;
+  explicit RPCResponse( std::string_view payload ) : Message( Message::Type::RPCResponse ), m_payload( payload ) {}
+  std::string_view raw() const noexcept { return m_payload; }
+
+private:
+  std::string m_payload;
 };
 
 }  // namespace yaodaq

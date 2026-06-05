@@ -2,6 +2,7 @@
 #include "yaodaq/Config.hpp"
 #include "yaodaq/Export.hpp"
 #include "yaodaq/Identifier.hpp"
+#include "yaodaq/JSONCodec.hpp"
 #include "yaodaq/JsonRPCResponder.hpp"
 #include "yaodaq/Logging.hpp"
 #include "yaodaq/Message.hpp"
@@ -41,6 +42,7 @@ protected:
 private:
   const Identifier m_identifier;
   ix::WebSocket    m_client;
+  JSONCodec        m_json_codec;
   YAODAQ_API explicit Client() noexcept = delete;
   YAODAQ_INTERNAL void handleMessage( const ix::WebSocketMessagePtr& msg ) noexcept;
 

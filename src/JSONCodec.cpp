@@ -4,40 +4,115 @@
 
 std::vector<std::byte> yaodaq::JSONCodec::encode( const yaodaq::Message& msg ) const
 {
+  std::cout << "use encode type:" << msg.type_str() << std::endl;
+  nlohmann::json json;
+  json["meta"]                               = nlohmann::json::object();
+  json["meta"]["time"]                       = msg.time();
+  json["meta"]["uuid"]                       = msg.uuid();
+  json["meta"]["type"]                       = msg.type_str();
+  json["meta"]["yaodaq"]["version"]["major"] = msg.version().major();
+  json["meta"]["yaodaq"]["version"]["minor"] = msg.version().minor();
+  json["meta"]["yaodaq"]["version"]["patch"] = msg.version().patch();
+  json["meta"]["yaodaq"]["version"]["tweak"] = msg.version().tweak();
+  json["payload"]                            = nlohmann::json::object();
   switch( msg.type() )
   {
     case Message::Type::Close:
-    case Message::Type::Error:
-    case Message::Type::Exception:
-    case Message::Type::Log:
-    case Message::Type::Open:
-    case Message::Type::Ping:
-    case Message::Type::Pong:
+    {
+      const auto& close         = static_cast<const Close&>( msg );
+      json["payload"]["code"]   = close.code();
+      json["payload"]["reason"] = close.reason();
+      json["payload"]["remote"] = close.remote();
+      break;
+    }
     case Message::Type::Reject:
+    {
+      const auto& reject        = static_cast<const Reject&>( msg );
+      json["payload"]["code"]   = reject.code();
+      json["payload"]["reason"] = reject.reason();
+      json["payload"]["remote"] = reject.remote();
+      break;
+    }
+    case Message::Type::Error:
+    {
+      const auto& error                      = static_cast<const Error&>( msg );
+      json["payload"]["retries"]             = error.retries();
+      json["payload"]["wait_time"]           = error.wait_time();
+      json["payload"]["http_status"]         = error.http_status();
+      json["payload"]["reason"]              = error.reason();
+      json["payload"]["decompression_error"] = error.decompression_error();
+      break;
+    }
+    case Message::Type::Exception:
+    {
+      const auto& exception             = static_cast<const Except&>( msg );
+      json["payload"]["what"]           = exception.what();
+      json["payload"]["exception_type"] = exception.exception_type();
+      break;
+    }
+    case Message::Type::Log:
+    {
+      const auto& log                           = static_cast<const Log&>( msg );
+      json["payload"]["logger_name"]            = log.name();
+      json["payload"]["level"]                  = log.level();
+      json["payload"]["message"]                = log.message();
+      json["payload"]["time"]                   = log.logger_time();
+      json["payload"]["source_loc"]["filename"] = log.file_name();
+      json["payload"]["source_loc"]["funcname"] = log.function_name();
+      json["payload"]["source_loc"]["line"]     = log.line();
+      break;
+    }
+    case Message::Type::Open:
+    {
+      const auto& open            = static_cast<const Open&>( msg );
+      json["payload"]["uri"]      = open.uri();
+      json["payload"]["headers"]  = open.headers();
+      json["payload"]["protocol"] = open.protocol();
+      break;
+    }
+    case Message::Type::Ping:
+    {
+      const auto& ping           = static_cast<const Ping&>( msg );
+      json["payload"]["message"] = ping.message();
+      json["payload"]["binary"]  = ping.binary();
+      json["payload"]["size"]    = ping.size();
+      break;
+    }
+    case Message::Type::Pong:
+    {
+      const auto& pong           = static_cast<const Pong&>( msg );
+      json["payload"]["message"] = pong.message();
+      json["payload"]["binary"]  = pong.binary();
+      json["payload"]["size"]    = pong.size();
+      break;
+    }
     case Message::Type::RPCRequest:
+    {
+      const auto& request = static_cast<const RPCRequest&>( msg );
+      json["payload"]     = request.raw();
+      break;
+    }
     case Message::Type::RPCResponse:
     {
+      const auto& response = static_cast<const RPCResponse&>( msg );
+      json["payload"]      = response.raw();
       break;
     }
     case Message::Type::RawData:
     {
-      auto const& raw = dynamic_cast<const RawData&>( msg );
+      auto const& raw = dynamic_cast<const RawData&>( msg );  //TODO ADD A WAY TO SAVE THE topic
       //std::cout<<"I will send a rawdata :\n"<<std::endl;
       //const std::string_view view(reinterpret_cast<const char*>(raw.raw().data()),raw.raw().size());
       //std::cout<<view<<"\n\n"<<std::endl;
 
       return { raw.raw().begin(), raw.raw().end() };
+      break;
     }
-    break;
   }
 
-  const std::string      j = msg.dump();
-  std::vector<std::byte> out;
-  out.reserve( j.size() );
+  const std::string j = json.dump();
 
-  for( unsigned char c: j ) out.push_back( static_cast<std::byte>( c ) );
-
-  return out;
+  return { reinterpret_cast<const std::byte*>( j.data() ), reinterpret_cast<const std::byte*>( j.data() + j.size() ) };
 }
 
 std::unique_ptr<yaodaq::Message> yaodaq::JSONCodec::decode( std::span<const std::byte> data ) const

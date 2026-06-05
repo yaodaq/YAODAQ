@@ -255,12 +255,14 @@ void yaodaq::Client::send( const Message& message, const send_as as ) noexcept
   {
     case send_as::utf8:
     {
-      ret = m_client.sendUtf8Text( message.dump(), callback );
+      const auto raw = m_json_codec.encode( message );
+      ret            = m_client.sendUtf8Text( ix::IXWebSocketSendData( reinterpret_cast<const char*>( raw.data() ), raw.size() ), callback );
       break;
     }
     case send_as::binary:
     {
-      ret = m_client.sendBinary( message.dump(), callback );
+      const auto raw = m_json_codec.encode( message );
+      ret            = m_client.sendBinary( ix::IXWebSocketSendData( reinterpret_cast<const char*>( raw.data() ), raw.size() ), callback );
       break;
     }
   }
