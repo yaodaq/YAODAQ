@@ -271,6 +271,8 @@ void yaodaq::Client::send( const Message& message, const send_as as ) noexcept
   {
     const std::string error_message = fmt::format( "Error sending message of type '{}', payload: {}, wire_size:{}{}", message.meta()["type"].get<std::string_view>(), ret.payloadSize, ret.wireSize, ret.compressionError ? " (compression error)" : "" );
     error_without_websocket( error_message );
-    m_client.sendUtf8Text( Log( spdlog::details::log_msg( identifier().id(), spdlog::level::err, error_message ) ).dump(), callback );
+    const Log  log( spdlog::details::log_msg( identifier().id(), spdlog::level::err, error_message ) );
+    const auto raw = m_json_codec.encode( log );
+    m_client.sendUtf8Text( ix::IXWebSocketSendData( reinterpret_cast<const char*>( raw.data() ), raw.size() ), callback );
   }
 }

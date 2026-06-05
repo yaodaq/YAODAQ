@@ -54,7 +54,7 @@ public:
   };
   virtual ~Message() = default;
   YAODAQ_API explicit Message( const nlohmann::json& json );
-  YAODAQ_API std::string dump( const std::size_t i = 0 ) const { return m_data.dump( i ); }
+  //YAODAQ_API std::string dump( const std::size_t i = 0 ) const { return m_data.dump( i ); }
   YAODAQ_API const nlohmann::json& payload() const noexcept { return m_data["payload"]; }
   YAODAQ_API const nlohmann::json& meta() const noexcept { return m_data["meta"]; }
   YAODAQ_API const nlohmann::json& operator()() const noexcept { return m_data; }
@@ -111,9 +111,9 @@ public:
   static constexpr Message::Type type = Message::Type::Open;
   YAODAQ_API explicit Open() noexcept = delete;
   YAODAQ_API explicit Open( const ix::WebSocketOpenInfo& open );
-  YAODAQ_API std::string uri() const noexcept { return payload()["uri"].get<std::string>(); }
-  YAODAQ_API std::map<std::string, std::string> headers() const noexcept { return payload()["headers"].get<std::map<std::string, std::string>>(); }
-  YAODAQ_API std::string protocol() const noexcept { return payload()["protocol"].get<std::string>(); }
+  YAODAQ_API std::string uri() const noexcept { return m_uri; }
+  YAODAQ_API std::map<std::string, std::string> headers() const noexcept { return m_headers; }
+  YAODAQ_API std::string protocol() const noexcept { return m_protocol; }
 
 private:
   std::string                        m_uri;
@@ -127,9 +127,9 @@ public:
   static constexpr Message::Type type  = Message::Type::Close;
   YAODAQ_API explicit Close() noexcept = delete;
   YAODAQ_API explicit Close( const ix::WebSocketCloseInfo& close );
-  YAODAQ_API std::uint16_t code() const noexcept { return payload()["code"].get<std::uint16_t>(); }
-  YAODAQ_API std::string reason() const noexcept { return payload()["reason"].get<std::string>(); }
-  YAODAQ_API bool        remote() const noexcept { return payload()["remote"].get<bool>(); }
+  YAODAQ_API std::uint16_t code() const noexcept { return m_code; }
+  YAODAQ_API std::string reason() const noexcept { return m_reason; }
+  YAODAQ_API bool        remote() const noexcept { return m_remote; }
 
 private:
   std::string   m_reason;
@@ -143,9 +143,9 @@ public:
   static constexpr Message::Type type   = Message::Type::Reject;
   YAODAQ_API explicit Reject() noexcept = delete;
   YAODAQ_API explicit Reject( const ix::WebSocketCloseInfo& close );
-  YAODAQ_API std::uint16_t code() const noexcept { return payload()["code"].get<std::uint16_t>(); }
-  YAODAQ_API std::string reason() const noexcept { return payload()["reason"].get<std::string>(); }
-  YAODAQ_API bool        remote() const noexcept { return payload()["remote"].get<bool>(); }
+  YAODAQ_API std::uint16_t code() const noexcept { return m_code; }
+  YAODAQ_API std::string reason() const noexcept { return m_reason; }
+  YAODAQ_API bool        remote() const noexcept { return m_remote; }
 
 private:
   std::string   m_reason;
@@ -159,11 +159,11 @@ public:
   static constexpr Message::Type type  = Message::Type::Error;
   YAODAQ_API explicit Error() noexcept = delete;
   YAODAQ_API explicit Error( const ix::WebSocketErrorInfo& error );
-  YAODAQ_API std::uint32_t retries() const noexcept { return payload()["retries"].get<std::uint32_t>(); }
-  YAODAQ_API double        wait_time() const noexcept { return payload()["wait_time"].get<double>(); }
-  YAODAQ_API int           http_status() const noexcept { return payload()["http_status"].get<int>(); }
-  YAODAQ_API std::string reason() const noexcept { return payload()["reason"].get<std::string>(); }
-  YAODAQ_API bool        decompression_error() const noexcept { return payload()["decompression_error"].get<bool>(); }
+  YAODAQ_API std::uint32_t retries() const noexcept { return m_retries; }
+  YAODAQ_API double        wait_time() const noexcept { return m_wait_time; }
+  YAODAQ_API int           http_status() const noexcept { return m_http_status; }
+  YAODAQ_API std::string reason() const noexcept { return m_reason; }
+  YAODAQ_API bool        decompression_error() const noexcept { return m_decompression_error; }
 
 private:
   std::string   m_reason;
@@ -184,9 +184,9 @@ public:
     payload()["binary"]  = binary;
     payload()["size"]    = size;
   }
-  YAODAQ_API std::string message() const noexcept { return payload()["message"].get<std::string>(); }
-  YAODAQ_API bool        binary() const noexcept { return payload()["binary"].get<bool>(); }
-  YAODAQ_API std::size_t size() const noexcept { return payload()["size"].get<std::size_t>(); }
+  YAODAQ_API std::string message() const noexcept { return m_message; }
+  YAODAQ_API bool        binary() const noexcept { return m_binary; }
+  YAODAQ_API std::size_t size() const noexcept { return m_size; }
 
 private:
   std::string m_message;
@@ -205,9 +205,9 @@ public:
     payload()["binary"]  = binary;
     payload()["size"]    = size;
   }
-  YAODAQ_API std::string message() const noexcept { return payload()["message"].get<std::string>(); }
-  YAODAQ_API bool        binary() const noexcept { return payload()["binary"].get<bool>(); }
-  YAODAQ_API std::size_t size() const noexcept { return payload()["size"].get<std::size_t>(); }
+  YAODAQ_API std::string message() const noexcept { return m_message; }
+  YAODAQ_API bool        binary() const noexcept { return m_binary; }
+  YAODAQ_API std::size_t size() const noexcept { return m_size; }
 
 private:
   std::string m_message;
@@ -223,8 +223,8 @@ public:
   YAODAQ_API explicit Except( const Exception& exception );
   YAODAQ_API explicit Except( const std::exception& exception );
   YAODAQ_API explicit Except( const std::string_view& exception );
-  YAODAQ_API std::string what() const noexcept { return payload()["what"].get<std::string>(); }
-  YAODAQ_API std::string exception_type() const noexcept { return payload()["exception_type"].get<std::string>(); }
+  YAODAQ_API std::string what() const noexcept { return m_what; }
+  YAODAQ_API std::string exception_type() const noexcept { return m_exception_type; }
 
 private:
   std::string m_what;
