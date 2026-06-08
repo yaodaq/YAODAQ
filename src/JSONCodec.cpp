@@ -127,8 +127,24 @@ std::unique_ptr<yaodaq::Message> yaodaq::JSONCodec::decode( std::span<const std:
   //
   // RPC fast-path
   //
-  if( !json["method"].error() || !json["notification"].error() ) return std::make_unique<RPCRequest>( simdjson::minify( json ) );
-  if( !json["result"].error() || !json["error"].error() ) return std::make_unique<RPCResponse>( simdjson::minify( json ) );
+  if( !json["method"].error() || !json["notification"].error() )
+  {
+    std::unique_ptr<RPCRequest> msg     = std::make_unique<RPCRequest>( simdjson::minify( json ) );
+    auto                        id_elem = json["id"];
+    if( id_elem.type() == simdjson::dom::element_type::STRING ) msg->id( std::string( json["id"] ) );
+    else
+      msg->id( std::int64_t( json["id"] ) );
+    return msg;
+  }
+  if( !json["result"].error() || !json["error"].error() )
+  {
+    std::unique_ptr<RPCResponse> msg     = std::make_unique<RPCResponse>( simdjson::minify( json ) );
+    auto                         id_elem = json["id"];
+    if( id_elem.type() == simdjson::dom::element_type::STRING ) msg->id( std::string( json["id"] ) );
+    else
+      msg->id( std::int64_t( json["id"] ) );
+    return msg;
+  }
 
   //
   // Raw payload

@@ -12,6 +12,7 @@
 #include <nlohmann/json.hpp>
 #include <span>
 #include <string_view>
+#include <variant>
 
 namespace spdlog
 {
@@ -302,10 +303,13 @@ public:
   static constexpr Message::Type type       = Message::Type::RPCRequest;
   YAODAQ_API explicit RPCRequest() noexcept = delete;
   explicit RPCRequest( std::string_view payload ) : Message( Message::Type::RPCRequest ), m_payload( payload ) {}
-  std::string_view raw() const noexcept { return m_payload; }
+  std::string_view                        raw() const noexcept { return m_payload; }
+  std::variant<std::int64_t, std::string> id() const noexcept { return m_id; }
+  void                                    id( const std::variant<std::int64_t, std::string> id ) noexcept { m_id = id; }
 
 private:
-  std::string m_payload;
+  std::string                             m_payload;
+  std::variant<std::int64_t, std::string> m_id;
 };
 
 class RPCResponse : public Message
@@ -314,10 +318,13 @@ public:
   static constexpr Message::Type type        = Message::Type::RPCResponse;
   YAODAQ_API explicit RPCResponse() noexcept = delete;
   explicit RPCResponse( std::string_view payload ) : Message( Message::Type::RPCResponse ), m_payload( payload ) {}
-  std::string_view raw() const noexcept { return m_payload; }
+  std::string_view                        raw() const noexcept { return m_payload; }
+  std::variant<std::int64_t, std::string> id() const noexcept { return m_id; }
+  void                                    id( const std::variant<std::int64_t, std::string> id ) noexcept { m_id = id; }
 
 private:
-  std::string m_payload;
+  std::string                             m_payload;
+  std::variant<std::int64_t, std::string> m_id;
 };
 
 }  // namespace yaodaq

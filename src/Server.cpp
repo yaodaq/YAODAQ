@@ -202,50 +202,28 @@ void yaodaq::Server::onReject( std::shared_ptr<ix::ConnectionState> connectionSt
 
 void yaodaq::Server::onMessage( std::shared_ptr<ix::ConnectionState> connectionState, ix::WebSocket& webSocket, const std::string& str, const std::size_t size, const bool binary )
 {
-  thread_local simdjson::dom::parser  parser;  // to remove
-  thread_local simdjson::dom::element r;
-  r = parser.parse( str );  //to remove
-  if( !r["method"].error() || !r["notification"].error() ) onJsonRPCRequest( connectionState, webSocket, parser, str );
-  else if( !r["result"].error() || !r["error"].error() )
+  std::span<const std::byte> m_bytes{ reinterpret_cast<const std::byte*>( str.data() ), str.size() };
+  std::unique_ptr<Message>   mess = m_json_codec.decode( m_bytes );
+  switch( mess->type() )
   {
-    jsonrpc::id_t id;
-    auto          id_elem = r["id"];
-    if( id_elem.type() == simdjson::dom::element_type::STRING )
+    case Message::Type::RPCRequest:
     {
-      std::string_view s;
-      id_elem.get( s );
-      id = std::string( s );
+      std::unique_ptr<RPCRequest> req( dynamic_cast<RPCRequest*>( mess.release() ) );
+      onJsonRPCRequest( connectionState, webSocket, std::move( req ) );
+      break;
     }
-    else
+    case Message::Type::RPCResponse:
     {
-      int64_t v;
-      id_elem.get( v );
-      id = v;
+      std::unique_ptr<RPCResponse> req( dynamic_cast<RPCResponse*>( mess.release() ) );
+      onJsonRPCResponse( connectionState, webSocket, std::move( req ) );
+      break;
     }
-    onJsonRPCResponse( connectionState, webSocket, id, str );
-  }
-  else
-  {
-    yaodaq::Message::Type mess = magic_enum::enum_cast<yaodaq::Message::Type>( r["meta"]["type"].get<std::string_view>() ).value_or( yaodaq::Message::Type::Unknown );
-    switch( mess )
+    case Message::Type::Log:
     {
-      case Message::Type::Log:
-      {
-        std::string_view name;
-        std::string_view message;
-        std::int64_t     level;
-        r["payload"]["logger_name"].get( name );
-        r["payload"]["message"].get( message );
-        r["payload"]["level"].get( level );
-        Log log( spdlog::details::log_msg( name, static_cast<spdlog::level::level_enum>( level ), message ) );
-        onLog( connectionState, webSocket, log );
-        break;
-      }
-      default:
-      {
-        sendToAll( str );
-        break;
-      }
+      std::unique_ptr<Log> req( dynamic_cast<Log*>( mess.release() ) );
+      Log                  log( req->name(), req->level(), req->message(), req->logger_time(), req->file_name(), req->function_name(), req->line(), req->column() );
+      onLog( connectionState, webSocket, log );
+      break;
     }
   }
 }
@@ -268,43 +246,25 @@ void yaodaq::Server::onLog( std::shared_ptr<ix::ConnectionState> connectionState
  * 3) Merge the request
  * 4) Send the merged responses to the client
  **/
-void yaodaq::Server::onJsonRPCRequest( std::shared_ptr<ix::ConnectionState> connectionState, ix::WebSocket& webSocket, simdjson::dom::parser& parser, const std::string_view& str )
+void yaodaq::Server::onJsonRPCRequest( std::shared_ptr<ix::ConnectionState> connectionState, ix::WebSocket& webSocket, std::unique_ptr<RPCRequest> requ )
 {
-  simdjson::dom::element r;
-  r            = parser.parse( str );  //to remove
   auto answers = std::make_shared<ServerRequest>();
+  auto re      = std::shared_ptr<RPCRequest>( std::move( requ ) );
   // Capture everything by value or reference safely
-  auto task    = [this, connectionState, ws = &webSocket, r, answers]() mutable
+  auto task    = [this, connectionState, ws = &webSocket, re, answers]() mutable
   {
     try
     {
-      std::string str                  = simdjson::minify( r );
-      std::string ret                  = HandleRequest( str );  // Server handler request
+      std::string ret                  = HandleRequest( re->raw() );  // Server handler request
       answers->expected_responses      = getNumberOfClients() - 1;
       answers->responses[m_identifier] = ret;  // put the webserver response to the request
-      // Extract ID
-      jsonrpc::id_t id;
-      auto          id_elem = r["id"];
-      if( id_elem.type() == simdjson::dom::element_type::STRING )
-      {
-        std::string_view s;
-        id_elem.get( s );
-        id = std::string( s );
-      }
-      else
-      {
-        int64_t v;
-        id_elem.get( v );
-        id = v;
-      }
-      // prepare to wait for responses from the clients
       {
         std::lock_guard<std::mutex> lock( m_map_mutex );
-        m_server_construct_response[id] = answers;
+        m_server_construct_response[re->id()] = answers;
       }
 
       // send the request to the clients
-      sendExcept( str, *ws );
+      sendExcept( re->raw(), *ws );
 
       // Wait for all responses
       std::unique_lock<std::mutex> lock( answers->mtx );
@@ -315,9 +275,9 @@ void yaodaq::Server::onJsonRPCRequest( std::shared_ptr<ix::ConnectionState> conn
       builder.append_key_value( "jsonrpc", "2.0" );
       builder.append_comma();
       // "id"
-      if( std::holds_alternative<std::string>( id ) ) builder.append_key_value( "id", std::get<std::string>( id ) );
+      if( std::holds_alternative<std::string>( re->id() ) ) builder.append_key_value( "id", std::get<std::string>( re->id() ) );
       else
-        builder.append_key_value( "id", std::get<std::int64_t>( id ) );
+        builder.append_key_value( "id", std::get<std::int64_t>( re->id() ) );
       builder.append_comma();
       // array of answers
       builder.escape_and_append_with_quotes( "result" );
@@ -338,7 +298,7 @@ void yaodaq::Server::onJsonRPCRequest( std::shared_ptr<ix::ConnectionState> conn
       // cleaning
       {
         std::lock_guard<std::mutex> lock2( m_map_mutex );
-        m_server_construct_response.erase( id );
+        m_server_construct_response.erase( re->id() );
       }
     }
     catch( ... )
@@ -353,7 +313,7 @@ void yaodaq::Server::onJsonRPCRequest( std::shared_ptr<ix::ConnectionState> conn
 }
 
 // Server received a response
-void yaodaq::Server::onJsonRPCResponse( std::shared_ptr<ix::ConnectionState> connectionState, ix::WebSocket& webSocket, const jsonrpc::id_t& id, const std::string_view& str )
+void yaodaq::Server::onJsonRPCResponse( std::shared_ptr<ix::ConnectionState> connectionState, ix::WebSocket& webSocket, std::unique_ptr<RPCResponse> response )
 {
   std::unordered_map<jsonrpc::id_t, std::shared_ptr<yaodaq::ServerRequest>>::iterator it{ nullptr };
   bool                                                                                is_response_to_send_to_client{ false };
@@ -363,7 +323,7 @@ void yaodaq::Server::onJsonRPCResponse( std::shared_ptr<ix::ConnectionState> con
 
   {
     std::lock_guard<std::mutex> lock( m_map_mutex );
-    it = m_server_construct_response.find( id );
+    it = m_server_construct_response.find( response->id() );
     if( it != m_server_construct_response.end() )
     {
       request                       = it->second;
@@ -375,7 +335,7 @@ void yaodaq::Server::onJsonRPCResponse( std::shared_ptr<ix::ConnectionState> con
   {
     {
       std::lock_guard<std::mutex> lock( request->mtx );
-      request->responses[std::static_pointer_cast<yaodaq::ConnectionState>( connectionState )->getID()] = str;
+      request->responses[std::static_pointer_cast<yaodaq::ConnectionState>( connectionState )->getID()] = response->raw();
       request->received_responses++;
     }
     request->cv.notify_one();
@@ -384,7 +344,7 @@ void yaodaq::Server::onJsonRPCResponse( std::shared_ptr<ix::ConnectionState> con
   {
     // The server did its own requests
     std::lock_guard<std::mutex> lock( m_server_own_request );
-    it = m_server_own_construct_response.find( id );
+    it = m_server_own_construct_response.find( response->id() );
     if( it != m_server_own_construct_response.end() )
     {
       request                    = it->second;
@@ -396,7 +356,7 @@ void yaodaq::Server::onJsonRPCResponse( std::shared_ptr<ix::ConnectionState> con
   {
     {
       std::lock_guard<std::mutex> lock( request->mtx );
-      request->responses[std::static_pointer_cast<yaodaq::ConnectionState>( connectionState )->getID()] = str;
+      request->responses[std::static_pointer_cast<yaodaq::ConnectionState>( connectionState )->getID()] = response->raw();
       request->received_responses++;
     }
     request->cv.notify_one();

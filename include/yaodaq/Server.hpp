@@ -67,8 +67,8 @@ private:
 
   // Messages
   YAODAQ_INTERNAL void onMessage( std::shared_ptr<ix::ConnectionState> connectionState, ix::WebSocket& webSocket, const std::string& str, const std::size_t size, const bool binary );
-  YAODAQ_INTERNAL void onJsonRPCResponse( std::shared_ptr<ix::ConnectionState> connectionState, ix::WebSocket& webSocket, const jsonrpc::id_t& parser, const std::string_view& str );
-  YAODAQ_INTERNAL void onJsonRPCRequest( std::shared_ptr<ix::ConnectionState> connectionState, ix::WebSocket& webSocket, simdjson::dom::parser&, const std::string_view& request );
+  YAODAQ_INTERNAL void onJsonRPCResponse( std::shared_ptr<ix::ConnectionState> connectionState, ix::WebSocket& webSocket, std::unique_ptr<RPCResponse> response );
+  YAODAQ_INTERNAL void onJsonRPCRequest( std::shared_ptr<ix::ConnectionState> connectionState, ix::WebSocket& webSocket, std::unique_ptr<RPCRequest> requ );
   YAODAQ_INTERNAL void onLog( std::shared_ptr<ix::ConnectionState> connectionState, ix::WebSocket& webSocket, const Log& request );
   // Others
   YAODAQ_INTERNAL void onOpen( std::shared_ptr<ix::ConnectionState> connectionState, ix::WebSocket& webSocket, const Open& open );
