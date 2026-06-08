@@ -57,7 +57,7 @@ private:
 
   YAODAQ_INTERNAL void onPing( const Ping& ping );
   YAODAQ_INTERNAL void onPong( const Pong& pong );
-  YAODAQ_INTERNAL void onLog( const nlohmann::json& json );
+  YAODAQ_INTERNAL void onLog( const std::unique_ptr<Log> log );
 
   enum class send_as : unsigned char
   {

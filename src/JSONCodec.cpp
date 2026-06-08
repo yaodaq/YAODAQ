@@ -1,10 +1,11 @@
 #include "yaodaq/JSONCodec.hpp"
 
 #include <iostream>
+#include <magic_enum/magic_enum.hpp>
+#include <simdjson.h>
 
 std::vector<std::byte> yaodaq::JSONCodec::encode( const yaodaq::Message& msg ) const
 {
-  std::cout << "use encode type:" << msg.type_str() << std::endl;
   nlohmann::json json;
   json["meta"]                               = nlohmann::json::object();
   json["meta"]["time"]                       = msg.time();
@@ -117,30 +118,184 @@ std::vector<std::byte> yaodaq::JSONCodec::encode( const yaodaq::Message& msg ) c
 
 std::unique_ptr<yaodaq::Message> yaodaq::JSONCodec::decode( std::span<const std::byte> data ) const
 {
-  if( data.empty() ) throw std::runtime_error( "Empty payload" );
-  // 1. Convert once to string_view (no copy)
-  const std::string view( reinterpret_cast<const char*>( data.data() ), data.size() );
+  if( data.empty() ) return nullptr;
+  thread_local simdjson::dom::parser parser;
+  auto                               doc = parser.parse( reinterpret_cast<const char*>( data.data() ), data.size() );
+  if( doc.error() ) throw std::runtime_error( simdjson::error_message( doc.error() ) );
+  simdjson::dom::element json = doc.value();
 
-  //std::cout<<"ME:\n"<<view<<"\nEND\n\n"<<std::endl;
+  //
+  // RPC fast-path
+  //
+  if( !json["method"].error() || !json["notification"].error() ) return std::make_unique<RPCRequest>( simdjson::minify( json ) );
+  if( !json["result"].error() || !json["error"].error() ) return std::make_unique<RPCResponse>( simdjson::minify( json ) );
 
-  // 2. Parse JSON from view
-  nlohmann::json json = nlohmann::json::parse( view, nullptr, true );
-  // parse failure → discarded JSON (nullptr or discarded value)
-  if( json.is_discarded() )
+  //
+  // Raw payload
+  //
+  auto meta = json["meta"];
+  if( meta.error() ) return std::make_unique<RawData>( data, "unknown" );
+
+  std::string_view type_str;
+  if( meta["type"].get( type_str ) ) return std::make_unique<RawData>( data, "unknown" );
+
+  auto type = magic_enum::enum_cast<Message::Type>( type_str, magic_enum::case_insensitive ).value_or( Message::Type::Unknown );
+
+  //
+  // common metadata
+  //
+  std::string_view uuid;
+  std::int64_t     time{ 0 };
+
+  meta["uuid"].get( uuid );
+  meta["time"].get( time );
+
+  std::uint64_t major{};
+  std::uint64_t minor{};
+  std::uint64_t patch{};
+  std::uint64_t tweak{};
+
+  auto version = meta["yaodaq"]["version"];
+
+  version["major"].get( major );
+  version["minor"].get( minor );
+  version["patch"].get( patch );
+  version["tweak"].get( tweak );
+
+  Version ver{ major, minor, patch, tweak };
+
+  auto                     payload = json["payload"];
+  std::unique_ptr<Message> msg;
+
+  switch( type )
   {
-    std::cout << "OUPS     " << view << std::endl;
-    //return std::make_unique<yaodaq::RawData>(yaodaq::RawDataBuilder::from_text(view, "invalid-json"));
-    return nullptr;
-  }
+    case Message::Type::Close:
+    {
+      std::uint64_t    code{};
+      bool             remote{};
+      std::string_view reason;
 
-  // 3. Fast-path: missing metadata → treat as raw
-  const auto metaIt = json.find( "meta" );
-  if( metaIt == json.end() || !metaIt->contains( "type" ) )
-  {
-    //std::cout<<"IM A RAWDATA\n\n"<< <<std::endl;
-    return std::make_unique<yaodaq::RawData>( yaodaq::RawDataBuilder::from_text( json.dump(), "unknown" ) );
-  }
+      payload["code"].get( code );
+      payload["reason"].get( reason );
+      payload["remote"].get( remote );
 
-  // 4. Normal path
-  return std::make_unique<yaodaq::Message>( json );
+      msg = std::make_unique<Close>( static_cast<std::uint16_t>( code ), reason, remote );
+      break;
+    }
+    case Message::Type::Reject:
+    {
+      std::uint64_t    code{};
+      bool             remote{};
+      std::string_view reason;
+
+      payload["code"].get( code );
+      payload["reason"].get( reason );
+      payload["remote"].get( remote );
+
+      msg = std::make_unique<Reject>( static_cast<std::uint16_t>( code ), reason, remote );
+      break;
+    }
+    case Message::Type::Error:
+    {
+      std::string_view reason;
+      std::uint64_t    retries{};
+      double           wait_time{};
+      std::int64_t     http_status{};
+      bool             decompression{};
+
+      payload["reason"].get( reason );
+      payload["retries"].get( retries );
+      payload["wait_time"].get( wait_time );
+      payload["http_status"].get( http_status );
+      payload["decompression_error"].get( decompression );
+
+      msg = std::make_unique<Error>( reason, static_cast<std::uint32_t>( retries ), wait_time, static_cast<int>( http_status ), decompression );
+      break;
+    }
+    case Message::Type::Exception:
+    {
+      std::string_view what;
+      std::string_view exception_type;
+      payload["what"].get( what );
+      payload["exception_type"].get( exception_type );
+
+      msg = std::make_unique<Except>( what, exception_type );
+      break;
+    }
+    case Message::Type::Ping:
+    {
+      std::string_view message;
+      std::uint64_t    size{};
+      bool             binary{};
+
+      payload["message"].get( message );
+      payload["size"].get( size );
+      payload["binary"].get( binary );
+
+      msg = std::make_unique<Ping>( message, static_cast<std::size_t>( size ), binary );
+      break;
+    }
+    case Message::Type::Pong:
+    {
+      std::string_view message;
+      std::uint64_t    size{};
+      bool             binary{};
+
+      payload["message"].get( message );
+      payload["size"].get( size );
+      payload["binary"].get( binary );
+
+      msg = std::make_unique<Pong>( message, static_cast<std::size_t>( size ), binary );
+      break;
+    }
+    case Message::Type::Open:
+    {
+      std::string_view uri;
+      std::string_view protocol;
+
+      payload["uri"].get( uri );
+      payload["protocol"].get( protocol );
+
+      std::map<std::string, std::string> headers;
+
+      for( auto field: payload["headers"].get_object() )
+      {
+        std::string_view value;
+        if( !field.value.get( value ) ) headers.emplace( std::string( field.key ), std::string( value ) );
+      }
+
+      msg = std::make_unique<Open>( uri, headers, protocol );
+      break;
+    }
+    case Message::Type::Log:
+    {
+      std::string_view logger_name;
+      std::string_view message;
+      std::string_view filename;
+      std::string_view funcname;
+
+      std::int64_t  logger_time{};
+      std::int64_t  level{};
+      std::uint64_t line{};
+      std::uint64_t column{};
+
+      payload["logger_name"].get( logger_name );
+      payload["message"].get( message );
+      payload["time"].get( logger_time );
+      payload["level"].get( level );
+
+      payload["source_loc"]["filename"].get( filename );
+      payload["source_loc"]["funcname"].get( funcname );
+
+      payload["source_loc"]["line"].get( line );
+
+      payload["source_loc"]["column"].get( column );
+
+      msg = std::make_unique<Log>( logger_name, static_cast<int>( level ), message, logger_time, filename, funcname, static_cast<std::uint32_t>( line ), static_cast<std::uint32_t>( column ) );
+      break;
+    }
+    default: return std::make_unique<RawData>( data, "unknown" );
+  }
+  msg->setMeta( uuid, time, ver );
+  return msg;
 }

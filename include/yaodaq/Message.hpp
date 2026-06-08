@@ -54,7 +54,12 @@ public:
   };
   virtual ~Message() = default;
   YAODAQ_API explicit Message( const nlohmann::json& json );
-  //YAODAQ_API std::string dump( const std::size_t i = 0 ) const { return m_data.dump( i ); }
+  YAODAQ_API void setMeta( const std::string_view uuid, const std::int64_t time, const Version version )
+  {
+    m_uuid    = uuid;
+    m_time    = time;
+    m_version = version;
+  }
   YAODAQ_API const nlohmann::json& payload() const noexcept { return m_data["payload"]; }
   YAODAQ_API const nlohmann::json& meta() const noexcept { return m_data["meta"]; }
   YAODAQ_API const nlohmann::json& operator()() const noexcept { return m_data; }
@@ -85,6 +90,10 @@ public:
   static constexpr Message::Type type = Message::Type::Log;
   YAODAQ_API explicit Log() noexcept  = delete;
   YAODAQ_API explicit Log( const spdlog::details::log_msg& msg );
+  YAODAQ_API explicit Log( const std::string_view name, const int level, const std::string_view message, const std::int64_t time, const std::string_view filename, const std::string_view function, const std::uint32_t line, const std::uint32_t column ) :
+    Message( Type::Log ), m_logger_name( name ), m_level( level ), m_message( message ), m_logger_time( time ), m_file_name( filename ), m_function_name( function ), m_line( line ), m_column( column )
+  {
+  }
   YAODAQ_API std::string name() const noexcept { return m_logger_name; }
   YAODAQ_API int         level() const noexcept { return m_level; }
   YAODAQ_API std::string message() const noexcept { return m_message; }
@@ -111,6 +120,7 @@ public:
   static constexpr Message::Type type = Message::Type::Open;
   YAODAQ_API explicit Open() noexcept = delete;
   YAODAQ_API explicit Open( const ix::WebSocketOpenInfo& open );
+  YAODAQ_API explicit Open( const std::string_view uri, const std::map<std::string, std::string>& headers, const std::string_view protocol ) : Message( Type::Open ), m_uri( uri ), m_headers( headers ), m_protocol( protocol ) {}
   YAODAQ_API std::string uri() const noexcept { return m_uri; }
   YAODAQ_API std::map<std::string, std::string> headers() const noexcept { return m_headers; }
   YAODAQ_API std::string protocol() const noexcept { return m_protocol; }
@@ -127,6 +137,7 @@ public:
   static constexpr Message::Type type  = Message::Type::Close;
   YAODAQ_API explicit Close() noexcept = delete;
   YAODAQ_API explicit Close( const ix::WebSocketCloseInfo& close );
+  YAODAQ_API explicit Close( const std::uint16_t code, const std::string_view reason, const bool remote ) : Message( Type::Close ), m_reason( reason ), m_code( code ), m_remote( remote ) {}
   YAODAQ_API std::uint16_t code() const noexcept { return m_code; }
   YAODAQ_API std::string reason() const noexcept { return m_reason; }
   YAODAQ_API bool        remote() const noexcept { return m_remote; }
@@ -142,6 +153,7 @@ class Reject : public Message
 public:
   static constexpr Message::Type type   = Message::Type::Reject;
   YAODAQ_API explicit Reject() noexcept = delete;
+  YAODAQ_API explicit Reject( const std::uint16_t code, const std::string_view reason, const bool remote ) : Message( Type::Reject ), m_reason( reason ), m_code( code ), m_remote( remote ) {}
   YAODAQ_API explicit Reject( const ix::WebSocketCloseInfo& close );
   YAODAQ_API std::uint16_t code() const noexcept { return m_code; }
   YAODAQ_API std::string reason() const noexcept { return m_reason; }
@@ -159,6 +171,10 @@ public:
   static constexpr Message::Type type  = Message::Type::Error;
   YAODAQ_API explicit Error() noexcept = delete;
   YAODAQ_API explicit Error( const ix::WebSocketErrorInfo& error );
+  YAODAQ_API explicit Error( const std::string_view reason, const std::uint32_t retries, const double wait_time, const int http_status, const bool decompression ) :
+    Message( Type::Error ), m_reason( reason ), m_retries( retries ), m_wait_time( wait_time ), m_http_status( http_status ), m_decompression_error( decompression )
+  {
+  }
   YAODAQ_API std::uint32_t retries() const noexcept { return m_retries; }
   YAODAQ_API double        wait_time() const noexcept { return m_wait_time; }
   YAODAQ_API int           http_status() const noexcept { return m_http_status; }
@@ -220,6 +236,7 @@ class Except : public Message
 public:
   static constexpr Message::Type type   = Message::Type::Exception;
   YAODAQ_API explicit Except() noexcept = delete;
+  YAODAQ_API explicit Except( const std::string_view what, const std::string_view type ) : Message( Type::Exception ), m_what( what ), m_exception_type( type ) {}
   YAODAQ_API explicit Except( const Exception& exception );
   YAODAQ_API explicit Except( const std::exception& exception );
   YAODAQ_API explicit Except( const std::string_view& exception );

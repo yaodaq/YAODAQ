@@ -137,26 +137,27 @@ void yaodaq::Client::onOpen( const Open& open )
 
 void yaodaq::Client::onMessage( const std::string& str, const std::size_t size, const bool binary )
 {
-  nlohmann::json json = nlohmann::json::parse( str, nullptr, false );
-  Message        mess( json );
-  //thread_local std::unique_ptr<ICodec> codec{ nullptr };
-  //if( !codec ) codec = yaodaq::make_codec();
-  // Message mess = codec->decode( str );
-  switch( mess.type() )
+  auto                     bytes = std::span{ reinterpret_cast<const std::byte*>( str.data() ), str.size() };
+  std::unique_ptr<Message> msg   = m_json_codec.decode( bytes );
+  switch( msg->type() )
   {
     case Message::Type::RPCRequest:
     {
-      m_client.sendUtf8Text( HandleRequest( mess.payload().dump() ) );
+      std::unique_ptr<RPCRequest> req( dynamic_cast<RPCRequest*>( msg.release() ) );
+      m_client.sendUtf8Text( HandleRequest( { reinterpret_cast<const char*>( req->raw().data() ), req->raw().size() } ) );
       break;
     }
     case Message::Type::RPCResponse:
     {
-      onResponse( mess.payload().dump() );
+      std::unique_ptr<RPCResponse> req( dynamic_cast<RPCResponse*>( msg.release() ) );
+      onResponse( { reinterpret_cast<const char*>( req->raw().data() ), req->raw().size() } );
       break;
     }
     case Message::Type::Log:
     {
-      onLog( mess() );
+      std::unique_ptr<Log> req( dynamic_cast<Log*>( msg.release() ) );
+      onLog( std::move( req ) );
+      break;
     }
   }
 }
@@ -204,38 +205,38 @@ void yaodaq::Client::onPong( const Pong& pong )
   info( "received pong: {}", pong.message() );
 }
 
-void yaodaq::Client::onLog( const nlohmann::json& json )
+void yaodaq::Client::onLog( const std::unique_ptr<Log> log )
 {
-  switch( static_cast<spdlog::level::level_enum>( json["payload"]["level"].get<int>() ) )
+  switch( static_cast<spdlog::level::level_enum>( log->level() ) )
   {
     case spdlog::level::level_enum::info:
     {
-      info( "{}: {}", fmt::styled( json["payload"]["logger_name"].get<std::string>(), fmt::fg( fmt::color::gray ) | fmt::emphasis::bold ), json["payload"]["message"].get<std::string>() );
+      info( "{}: {}", fmt::styled( log->name(), fmt::fg( fmt::color::gray ) | fmt::emphasis::bold ), log->message() );
       break;
     }
     case spdlog::level::level_enum::critical:
     {
-      critical( "{}: {}", fmt::styled( json["payload"]["logger_name"].get<std::string>(), fmt::fg( fmt::color::gray ) | fmt::emphasis::bold ), json["payload"]["message"].get<std::string>() );
+      critical( "{}: {}", fmt::styled( log->name(), fmt::fg( fmt::color::gray ) | fmt::emphasis::bold ), log->message() );
       break;
     }
     case spdlog::level::level_enum::debug:
     {
-      debug( "{}: {}", fmt::styled( json["payload"]["logger_name"].get<std::string>(), fmt::fg( fmt::color::gray ) | fmt::emphasis::bold ), json["payload"]["message"].get<std::string>() );
+      debug( "{}: {}", fmt::styled( log->name(), fmt::fg( fmt::color::gray ) | fmt::emphasis::bold ), log->message() );
       break;
     }
     case spdlog::level::level_enum::err:
     {
-      error( "{}: {}", fmt::styled( json["payload"]["logger_name"].get<std::string>(), fmt::fg( fmt::color::gray ) | fmt::emphasis::bold ), json["payload"]["message"].get<std::string>() );
+      error( "{}: {}", fmt::styled( log->name(), fmt::fg( fmt::color::gray ) | fmt::emphasis::bold ), log->message() );
       break;
     }
     case spdlog::level::level_enum::trace:
     {
-      trace( "{}: {}", fmt::styled( json["payload"]["logger_name"].get<std::string>(), fmt::fg( fmt::color::gray ) | fmt::emphasis::bold ), json["payload"]["message"].get<std::string>() );
+      trace( "{}: {}", fmt::styled( log->name(), fmt::fg( fmt::color::gray ) | fmt::emphasis::bold ), log->message() );
       break;
     }
     case spdlog::level::level_enum::warn:
     {
-      warn( "{}: {}", fmt::styled( json["payload"]["logger_name"].get<std::string>(), fmt::fg( fmt::color::gray ) | fmt::emphasis::bold ), json["payload"]["message"].get<std::string>() );
+      warn( "{}: {}", fmt::styled( log->name(), fmt::fg( fmt::color::gray ) | fmt::emphasis::bold ), log->message() );
       break;
     }
     default: break;

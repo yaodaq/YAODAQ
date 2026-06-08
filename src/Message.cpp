@@ -26,10 +26,10 @@ yaodaq::Message::Message() noexcept
   meta()                               = nlohmann::json::object();
   payload()                            = nlohmann::json::object();
   meta()["type"]                       = magic_enum::enum_name( Message::Type::Unknown );
-  meta()["yaodaq"]["version"]["major"] = yaodaq::Version::major();
-  meta()["yaodaq"]["version"]["minor"] = yaodaq::Version::minor();
-  meta()["yaodaq"]["version"]["patch"] = yaodaq::Version::patch();
-  meta()["yaodaq"]["version"]["tweak"] = yaodaq::Version::tweak();
+  meta()["yaodaq"]["version"]["major"] = m_version.major();
+  meta()["yaodaq"]["version"]["minor"] = m_version.minor();
+  meta()["yaodaq"]["version"]["patch"] = m_version.patch();
+  meta()["yaodaq"]["version"]["tweak"] = m_version.tweak();
   meta()["uuid"]                       = m_uuid;
   meta()["time"]                       = m_time;
 }
