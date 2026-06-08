@@ -3,16 +3,16 @@
 #include "yaodaq/Export.hpp"
 #include "yaodaq/Version.hpp"
 
+#include <chrono>
 #include <cstddef>
 #include <cstdint>
 #include <exception>
-#include <iostream>
 #include <map>
 #include <new>
-#include <nlohmann/json.hpp>
 #include <span>
 #include <string_view>
 #include <variant>
+#include <vector>
 
 namespace spdlog
 {
@@ -54,19 +54,13 @@ public:
     Data,
   };
   virtual ~Message() = default;
-  YAODAQ_API explicit Message( const nlohmann::json& json );
   YAODAQ_API void setMeta( const std::string_view uuid, const std::int64_t time, const Version version )
   {
     m_uuid    = uuid;
     m_time    = time;
     m_version = version;
   }
-  YAODAQ_API const nlohmann::json& payload() const noexcept { return m_data["payload"]; }
-  YAODAQ_API const nlohmann::json& meta() const noexcept { return m_data["meta"]; }
-  YAODAQ_API const nlohmann::json& operator()() const noexcept { return m_data; }
-  YAODAQ_API nlohmann::json& payload() noexcept { return m_data["payload"]; }
-  YAODAQ_API nlohmann::json& meta() noexcept { return m_data["meta"]; }
-  YAODAQ_API Type            type() const noexcept { return m_type; };
+  YAODAQ_API Type type() const noexcept { return m_type; };
   YAODAQ_API std::string type_str() const noexcept { return yaodaq::Message::type_str( m_type ).data(); };
   YAODAQ_API std::string uuid() const noexcept { return m_uuid; }
   YAODAQ_API std::int64_t            time() const noexcept { return m_time; }
@@ -75,7 +69,6 @@ public:
 
 protected:
   YAODAQ_API explicit Message( const Type type );
-  nlohmann::json m_data;
 
 private:
   YAODAQ_API explicit Message() noexcept;
@@ -195,12 +188,7 @@ class Ping : public Message
 public:
   static constexpr Message::Type type = Message::Type::Ping;
   YAODAQ_API explicit Ping() noexcept = delete;
-  YAODAQ_API explicit Ping( const std::string_view& message, const std::size_t size, const bool binary ) : Message( yaodaq::Message::Type::Ping ), m_message( message ), m_size( size ), m_binary( binary )
-  {
-    payload()["message"] = message;
-    payload()["binary"]  = binary;
-    payload()["size"]    = size;
-  }
+  YAODAQ_API explicit Ping( const std::string_view& message, const std::size_t size, const bool binary ) : Message( yaodaq::Message::Type::Ping ), m_message( message ), m_size( size ), m_binary( binary ) {}
   YAODAQ_API std::string message() const noexcept { return m_message; }
   YAODAQ_API bool        binary() const noexcept { return m_binary; }
   YAODAQ_API std::size_t size() const noexcept { return m_size; }
@@ -216,12 +204,7 @@ class Pong : public Message
 public:
   static constexpr Message::Type type = Message::Type::Pong;
   YAODAQ_API explicit Pong() noexcept = delete;
-  YAODAQ_API explicit Pong( const std::string_view& message, const std::size_t size, const bool binary ) : Message( yaodaq::Message::Type::Pong ), m_message( message ), m_size( size ), m_binary( binary )
-  {
-    payload()["message"] = message;
-    payload()["binary"]  = binary;
-    payload()["size"]    = size;
-  }
+  YAODAQ_API explicit Pong( const std::string_view& message, const std::size_t size, const bool binary ) : Message( yaodaq::Message::Type::Pong ), m_message( message ), m_size( size ), m_binary( binary ) {}
   YAODAQ_API std::string message() const noexcept { return m_message; }
   YAODAQ_API bool        binary() const noexcept { return m_binary; }
   YAODAQ_API std::size_t size() const noexcept { return m_size; }

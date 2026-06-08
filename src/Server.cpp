@@ -181,7 +181,7 @@ void yaodaq::Server::checkClient( std::shared_ptr<ix::ConnectionState> connectio
 
 void yaodaq::Server::onOpen( std::shared_ptr<ix::ConnectionState> connectionState, ix::WebSocket& webSocket, const yaodaq::Open& open )
 {
-  info( "client {} at {} port {} connected to server:\n  {}", connectionState->getId(), connectionState->getRemoteIp(), connectionState->getRemotePort(), yaodaq::Formatter::format( open.payload() ) );
+  info( "client {} at {} port {} connected to server:\n  {}", connectionState->getId(), connectionState->getRemoteIp(), connectionState->getRemotePort(), yaodaq::Formatter::format( open.headers() ) );
   sendExcept( open, webSocket );
 }
 

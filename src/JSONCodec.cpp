@@ -2,6 +2,7 @@
 
 #include <iostream>
 #include <magic_enum/magic_enum.hpp>
+#include <nlohmann/json.hpp>
 #include <simdjson.h>
 
 std::vector<std::byte> yaodaq::JSONCodec::encode( const yaodaq::Message& msg ) const

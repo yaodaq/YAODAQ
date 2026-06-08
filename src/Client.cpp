@@ -131,7 +131,7 @@ void yaodaq::Client::handleMessage( const ix::WebSocketMessagePtr& msg ) noexcep
 
 void yaodaq::Client::onOpen( const Open& open )
 {
-  info( "Connected (uri: {})\nheaders: {}\nprotocol: {}", open.uri(), yaodaq::Formatter::format( open.payload()["headers"] ), open.protocol() );
+  info( "Connected (uri: {})\nheaders: {}\nprotocol: {}", open.uri(), yaodaq::Formatter::format( open.headers() ), open.protocol() );
   send( open );
 }
 
@@ -270,7 +270,7 @@ void yaodaq::Client::send( const Message& message, const send_as as ) noexcept
   if( ret.success ) debug_without_websocket( "sent successful, payload: {}, wire_size:{}", ret.payloadSize, ret.wireSize );
   else
   {
-    const std::string error_message = fmt::format( "Error sending message of type '{}', payload: {}, wire_size:{}{}", message.meta()["type"].get<std::string_view>(), ret.payloadSize, ret.wireSize, ret.compressionError ? " (compression error)" : "" );
+    const std::string error_message = fmt::format( "Error sending message of type '{}', payload: {}, wire_size:{}{}", message.type_str(), ret.payloadSize, ret.wireSize, ret.compressionError ? " (compression error)" : "" );
     error_without_websocket( error_message );
     const Log  log( spdlog::details::log_msg( identifier().id(), spdlog::level::err, error_message ) );
     const auto raw = m_json_codec.encode( log );

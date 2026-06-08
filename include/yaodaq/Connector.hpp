@@ -9,6 +9,7 @@
 #include "yaodaq/Formatter.hpp"
 
 #include <atomic>
+#include <iostream>
 #include <memory>
 #include <thread>
 

@@ -3,6 +3,7 @@
 #include "yaodaq/Message.hpp"
 
 #include <functional>
+#include <iostream>
 #include <mutex>
 #include <unordered_map>
 #include <vector>
