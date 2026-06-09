@@ -90,8 +90,7 @@ struct Accumulator
 
   double last_v = 0.0;
   double last_i = 0.0;
-  double t_min  = 0;
-  double t_max  = 0;
+  double t_sum  = 0;
 };
 
 std::unordered_map<Key, long long, KeyHash> channel_map;
@@ -172,7 +171,7 @@ public:
     if( it == channel_map.end() ) return;
     {
       std::lock_guard<std::mutex> lock( m_mutex );
-      buffer.push_back( { ts, it->second, voltage, current, sigma_v, sigma_i } );
+      buffer.push_back( { ts, it->second, voltage, sigma_v, current, sigma_i } );
     }
     if( buffer.size() >= 6 ) m_cv.notify_one();
   }
@@ -190,9 +189,9 @@ private:
         std::unique_lock<std::mutex> lock( m_mutex );
         m_cv.wait_for( lock, std::chrono::seconds( 1 ), [this]() { return !buffer.empty() || !m_running; } );
       }
-      //flush();
+      flush();
     }
-    //flush();
+    flush();
   }
 
   // ========================================================
@@ -210,11 +209,12 @@ private:
     try
     {
       soci::statement st = ( sql.prepare << "INSERT IGNORE INTO hv_measurement "
-                                            "(ts, channel_id, mean_V, mean_nA, sigma_v, sigma_A) "
+                                            "(ts, channel_id, voltage_V, current_nA, sigma_V, sigma_A) "
                                             "VALUES (:ts, :ch, :v, :a, :sv, :sa)" );
 
       for( auto& r: local )
       {
+        fmt::print( "2)    sigma v:{}, sigma A:{}\n", r.v_sigma, r.i_sigma );
         st.exchange( soci::use( r.ts, "ts" ) );
         st.exchange( soci::use( r.channel_id, "ch" ) );
         st.exchange( soci::use( r.v_mean, "v" ) );
@@ -440,15 +440,9 @@ std::vector<Info> parse( const std::string_view str )
 
         s.v_sq_sum += s.last_v * s.last_v;
         s.i_sq_sum += s.last_i * s.last_i;
-
+        s.t_sum += time;
         s.has_v = false;
         s.has_i = false;
-      }
-      if( s.n == 0 ) { s.t_min = s.t_max = time; }
-      else
-      {
-        s.t_min = std::min( s.t_min, time );
-        s.t_max = std::max( s.t_max, time );
       }
       if( s.n >= N )
       {
@@ -456,17 +450,19 @@ std::vector<Info> parse( const std::string_view str )
         info.v_mean = s.v_sum / s.n;
         info.i_mean = s.i_sum / s.n;
 
-        auto v_var = ( s.v_sq_sum / s.n ) - ( info.v_mean * info.v_mean );
-        auto i_var = ( s.i_sq_sum / s.n ) - ( info.i_mean * info.i_mean );
+        double v_var = ( s.v_sq_sum - s.v_sum * s.v_sum / s.n ) / ( s.n - 1 );
+
+        double i_var = ( s.i_sq_sum - s.i_sum * s.i_sum / s.n ) / ( s.n - 1 );
 
         info.v_sigma = std::sqrt( std::max( 0.0, v_var ) );
         info.i_sigma = std::sqrt( std::max( 0.0, i_var ) );
-
+        fmt::print( "sigma v:{}, sigma A:{}\n", info.v_sigma, info.i_sigma );
         info.crate   = crate;
         info.board   = board;
         info.channel = chan;
-        double t_mid = 0.5 * ( s.t_min + s.t_max );
-        info.ts      = format_utc( std::to_string( t_mid ) );
+
+        double t_mean = s.t_sum / s.n;
+        info.ts       = format_utc( std::to_string( t_mean ) );
         if( std::fabsl( info.v_mean ) >= 1.0 ) m_infos.push_back( info );
         // FULL RESET (important)
         s.n     = 0;
@@ -475,7 +471,7 @@ std::vector<Info> parse( const std::string_view str )
         s.has_v                 = false;
         s.has_i                 = false;
         s.last_v = s.last_i = 0.0;
-        s.t_min = s.t_max = 0;
+        s.t_sum             = 0;
       }
     }
   }
