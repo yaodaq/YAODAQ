@@ -102,10 +102,10 @@ public:
 
   YAODAQ_API Dispatcher& dispatcher() { return m_dispatcher; }
 
-  YAODAQ_API void setLogger( yaodaq::Logging* logging ) noexcept { m_logging = logging; }
+  YAODAQ_API void setLogger( std::shared_ptr<yaodaq::Logging> logging ) noexcept { m_logging = logging; }
 
 private:
-  yaodaq::Logging* m_logging{ nullptr };
+  std::shared_ptr<yaodaq::Logging> m_logging{ nullptr };
 
   std::unique_ptr<yaodaq::ITransport> m_transport;
   std::unique_ptr<yaodaq::ICodec>     m_codec;

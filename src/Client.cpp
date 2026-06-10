@@ -25,11 +25,12 @@ yaodaq::Client::~Client() noexcept
   ix::uninitNetSystem();
 }
 
-yaodaq::Client::Client( const Identifier& id, const Config& config ) : m_identifier( id ), Logging( id )
+yaodaq::Client::Client( const Identifier& id, const Config& config ) : m_identifier( id ), m_log( std::make_shared<Logging>( id ) )
 {
   ix::initNetSystem();
-  if( m_identifier.component().role() != Component::Role::Logger ) add_websocket_callback( [this]( const Log& msg ) noexcept { send( msg ); } );
-  setVerbosity( config.getVerbosity() );
+  this->setLogger( m_log );
+  if( m_identifier.component().role() != Component::Role::Logger ) m_log->add_websocket_callback( [this]( const Log& msg ) noexcept { send( msg ); } );
+  m_log->setVerbosity( config.getVerbosity() );
   m_client.setUrl( config.url() );
   if( config.isTLS() )
   {
@@ -247,7 +248,7 @@ void yaodaq::Client::send( const Message& message, const send_as as ) noexcept
 {
   static const ix::OnProgressCallback callback{ [this]( int current, int total ) noexcept -> bool
                                                 {
-                                                  debug_without_websocket( "sent {}/{} ({}%)", current + 1, total, ( current + 1 ) * 100.0 / total );
+                                                  m_log->debug_without_websocket( "sent {}/{} ({}%)", current + 1, total, ( current + 1 ) * 100.0 / total );
                                                   return true;
                                                 } };
   if( m_client.getReadyState() == ix::ReadyState::Closed || m_client.getReadyState() == ix::ReadyState::Closing ) return;
@@ -267,11 +268,11 @@ void yaodaq::Client::send( const Message& message, const send_as as ) noexcept
       break;
     }
   }
-  if( ret.success ) debug_without_websocket( "sent successful, payload: {}, wire_size:{}", ret.payloadSize, ret.wireSize );
+  if( ret.success ) m_log->debug_without_websocket( "sent successful, payload: {}, wire_size:{}", ret.payloadSize, ret.wireSize );
   else
   {
     const std::string error_message = fmt::format( "Error sending message of type '{}', payload: {}, wire_size:{}{}", message.type_str(), ret.payloadSize, ret.wireSize, ret.compressionError ? " (compression error)" : "" );
-    error_without_websocket( error_message );
+    m_log->error_without_websocket( error_message );
     const Log  log( spdlog::details::log_msg( identifier().id(), spdlog::level::err, error_message ) );
     const auto raw = m_json_codec.encode( log );
     m_client.sendUtf8Text( ix::IXWebSocketSendData( reinterpret_cast<const char*>( raw.data() ), raw.size() ), callback );

@@ -17,7 +17,7 @@
 namespace yaodaq
 {
 
-class YAODAQ_API Client : public JsonRPCResponder, public Logging  //TODO : Why YAODAQ_API is needed here ?
+class YAODAQ_API Client : public JsonRPCResponder, public LoggableClient  //TODO : Why YAODAQ_API is needed here ?
 {
 public:
   YAODAQ_API ~Client() noexcept override;
@@ -26,6 +26,7 @@ public:
   YAODAQ_API const Identifier& identifier() const noexcept { return m_identifier; }
 
 protected:
+  std::shared_ptr<Logging> get_logger() const noexcept { return m_log; }
   YAODAQ_API ix::WebSocket& getWebsocketClient() noexcept { return m_client; }
   YAODAQ_API void           start()
   {
@@ -40,9 +41,10 @@ protected:
   YAODAQ_API virtual void onResponse( const std::string& ) { /* Standard client don't receive response !!  Only Controller has the right to ask */ }
 
 private:
-  const Identifier m_identifier;
-  ix::WebSocket    m_client;
-  JSONCodec        m_json_codec;
+  const Identifier         m_identifier;
+  ix::WebSocket            m_client;
+  JSONCodec                m_json_codec;
+  std::shared_ptr<Logging> m_log;
   YAODAQ_API explicit Client() noexcept = delete;
   YAODAQ_INTERNAL void handleMessage( const ix::WebSocketMessagePtr& msg ) noexcept;
 

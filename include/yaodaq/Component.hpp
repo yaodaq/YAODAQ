@@ -18,7 +18,11 @@ public:
     Board,   //< A board, presumably a hardware or logical component
     Controller,
     Logger,
-    Browser = 100,  //< A client that is a browser (not a Yaodaq client)
+    Browser   = 100,  //< A client that is a browser (not a Yaodaq client)
+    // Specials
+    Connector = 200,
+    Transport,
+    Codec
   };
   YAODAQ_API Component() noexcept = delete;
   YAODAQ_API explicit Component( const Component::Role role ) noexcept : m_role( role ) {}

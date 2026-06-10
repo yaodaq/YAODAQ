@@ -31,7 +31,7 @@ public:
       info( "Connecting" );
       bool ret = on_connect();
       if( !ret ) return false;
-      m_connector->setLogger( this );
+      m_connector->setLogger( this->get_logger() );
       ret = m_connector->connect();
       if( ret )
       {
