@@ -31,61 +31,61 @@ public:
     return true;
   }
 
-  YAODAQ_API ResponseClients initialize()
+  YAODAQ_API Response initialize()
   {
     info( "Initializing" );
     return CallMethod( "initialize" );
   }
 
-  YAODAQ_API ResponseClients configure()
+  YAODAQ_API Response configure()
   {
     info( "Configuring" );
     return CallMethod( "configure" );
   }
 
-  YAODAQ_API ResponseClients start()
+  YAODAQ_API Response start()
   {
     info( "Starting" );
     return CallMethod( "start" );
   }
 
-  YAODAQ_API ResponseClients pause()
+  YAODAQ_API Response pause()
   {
     info( "Pausing" );
     return CallMethod( "pause" );
   }
 
-  YAODAQ_API ResponseClients resume()
+  YAODAQ_API Response resume()
   {
     info( "Resuming" );
     return CallMethod( "resume" );
   }
 
-  YAODAQ_API ResponseClients stop()
+  YAODAQ_API Response stop()
   {
     info( "Stopping" );
     return CallMethod( "stop" );
   }
 
-  YAODAQ_API ResponseClients clear()
+  YAODAQ_API Response clear()
   {
     info( "Clearing" );
     return CallMethod( "clear" );
   }
 
-  YAODAQ_API ResponseClients release()
+  YAODAQ_API Response release()
   {
     info( "Releasing" );
     return CallMethod( "release" );
   }
 
-  YAODAQ_API ResponseClients connect()
+  YAODAQ_API Response connect()
   {
     info( "Connecting" );
     return CallMethod( "connect" );
   }
 
-  YAODAQ_API ResponseClients disconnect()
+  YAODAQ_API Response disconnect()
   {
     info( "Disconnecting" );
     return CallMethod( "disconnect" );

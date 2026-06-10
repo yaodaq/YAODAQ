@@ -214,7 +214,6 @@ private:
 
       for( auto& r: local )
       {
-        fmt::print( "2)    sigma v:{}, sigma A:{}\n", r.v_sigma, r.i_sigma );
         st.exchange( soci::use( r.ts, "ts" ) );
         st.exchange( soci::use( r.channel_id, "ch" ) );
         st.exchange( soci::use( r.v_mean, "v" ) );
@@ -456,7 +455,6 @@ std::vector<Info> parse( const std::string_view str )
 
         info.v_sigma = std::sqrt( std::max( 0.0, v_var ) );
         info.i_sigma = std::sqrt( std::max( 0.0, i_var ) );
-        fmt::print( "sigma v:{}, sigma A:{}\n", info.v_sigma, info.i_sigma );
         info.crate   = crate;
         info.board   = board;
         info.channel = chan;

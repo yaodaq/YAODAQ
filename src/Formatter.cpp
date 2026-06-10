@@ -1,73 +1,87 @@
 #include "yaodaq/Formatter.hpp"
 
-#include <fmt/color.h>
-#include <fmt/core.h>
-#include <nlohmann/json.hpp>
+#include <cstddef>
+#include <optional>
+#include <simdjson.h>
+#include <string>
+#include <string_view>
 
-// --- Color helpers ---
-inline std::string key_color( const std::string& s ) { return fmt::format( "{}", fmt::styled( s, fmt::fg( fmt::color::cornflower_blue ) | fmt::emphasis::bold ) ); }
-
-inline std::string string_color( const std::string& s ) { return fmt::format( "{}", fmt::styled( "\"" + s + "\"", fmt::fg( fmt::color::light_green ) ) ); }
-
-inline std::string number_int_color( long long v ) { return fmt::format( "{}", fmt::styled( v, fmt::fg( fmt::color::plum ) ) ); }
-
-inline std::string number_float_color( double v ) { return fmt::format( "{}", fmt::styled( v, fmt::fg( fmt::color::medium_purple ) ) ); }
-
-inline std::string bool_color( bool v ) { return fmt::format( "{}", fmt::styled( v ? "true" : "false", fmt::fg( fmt::color::orange ) | fmt::emphasis::bold ) ); }
-
-inline std::string null_color() { return fmt::format( "{}", fmt::styled( "null", fmt::fg( fmt::color::gray ) ) ); }
-
-inline std::string punct( const std::string& s ) { return fmt::format( "{}", fmt::styled( s, fmt::fg( fmt::color::gray ) ) ); }
-
-std::string yaodaq::Formatter::format( const nlohmann::json& j, const std::size_t indent )
+static inline std::optional<simdjson::dom::element> try_parse_json( const std::string_view sv )
 {
-  std::string out;
-  std::string pad( indent * 2, ' ' );
+  static thread_local simdjson::dom::parser parser;
+  simdjson::padded_string                   padded( sv );
+  simdjson::dom::element                    e;
+  if( parser.parse( padded ).get( e ) != simdjson::SUCCESS ) return std::nullopt;
+  return e;
+}
 
-  if( j.is_object() )
+static std::string format_impl( const simdjson::dom::element& e, const std::size_t indent )
+{
+  switch( e.type() )
   {
-    out += punct( "{" ) + "\n";
-
-    auto it = j.begin();
-    while( it != j.end() )
+    case simdjson::dom::element_type::OBJECT:
     {
-      out += pad + "  ";
-      out += key_color( "\"" + it.key() + "\"" );
-      out += punct( ": " );
-
-      out += format( it.value(), indent + 1 );
-
-      ++it;
-      if( it != j.end() ) out += punct( "," );
-      out += "\n";
-    }
-
-    out += pad + punct( "}" );
-  }
-  else if( j.is_array() )
-  {
-    if( j.empty() ) { out += punct( "[]" ); }
-    else
-    {
-      out += punct( "[" ) + "\n";
-
-      for( size_t i = 0; i < j.size(); ++i )
+      simdjson::dom::object obj( e );
+      if( obj.size() == 0 ) return yaodaq::punct( "{}" );
+      std::string out = yaodaq::punct( "{" ) + "\n";
+      for( const auto&& [key, value]: obj )
       {
-        out += pad + "  ";
-        out += format( j[i], indent + 1 );
-
-        if( i + 1 != j.size() ) out += punct( "," );
+        out += std::string( indent * 2 + 2, ' ' );
+        out += yaodaq::key_color( fmt::format( "\"{}\"", std::string( key ) ) );
+        out += yaodaq::punct( ": " );
+        out += yaodaq::Formatter::format( value, indent + 1 );
         out += "\n";
       }
-
-      out += pad + punct( "]" );
+      out += std::string( indent * 2, ' ' ) + yaodaq::punct( "}" );
+      return out;
     }
+    case simdjson::dom::element_type::ARRAY:
+    {
+      simdjson::dom::array arr( e );
+      if( arr.size() == 0 ) return yaodaq::punct( "[]" );
+      std::string out = yaodaq::punct( "[" ) + "\n";
+      std::size_t i{ 0 };
+      for( const auto&& v: arr )
+      {
+        out += std::string( indent * 2 + 2, ' ' );
+        out += yaodaq::Formatter::format( v, indent + 1 );
+        if( ++i != arr.size() ) out += yaodaq::punct( "," );
+        out += '\n';
+      }
+      out += std::string( indent * 2, ' ' ) + yaodaq::punct( "]" );
+      return out;
+    }
+    case simdjson::dom::element_type::STRING: return yaodaq::string_color( std::string( e.get_string().value_unsafe() ) );
+    case simdjson::dom::element_type::INT64: return yaodaq::number_int_color( e.get_int64() );
+    case simdjson::dom::element_type::UINT64: return yaodaq::number_int_color( (long long)e.get_uint64() );
+    case simdjson::dom::element_type::DOUBLE: return yaodaq::number_float_color( e.get_double() );
+    case simdjson::dom::element_type::BOOL: return yaodaq::bool_color( e.get_bool() );
+    case simdjson::dom::element_type::NULL_VALUE: return yaodaq::null_color();
+    default: return yaodaq::string_color( "[unsupported]" );
   }
-  else if( j.is_string() ) { out += string_color( j.get<std::string>() ); }
-  else if( j.is_number_integer() ) { out += number_int_color( j.get<long long>() ); }
-  else if( j.is_number_float() ) { out += number_float_color( j.get<double>() ); }
-  else if( j.is_boolean() ) { out += bool_color( j.get<bool>() ); }
-  else if( j.is_null() ) { out += null_color(); }
+}
 
-  return out;
+std::string yaodaq::Formatter::format_impl( const std::string& v, const std::size_t indent )
+{
+  if( auto j = try_parse_json( v ) ) return format( *j, indent );
+
+  return string_color( v );
+}
+
+std::string yaodaq::Formatter::format_impl( const std::string_view v, const std::size_t indent )
+{
+  if( auto j = try_parse_json( v ) ) return format( *j, indent );
+
+  return string_color( std::string( v ) );
+}
+
+std::string yaodaq::Formatter::format_impl( const char* const v, const std::size_t indent )
+{
+  if( !v ) return null_color();
+
+  std::string_view sv( v );
+
+  if( auto j = try_parse_json( sv ) ) return format( *j, indent );
+
+  return string_color( std::string( v ) );
 }

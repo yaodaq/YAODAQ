@@ -26,7 +26,7 @@ public:
   YAODAQ_API bool Add( const std::string& name, jsonrpc::Method callback, const std::initializer_list<std::string>& mapping = {} ) { return m_server.Add( name, std::move( callback ), mapping ); }
   YAODAQ_API bool Add( const std::string& name, jsonrpc::Notification callback, const std::initializer_list<std::string>& mapping = {} ) { return m_server.Add( name, std::move( callback ), mapping ); }
 
-  YAODAQ_API nlohmann::json getProcedures() { return m_server.getProcedures(); }
+  YAODAQ_API std::string getProcedures() { return m_server.getProcedures().dump(); }
 
 protected:
   YAODAQ_API std::string HandleRequest( const std::string_view request ) { return m_server.HandleRequest( std::string( request ) ); }

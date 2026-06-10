@@ -1,53 +1,31 @@
 #pragma once
 
+#include "yaodaq/Export.hpp"
+#include "yaodaq/Formatter.hpp"
 #include "yaodaq/Identifier.hpp"
 
-#include <cpp-terminal/screen.hpp>
-#include <fmt/color.h>
-#include <fmt/core.h>
-#include <fmt/format.h>
-#include <new>
-#include <nlohmann/json.hpp>
-#include <unordered_map>
-#include <yaodaq/Export.hpp>
+#include <string>
+#include <string_view>
+
 namespace yaodaq
 {
 
-// A response to a JsonRPC
+// ============================================================
+// Response (raw JSON container)
+// ============================================================
+
 class Response
 {
 public:
-  YAODAQ_API explicit Response( const nlohmann::json& response ) : m_json( response ) {}
-  YAODAQ_API std::string dump( const std::size_t j = 0 ) { return m_json.dump( j ); }
-  YAODAQ_API             operator const nlohmann::json&() const noexcept { return m_json; }
-  YAODAQ_API             operator nlohmann::json() noexcept { return m_json; }
-  // Pretty formatter for JSON-RPC array of results/errors
+  YAODAQ_API explicit Response( const std::string_view response ) : m_raw( response ) {}
+
+  YAODAQ_API std::string_view dump( std::size_t = 0 ) const { return m_raw; }
+
   YAODAQ_API std::string pretty_format();
+  YAODAQ_API std::string tabulate();
 
 protected:
-  nlohmann::json m_json;
-};
-
-// Response where you don't care the server response
-class ResponseClients : public Response
-{
-public:
-  YAODAQ_API ResponseClients( const Response& response ) : Response( response )  // uses your conversion operator
-  { filter(); }
-  YAODAQ_API explicit ResponseClients( const nlohmann::json& response ) : Response( response ) { filter(); }
-
-private:
-  void filter()
-  {
-    for( auto it = m_json.begin(); it != m_json.end(); )
-    {
-      if( it->is_object() && it->contains( "yaodaq_id" ) && ( *it )["yaodaq_id"].contains( "component" ) && ( *it )["yaodaq_id"]["component"] == "Server" ) { it = m_json.erase( it ); }
-      else
-      {
-        ++it;
-      }
-    }
-  }
+  std::string m_raw;
 };
 
 }  // namespace yaodaq

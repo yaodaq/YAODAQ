@@ -19,9 +19,9 @@ private:
   jsonrpc::JsonRpcClient m_client;
 
 public:
-  Response CallMethod( const std::string& name ) { return Response( m_client.CallMethod<nlohmann::json>( ix::uuid4(), name ) ); }
-  Response CallMethod( const std::string& name, const jsonrpc::positional_parameter& params ) { return Response( m_client.CallMethod<nlohmann::json>( ix::uuid4(), name, params ) ); }
-  Response CallMethodNamed( const std::string& name, const jsonrpc::named_parameter& params = {} ) { return Response( m_client.CallMethodNamed<nlohmann::json>( ix::uuid4(), name, params ) ); }
+  Response CallMethod( const std::string& name ) { return Response( m_client.CallMethod<nlohmann::json>( ix::uuid4(), name ).dump() ); }
+  Response CallMethod( const std::string& name, const jsonrpc::positional_parameter& params ) { return Response( m_client.CallMethod<nlohmann::json>( ix::uuid4(), name, params ).dump() ); }
+  Response CallMethodNamed( const std::string& name, const jsonrpc::named_parameter& params = {} ) { return Response( m_client.CallMethodNamed<nlohmann::json>( ix::uuid4(), name, params ).dump() ); }
 
   YAODAQ_API void CallNotification( const std::string& name, const jsonrpc::positional_parameter& params = {} ) { m_client.CallNotification( name, params ); }
   YAODAQ_API void CallNotificationNamed( const std::string& name, const jsonrpc::named_parameter& params = {} ) { m_client.CallNotificationNamed( name, params ); }

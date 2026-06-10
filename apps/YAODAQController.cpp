@@ -57,52 +57,52 @@ try
         }
         else if( key == Term::Key::Ctrl_I )
         {
-          Term::cout << controller.initialize().pretty_format() << std::endl;
+          Term::cout << controller.initialize().tabulate() << std::endl;
           nbrCTLC = 3;
         }
         else if( key == Term::Key::Ctrl_L )
         {
-          Term::cout << controller.connect().pretty_format() << std::endl;
+          Term::cout << controller.connect().tabulate() << std::endl;
           nbrCTLC = 3;
         }
         else if( key == Term::Key::Ctrl_C )
         {
-          Term::cout << controller.configure().pretty_format() << std::endl;
+          Term::cout << controller.configure().tabulate() << std::endl;
           nbrCTLC = 3;
         }
         else if( key == Term::Key::Ctrl_S )
         {
-          Term::cout << controller.start().pretty_format() << std::endl;
+          Term::cout << controller.start().tabulate() << std::endl;
           nbrCTLC = 3;
         }
         else if( key == Term::Key::p )
         {
-          Term::cout << controller.pause().pretty_format() << std::endl;
+          Term::cout << controller.pause().tabulate() << std::endl;
           nbrCTLC = 3;
         }
         else if( key == Term::Key::r )
         {
-          Term::cout << controller.resume().pretty_format() << std::endl;
+          Term::cout << controller.resume().tabulate() << std::endl;
           nbrCTLC = 3;
         }
         else if( key == Term::Key::Ctrl_K )
         {
-          Term::cout << controller.stop().pretty_format() << std::endl;
+          Term::cout << controller.stop().tabulate() << std::endl;
           nbrCTLC = 3;
         }
         else if( key == Term::Key::Ctrl_Z )
         {
-          Term::cout << controller.clear().pretty_format() << std::endl;
+          Term::cout << controller.clear().tabulate() << std::endl;
           nbrCTLC = 3;
         }
         else if( key == Term::Key::Ctrl_D )
         {
-          Term::cout << controller.disconnect().pretty_format() << std::endl;
+          Term::cout << controller.disconnect().tabulate() << std::endl;
           nbrCTLC = 3;
         }
         else if( key == Term::Key::Ctrl_R )
         {
-          Term::cout << controller.release().pretty_format() << std::endl;
+          Term::cout << controller.release().tabulate() << std::endl;
           nbrCTLC = 3;
         }
         else if( key == Term::Key::h )

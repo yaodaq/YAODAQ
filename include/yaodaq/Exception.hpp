@@ -21,7 +21,7 @@ public:
 
 private:
   explicit Exception() noexcept = delete;
-  const std::string m_message;
+  std::string m_message;
 };
 
 }  // namespace yaodaq
