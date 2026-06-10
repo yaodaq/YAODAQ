@@ -15,7 +15,7 @@ static inline std::optional<simdjson::dom::element> try_parse_json( const std::s
   return e;
 }
 
-static std::string format_impl( const simdjson::dom::element& e, const std::size_t indent )
+std::string yaodaq::Formatter::format_impl( const simdjson::dom::element& e, const std::size_t indent )
 {
   switch( e.type() )
   {

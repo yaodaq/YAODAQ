@@ -6,6 +6,7 @@
 #include <map>
 #include <memory>
 #include <optional>
+#include <simdjson.h>
 #include <span>
 #include <string>
 #include <string_view>
@@ -59,6 +60,7 @@ private:
   YAODAQ_API static std::string format_impl( const std::string& v, const std::size_t indent );
   YAODAQ_API static std::string format_impl( const std::string_view v, const std::size_t indent );
   YAODAQ_API static std::string format_impl( const char* const v, const std::size_t indent );
+  YAODAQ_API static std::string format_impl( const simdjson::dom::element& e, const std::size_t indent );
 
   // ============================================================
   // BOOL
