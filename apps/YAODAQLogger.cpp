@@ -30,7 +30,7 @@ try
     return app.exit( e );
   }
   yaodaq::Config cfg;
-  cfg().setPort( port ).setHost( host ).verbosity( verbosity );
+  cfg.setPort( port ).setHost( host ).verbosity( verbosity );
   yaodaq::Logger logger( cfg, name );
   logger.link();
   std::size_t nbrCTLC{ 3 };

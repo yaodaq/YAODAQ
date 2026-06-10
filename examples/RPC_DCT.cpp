@@ -284,7 +284,7 @@ try
     return app.exit( e );
   }
   yaodaq::Config cfg;
-  cfg().setPort( port ).setHost( host );
+  cfg.setPort( port ).setHost( host );
   DCT module( cfg, "DCT" );
   module.setBinaryPath( path_binary );
   module.setEventNumbers( event_number );

@@ -3,6 +3,7 @@
 #include "yaodaq/Defaults.hpp"
 #include "yaodaq/Exception.hpp"
 #include "yaodaq/Export.hpp"
+#include "yaodaq/Parameters.hpp"
 #include "yaodaq/Verbosity.hpp"
 
 #include <cstdint>
@@ -19,10 +20,8 @@ class ServerConfig
 {
 public:
   YAODAQ_API explicit ServerConfig() noexcept = default;
-  YAODAQ_API ServerConfig&       operator()() noexcept { return *this; }
-  YAODAQ_API const ServerConfig& operator()() const noexcept { return *this; }
   // Fluent setters
-  YAODAQ_API ServerConfig&       setHost( const std::string_view h )
+  YAODAQ_API ServerConfig& setHost( const std::string_view h )
   {
     m_host = std::string( h );
     return *this;
@@ -121,10 +120,8 @@ class Config
 {
 public:
   YAODAQ_API explicit Config() noexcept = default;
-  YAODAQ_API Config&       operator()() noexcept { return *this; }
-  YAODAQ_API const Config& operator()() const noexcept { return *this; }
   // Fluent setters
-  YAODAQ_API Config&       setHost( const std::string_view h )
+  YAODAQ_API Config& setHost( const std::string_view h )
   {
     m_host = std::string( h );
     return *this;
@@ -215,10 +212,20 @@ class BoardConfig : public Config
 {
 public:
   explicit BoardConfig( std::unique_ptr<Connector> connector ) : m_Connector( std::move( connector ) ) {}
-  std::unique_ptr<Connector> getConnector() const noexcept { return std::move( m_Connector ); }
+  YAODAQ_API std::unique_ptr<Connector> takeConnector() noexcept { return std::move( m_Connector ); }
+  YAODAQ_API const Parameters&          codecParameters() const noexcept { return m_codec_params; }
+  YAODAQ_API Parameters&                codecParameters() { return m_codec_params; }
+  YAODAQ_API const Parameters&          transportParameters() const noexcept { return m_transport_params; }
+  YAODAQ_API Parameters&                transportParameters() { return m_transport_params; }
+  YAODAQ_API                            BoardConfig( const BoardConfig& )     = delete;
+  YAODAQ_API BoardConfig&               operator=( const BoardConfig& )       = delete;
+  YAODAQ_API                            BoardConfig( BoardConfig&& ) noexcept = default;
+  YAODAQ_API BoardConfig&               operator=( BoardConfig&& ) noexcept   = default;
 
 private:
-  mutable std::unique_ptr<Connector> m_Connector{ nullptr };
+  std::unique_ptr<Connector> m_Connector{ nullptr };
+  Parameters                 m_codec_params;
+  Parameters                 m_transport_params;
 };
 
 }  // namespace yaodaq

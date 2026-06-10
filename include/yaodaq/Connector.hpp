@@ -7,18 +7,32 @@
 #include "TransactionManager.hpp"
 #include "yaodaq/Export.hpp"
 #include "yaodaq/Formatter.hpp"
+#include "yaodaq/Parameters.hpp"
 
 #include <atomic>
 #include <iostream>
 #include <memory>
 #include <thread>
 
+namespace yaodaq
+{
+
 class Connector
 {
 public:
-  YAODAQ_API Connector( std::unique_ptr<ITransport> transport, std::unique_ptr<yaodaq::ICodec> codec ) : m_transport( std::move( transport ) ), m_codec( std::move( codec ) ) {}
+  YAODAQ_API Connector( std::unique_ptr<yaodaq::ITransport> transport, std::unique_ptr<yaodaq::ICodec> codec ) : m_transport( std::move( transport ) ), m_codec( std::move( codec ) ) {}
 
   YAODAQ_API ~Connector() noexcept { disconnect(); }
+
+  YAODAQ_API void setParameters( const Parameters params )
+  {
+    m_transport->setParameters( params );
+    m_codec->setParameters( params );
+  }
+
+  YAODAQ_API void setTransportParameters( const Parameters params ) { m_transport->setParameters( params ); }
+
+  YAODAQ_API void setCodecParameters( const Parameters params ) { m_codec->setParameters( params ); }
 
   YAODAQ_API bool connect()
   {
@@ -93,8 +107,8 @@ public:
 private:
   yaodaq::Logging* m_logging{ nullptr };
 
-  std::unique_ptr<ITransport>     m_transport;
-  std::unique_ptr<yaodaq::ICodec> m_codec;
+  std::unique_ptr<yaodaq::ITransport> m_transport;
+  std::unique_ptr<yaodaq::ICodec>     m_codec;
 
   ThreadSafeQueue<std::unique_ptr<yaodaq::Message>> m_outgoing;
 
@@ -147,20 +161,7 @@ private:
           continue;
         }
         std::unique_ptr<yaodaq::Message> msg;
-        try
-        {
-          msg = m_codec->decode( *raw );
-        }
-        catch( const nlohmann::json::parse_error& e )
-        {
-          m_logging->warn( "JSON parse error: {}", e.what() );
-          continue;
-        }
-        catch( const std::exception& e )
-        {
-          m_logging->error( "decode failed: {}", e.what() );
-          continue;
-        }
+        msg = m_codec->decode( *raw );
 
         // TransactionManager consumes or returns ownership
 
@@ -192,3 +193,5 @@ private:
     }
   }
 };
+
+}  // namespace yaodaq

@@ -30,7 +30,7 @@ try
   }
 
   yaodaq::Config cfg;
-  cfg().setPort( port ).setHost( host ).verbosity( verbosity );
+  cfg.setPort( port ).setHost( host ).verbosity( verbosity );
   yaodaq::Module module( cfg, name );
   if( name == "loop" )
     module.setRun(

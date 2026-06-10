@@ -1,13 +1,12 @@
 #pragma once
-#include "Module.hpp"
 #include "yaodaq/Export.hpp"
+#include "yaodaq/Module.hpp"
 
 #include <cstdint>
 #include <mutex>
 #include <string_view>
 #include <yaodaq/Connector.hpp>
 #include <yaodaq/Defaults.hpp>
-#include <yaodaq/Export.hpp>
 #include <yaodaq/Identifier.hpp>
 
 namespace yaodaq
@@ -20,9 +19,11 @@ namespace yaodaq
 class Board : public Module
 {
 public:
-  YAODAQ_API explicit Board( BoardConfig& cfg, const std::string_view name, const std::string_view type = "yaodaq" ) : Module( cfg, name, type, Component::Role::Board ), m_connector( cfg.getConnector() ) {}
+  Board( BoardConfig& cfg, const std::string_view name, const std::string_view type = "yaodaq" ) : Module( cfg, name, type, Component::Role::Board ), m_config( std::move( cfg ) ) { m_connector = m_config.takeConnector(); }
   YAODAQ_API bool connect() final
   {
+    m_connector->setCodecParameters( m_config.codecParameters() );
+    m_connector->setTransportParameters( m_config.transportParameters() );
     Transition transition{ allowTransition( State::ID::Connected ) };
     if( transition == Transition::alreadyDone ) return true;
     else if( transition == Transition::allowed )
@@ -82,6 +83,7 @@ protected:
 
 private:
   std::unique_ptr<Connector> m_connector{ nullptr };
+  BoardConfig                m_config;
 };
 
 }  // namespace yaodaq

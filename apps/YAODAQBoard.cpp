@@ -248,15 +248,13 @@ private:
 };
 
 // ============================================================
-// MotorBoard
+// isegBoard
 // ============================================================
-
-class MotorBoard : public yaodaq::Board
+class isegBoard : public yaodaq::Board
 {
 public:
-  MotorBoard( yaodaq::BoardConfig& cfg, const std::string_view name ) : yaodaq::Board( cfg, name, "MotorBoard" ) {}
-
-  ~MotorBoard() final { writer.stop(); }
+  isegBoard( yaodaq::BoardConfig& cfg, const std::string_view name ) : yaodaq::Board( cfg, name, "isegBoard" ) {}
+  ~isegBoard() final { writer.stop(); }
 
   bool on_initialize() override
   {
@@ -515,15 +513,12 @@ try
     return app.exit( e );
   }
 
-  nlohmann::json json;
+  yaodaq::BoardConfig cfg( std::make_unique<yaodaq::Connector>( std::make_unique<WebSocket>(), std::make_unique<yaodaq::JSONCodec>() ) );
 
-  json["url"] = "ws://192.168.50.119:8080";
+  cfg.setPort( port ).setHost( host ).verbosity( verbosity );
+  cfg.transportParameters().set( "url", "ws://192.168.50.119:8080" );
 
-  yaodaq::BoardConfig cfg( std::make_unique<Connector>( std::make_unique<WebSocket>( json ), std::make_unique<yaodaq::JSONCodec>() ) );
-
-  cfg().setPort( port ).setHost( host ).verbosity( verbosity );
-
-  MotorBoard board( cfg, name );
+  isegBoard board( cfg, name );
 
   board.dispatcher().subscribe<yaodaq::RawData>(
     [&board]( const yaodaq::RawData& msg )

@@ -357,6 +357,8 @@ public:
   YAODAQ_API void setRun( const std::function<bool()>& fun ) noexcept { m_onrun = fun; }
 
 protected:
+  //
+
   virtual bool on_initialize() { return true; };
   virtual bool on_configure() { return true; };
   virtual bool on_first_start() { return true; }

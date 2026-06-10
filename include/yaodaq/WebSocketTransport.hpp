@@ -9,10 +9,10 @@
 #include <ixwebsocket/IXWebSocket.h>
 #include <ixwebsocket/IXWebSocketSendData.h>
 
-class WebSocket final : public ITransport
+class WebSocket final : public yaodaq::ITransport
 {
 public:
-  YAODAQ_API explicit WebSocket( nlohmann::json json ) : ITransport( std::move( json ) )
+  YAODAQ_API explicit WebSocket() : ITransport()
   {
     ix::initNetSystem();
     m_client.disablePerMessageDeflate();
@@ -23,13 +23,12 @@ public:
   YAODAQ_API ~WebSocket() noexcept override
   {
     close();
-
     ix::uninitNetSystem();
   }
 
   YAODAQ_API bool open() final
   {
-    m_client.setUrl( getParameters()["url"].get<std::string>() );
+    m_client.setUrl( getParameters().get_as_f<std::string>( "url" ).or_throw( "url not provided !" ) );
 
     m_client.start();
 
