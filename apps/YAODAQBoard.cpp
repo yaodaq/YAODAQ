@@ -189,9 +189,9 @@ private:
         std::unique_lock<std::mutex> lock( m_mutex );
         m_cv.wait_for( lock, std::chrono::seconds( 1 ), [this]() { return !buffer.empty() || !m_running; } );
       }
-      flush();
+      //flush();
     }
-    flush();
+    //flush();
   }
 
   // ========================================================
@@ -264,9 +264,9 @@ public:
     writer.setHost( "192.168.50.18" );
     writer.setPort( "3306" );
 
-    writer.connect();
-    writer.preload();
-    writer.start();
+    //writer.connect();
+    //writer.preload();
+    //writer.start();
 
     info( "Finding the key" );
 
@@ -316,6 +316,12 @@ public:
 
     this->setRun( fun );
 
+    return true;
+  }
+
+  bool on_disconnect() override
+  {
+    info( "I'm calling on_disconnect" );
     return true;
   }
 

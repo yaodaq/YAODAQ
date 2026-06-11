@@ -21,12 +21,15 @@
 
 yaodaq::Client::~Client() noexcept
 {
+  debug( "~Client called" );
+  Cleaner::instance().remove( this );
   m_client.stop();
   ix::uninitNetSystem();
 }
 
 yaodaq::Client::Client( const Identifier& id, const Config& config ) : m_identifier( id ), m_log( std::make_shared<Logging>( id ) )
 {
+  Cleaner::instance().add( this );
   ix::initNetSystem();
   this->setLogger( m_log );
   if( m_identifier.component().role() != Component::Role::Logger ) m_log->add_websocket_callback( [this]( const Log& msg ) noexcept { send( msg ); } );

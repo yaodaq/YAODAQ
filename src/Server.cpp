@@ -1,5 +1,6 @@
 #include "yaodaq/Server.hpp"
 
+#include "yaodaq/Cleaner.hpp"
 #include "yaodaq/ConnectionState.hpp"
 #include "yaodaq/Exception.hpp"
 #include "yaodaq/Formatter.hpp"
@@ -120,12 +121,14 @@ void yaodaq::Server::Send( const std::string_view re )
 }
 
 YAODAQ_API yaodaq::Server::Server( const ServerConfig& cfg, const std::string_view name, const std::string_view type ) :
-  m_identifier( Component::Role::Server, type, name ), m_server( cfg.getPort(), cfg.getHost().data(), cfg.getBacklog(), cfg.getMaxConnections(), cfg.getHandshakeTimeoutSecs(), cfg.getAddressFamily(), cfg.getPingIntervalSeconds() ),
-  Logging( { Component::Role::Server, type, name } )
+  m_identifier( Component::Role::Server, type, name ), m_log( std::make_shared<Logging>( Identifier( Component::Role::Server, type, name ) ) ),
+  m_server( cfg.getPort(), cfg.getHost().data(), cfg.getBacklog(), cfg.getMaxConnections(), cfg.getHandshakeTimeoutSecs(), cfg.getAddressFamily(), cfg.getPingIntervalSeconds() )
 {
+  Cleaner::instance().add( this );
   ix::initNetSystem();
-  add_websocket_callback( [this]( const Log& msg ) noexcept { sendToLoggers( msg ); } );
-  setVerbosity( cfg.getVerbosity() );
+  this->setLogger( m_log );
+  m_log->add_websocket_callback( [this]( const Log& msg ) noexcept { sendToLoggers( msg ); } );
+  m_log->setVerbosity( cfg.getVerbosity() );
   if( cfg.isTLS() )
   {
     ix::SocketTLSOptions m_tlsOptions;

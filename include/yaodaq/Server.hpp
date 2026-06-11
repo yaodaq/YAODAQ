@@ -36,11 +36,15 @@ struct ServerRequest
   std::size_t                                         received_responses{ 0 };
 };
 
-class Server : public JsonRPCResponder, public Logging, public JsonRPCAsker
+class Server : public JsonRPCResponder, public LoggableBase, public JsonRPCAsker
 {
 public:
   YAODAQ_API ~Server() noexcept;
   YAODAQ_API Server( const ServerConfig& cfg, const std::string_view name, const std::string_view type = "yaodaq" );
+  Server( const Server& )            = delete;
+  Server& operator=( const Server& ) = delete;
+  Server( Server&& )                 = delete;
+  Server& operator=( Server&& )      = delete;
 
   YAODAQ_API const Identifier& identifier() const noexcept { return m_identifier; }
 
@@ -51,15 +55,17 @@ public:
   YAODAQ_API void rejectBrowsers() noexcept { m_rejectBrowser = true; }
 
   YAODAQ_API std::size_t getNumberOfClients() noexcept;
+  YAODAQ_API void        cleanup() {}
 
 private:
-  YAODAQ_INTERNAL explicit Server() noexcept = delete;
-  ix::WebSocketServer  m_server;
-  Identifier           m_identifier;
-  ThreadPool           m_threadPool;
-  JSONCodec            m_json_codec;
-  YAODAQ_INTERNAL void handleMessage( std::shared_ptr<ix::ConnectionState> connectionState, ix::WebSocket& webSocket, const ix::WebSocketMessagePtr& msg ) noexcept;
-  bool                 m_rejectBrowser{ false };  //< Reject the Browsers
+  explicit Server() noexcept = delete;
+  std::shared_ptr<Logging> m_log;
+  ix::WebSocketServer      m_server;
+  Identifier               m_identifier;
+  ThreadPool               m_threadPool;
+  JSONCodec                m_json_codec;
+  YAODAQ_INTERNAL void     handleMessage( std::shared_ptr<ix::ConnectionState> connectionState, ix::WebSocket& webSocket, const ix::WebSocketMessagePtr& msg ) noexcept;
+  bool                     m_rejectBrowser{ false };  //< Reject the Browsers
 
   virtual void         Send( const std::string_view request ) override final;
   /* Check if client has all to be an yaodaq one and if he has the authorizations */

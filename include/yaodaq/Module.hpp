@@ -18,11 +18,12 @@ namespace yaodaq
 * @brief A YAODAQ Module is a generic class for all class that not need to connect
 *
 **/
-class Module : public yaodaq::Client
+class Module : public Client
 {
 public:
   YAODAQ_API Module( Config& config, const std::string_view name, const std::string_view type = "yaodaq", const Component::Role role = Component::Role::Module ) : Client( Identifier( role, type, name ), config )
   {
+    Cleaner::instance().add( this );
     Add( "initialize", jsonrpc::GetHandle( &yaodaq::Module::initialize, *this ) );
     Add( "configure", jsonrpc::GetHandle( &yaodaq::Module::configure, *this ) );
     Add( "start", jsonrpc::GetHandle( &yaodaq::Module::start, *this ) );
@@ -340,6 +341,17 @@ public:
   YAODAQ_API explicit Module() noexcept = delete;
   YAODAQ_API ~Module() noexcept override
   {
+    debug( "~Module called" );
+    Cleaner::instance().remove( this );
+  }
+
+  YAODAQ_API void send( const nlohmann::json& json ) { send( json.dump() ); }
+  YAODAQ_API void setRun( const std::function<bool()>& fun ) noexcept { m_onrun = fun; }
+
+protected:
+  bool cleanup() override
+  {
+    info( "Module cleanup" );
     if( m_worker.joinable() )
     {
       {
@@ -350,28 +362,46 @@ public:
       on_stop();  // call hook for proper cleanup
       m_worker.join();
     }
-    info( "Stopping Module" );
-  }
-
-  YAODAQ_API void send( const nlohmann::json& json ) { send( json.dump() ); }
-  YAODAQ_API void setRun( const std::function<bool()>& fun ) noexcept { m_onrun = fun; }
-
-protected:
-  //
-
-  virtual bool on_initialize() { return true; };
-  virtual bool on_configure() { return true; };
-  virtual bool on_first_start() { return true; }
-  virtual bool on_start()
-  {
-    info( "on_start running" );
+    Client::cleanup();
     return true;
-  };
-  virtual bool on_pause() { return true; };
-  virtual bool on_resume() { return true; };
-  virtual bool on_stop() { return true; };
-  virtual bool on_clear() { return true; };
-  virtual bool on_release() { return true; };
+  }
+  // link
+  virtual bool pre_link() { return true; }
+  virtual bool on_link() { return true; }
+  virtual bool post_link() { return true; }
+  // initialize
+  virtual bool pre_initialize() { return true; }
+  virtual bool on_initialize() { return true; }
+  virtual bool post_initialize() { return true; }
+  // configure
+  virtual bool pre_configure() { return true; }
+  virtual bool on_configure() { return true; }
+  virtual bool post_configure() { return true; }
+  // start
+  virtual bool pre_start() { return true; }
+  virtual bool on_start() { return true; }
+  virtual bool post_start() { return true; }
+  virtual bool on_first_start() { return true; }  // TODO
+  // pause
+  virtual bool pre_pause() { return true; }
+  virtual bool on_pause() { return true; }
+  virtual bool post_pause() { return true; }
+  // resume
+  virtual bool pre_resume() { return true; }
+  virtual bool on_resume() { return true; }
+  virtual bool post_resume() { return true; }
+  // stop
+  virtual bool pre_stop() { return true; }
+  virtual bool on_stop() { return true; }
+  virtual bool post_stop() { return true; }
+  // clear
+  virtual bool pre_clear() { return true; }
+  virtual bool on_clear() { return true; }
+  virtual bool post_clear() { return true; }
+  // release
+  virtual bool pre_release() { return true; }
+  virtual bool on_release() { return true; }
+  virtual bool post_release() { return true; }
 
   State      m_State;
   std::mutex m_mutex;

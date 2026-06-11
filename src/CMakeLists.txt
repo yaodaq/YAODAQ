@@ -21,6 +21,7 @@ add_library(yaodaq SHARED
  Message.cpp
  Formatter.cpp
  JSONCodec.cpp
+ Cleaner.cpp
 )
 
 list(APPEND YAODAQ_PUBLIC_HEADERS

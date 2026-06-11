@@ -19,8 +19,16 @@ namespace yaodaq
 class Board : public Module
 {
 public:
-  Board( BoardConfig& cfg, const std::string_view name, const std::string_view type = "yaodaq" ) : Module( cfg, name, type, Component::Role::Board ), m_config( std::move( cfg ) ) { m_connector = m_config.takeConnector(); }
-  YAODAQ_API bool connect() final
+  Board( BoardConfig& cfg, const std::string_view name, const std::string_view type = "yaodaq" ) : Module( cfg, name, type, Component::Role::Board ), m_config( std::move( cfg ) )
+  {
+    Cleaner::instance().add( this );
+    m_connector = m_config.takeConnector();
+  }
+  YAODAQ_API        Board( const Board& ) noexcept     = delete;
+  YAODAQ_API Board& operator=( const Board& ) noexcept = delete;
+  YAODAQ_API        Board( Board&& ) noexcept          = delete;
+  YAODAQ_API Board& operator=( Board&& ) noexcept      = delete;
+  YAODAQ_API bool   connect() final
   {
     m_connector->setCodecParameters( m_config.codecParameters() );
     m_connector->setTransportParameters( m_config.transportParameters() );
@@ -71,7 +79,11 @@ public:
     }
   };
   YAODAQ_API explicit Board() noexcept = delete;
-  YAODAQ_API virtual ~Board() noexcept { disconnect(); }
+  YAODAQ_API virtual ~Board() noexcept
+  {
+    debug( "~Board called" );
+    Cleaner::instance().remove( this );
+  }
   YAODAQ_API void send( std::unique_ptr<Message> msg ) { m_connector->send( std::move( msg ) ); }
 
   YAODAQ_API std::future<std::unique_ptr<Message>> request( std::unique_ptr<Message> msg ) { return m_connector->request( std::move( msg ) ); }
@@ -79,8 +91,15 @@ public:
   YAODAQ_API Dispatcher& dispatcher() { return m_connector->dispatcher(); }
 
 protected:
-  virtual bool on_connect() { return true; };
-  virtual bool on_disconnect() { return true; };
+  virtual bool            on_connect() { return true; };
+  virtual bool            on_disconnect() { return true; };
+  YAODAQ_API virtual bool cleanup() final
+  {
+    debug( "Board cleanup" );
+    disconnect();
+    Module::cleanup();
+    return true;
+  }
 
 private:
   std::unique_ptr<Connector> m_connector{ nullptr };

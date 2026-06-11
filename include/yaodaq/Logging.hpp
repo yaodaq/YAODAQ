@@ -103,6 +103,7 @@ public:
 
 protected:
   friend class Client;
+  friend class Server;
   template<typename... Args> void trace_without_websocket( const std::string_view& str, Args&&... args ) const noexcept
   {
     if( m_logger ) m_logger->trace( fmt::runtime( str ), std::forward<Args>( args )... );
@@ -135,13 +136,12 @@ private:
   mutable std::mutex              m_mutex;
 };
 
-class LoggableClient
+class LoggableBase
 {
 protected:
   void setLogger( std::shared_ptr<Logging> log ) { m_log = std::move( log ); }
 
 public:
-  explicit LoggableClient() = default;
   template<typename... Args> void trace( const std::string_view& str, Args&&... args ) const noexcept
   {
     if( m_log ) m_log->trace( str, std::forward<Args>( args )... );
