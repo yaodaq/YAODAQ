@@ -52,19 +52,19 @@ void yaodaq::Server::Send( const std::string_view re )
       // Extract ID
       jsonrpc::id_t id;
 
-      auto id_elem = r["id"];
+      const auto id_elem = r["id"];
 
       if( id_elem.type() == simdjson::dom::element_type::STRING )
       {
         std::string_view s;
-        id_elem.get( s );
-        id = std::string( s );
+        auto             ret = id_elem.get( s );
+        id                   = std::string( s );
       }
       else
       {
         int64_t v;
-        id_elem.get( v );
-        id = v;
+        auto    ret = id_elem.get( v );
+        id          = v;
       }
       // prepare to wait for responses from the clients
       {
