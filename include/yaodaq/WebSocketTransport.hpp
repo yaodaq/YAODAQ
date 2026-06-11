@@ -1,8 +1,7 @@
 #pragma once
-#include "ITransport.hpp"
-#include "ThreadSafeQueue.hpp"
-#include "nlohmann/json.hpp"
 #include "yaodaq/Export.hpp"
+#include "yaodaq/ITransport.hpp"
+#include "yaodaq/ThreadSafeQueue.hpp"
 
 #include <iostream>
 #include <ixwebsocket/IXNetSystem.h>
@@ -12,7 +11,7 @@
 class WebSocket final : public yaodaq::ITransport
 {
 public:
-  YAODAQ_API explicit WebSocket() : ITransport()
+  YAODAQ_API explicit WebSocket() : ITransport( "default", "Websocket" )
   {
     ix::initNetSystem();
     m_client.disablePerMessageDeflate();
@@ -63,8 +62,7 @@ private:
     {
       case ix::WebSocketMessageType::Open:
       {
-        std::cout << "WebSocket connected\n" << msg->openInfo.uri << " " << msg->openInfo.protocol << " ";
-
+        info( "Connected to {} (uri:{}) protocol: {}", m_client.getUrl(), msg->openInfo.uri, msg->openInfo.protocol );
         break;
       }
 

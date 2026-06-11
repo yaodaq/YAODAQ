@@ -135,7 +135,12 @@ public:
     if( it == m_params.end() ) return std::nullopt;
     return vis( it->second );
   }
+  template<typename Visitor> void visit_all( Visitor&& vis ) const
+  {
+    std::shared_lock lock( m_mutex );
 
+    for( const auto& [key, value]: m_params ) { vis( key, value ); }
+  }
   bool erase( const std::string_view key )
   {
     std::unique_lock lock( m_mutex );

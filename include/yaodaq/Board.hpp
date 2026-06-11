@@ -24,6 +24,7 @@ public:
   {
     m_connector->setCodecParameters( m_config.codecParameters() );
     m_connector->setTransportParameters( m_config.transportParameters() );
+    m_connector->setLogger( this->get_logger() );
     Transition transition{ allowTransition( State::ID::Connected ) };
     if( transition == Transition::alreadyDone ) return true;
     else if( transition == Transition::allowed )

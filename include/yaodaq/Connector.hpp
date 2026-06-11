@@ -17,12 +17,19 @@
 namespace yaodaq
 {
 
-class Connector
+class Connector : public Loggable
 {
 public:
-  YAODAQ_API Connector( std::unique_ptr<yaodaq::ITransport> transport, std::unique_ptr<yaodaq::ICodec> codec ) : m_transport( std::move( transport ) ), m_codec( std::move( codec ) ) {}
+  YAODAQ_API Connector( std::unique_ptr<yaodaq::ITransport> transport, std::unique_ptr<yaodaq::ICodec> codec ) : Loggable( Identifier( Component::Role::Connector, "yaodaq", "default" ) ), m_transport( std::move( transport ) ), m_codec( std::move( codec ) ) {}
 
   YAODAQ_API ~Connector() noexcept { disconnect(); }
+
+  YAODAQ_API void setLogger( std::shared_ptr<Logging> logger ) noexcept
+  {
+    Loggable::setLogger( logger );
+    if( m_codec ) m_codec->setLogger( logger );
+    if( m_transport ) m_transport->setLogger( logger );
+  }
 
   YAODAQ_API void setParameters( const Parameters params )
   {
@@ -38,11 +45,11 @@ public:
   {
     if( !m_transport->verifyParameters() )
     {
-      if( m_logging ) { m_logging->error( "Invalid connector parameters:\n{}", yaodaq::Formatter::format( m_transport->getParameters() ).data() ); }
+      error( "Invalid connector parameters:\n{}", yaodaq::Formatter::format( m_transport->getParameters() ) );
       return false;
     }
 
-    if( m_logging ) { m_logging->trace( "Parameters for connector verified:\n{}", yaodaq::Formatter::format( m_transport->getParameters() ).data() ); }
+    trace( "Parameters for connector verified:\n{}", yaodaq::Formatter::format( m_transport->getParameters() ) );
 
     if( !m_transport->open() ) return false;
 
@@ -57,7 +64,7 @@ public:
     {
       m_running = false;
 
-      if( m_logging ) m_logging->error( "Failed to start threads: {}", e.what() );
+      error( "Failed to start threads: {}", e.what() );
 
       return false;
     }
@@ -65,7 +72,7 @@ public:
     {
       m_running = false;
 
-      if( m_logging ) m_logging->error( "Failed to start threads" );
+      error( "Failed to start threads" );
 
       return false;
     }
@@ -102,11 +109,7 @@ public:
 
   YAODAQ_API Dispatcher& dispatcher() { return m_dispatcher; }
 
-  YAODAQ_API void setLogger( std::shared_ptr<yaodaq::Logging> logging ) noexcept { m_logging = logging; }
-
 private:
-  std::shared_ptr<yaodaq::Logging> m_logging{ nullptr };
-
   std::unique_ptr<yaodaq::ITransport> m_transport;
   std::unique_ptr<yaodaq::ICodec>     m_codec;
 
@@ -137,7 +140,7 @@ private:
     }
     catch( const std::exception& e )
     {
-      if( m_logging ) m_logging->error( "writerLoop exception: {}", e.what() );
+      error( "writerLoop exception: {}", e.what() );
 
       m_running = false;
     }
@@ -187,7 +190,7 @@ private:
     }
     catch( const std::exception& e )
     {
-      if( m_logging ) m_logging->error( "readerLoop exception: {}", e.what() );
+      error( "readerLoop exception: {}", e.what() );
 
       m_running = false;
     }

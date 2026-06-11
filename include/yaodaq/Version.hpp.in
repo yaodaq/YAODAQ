@@ -8,16 +8,16 @@ class Version
 {
 public:
   explicit Version() noexcept = default;
-  explicit Version(const std::uint32_t major,const std::uint32_t minor,const std::uint32_t patch,const std::uint32_t tweak) noexcept : m_major(major), m_minor(minor), m_patch(patch), m_tweak(tweak) {}
-  std::uint32_t major() const noexcept { return m_major;}
-  std::uint32_t minor() const noexcept { return m_minor;}
-  std::uint32_t patch() const noexcept { return m_patch;}
-  std::uint32_t tweak() const noexcept { return m_tweak;}
+  explicit Version(const std::uint64_t major,const std::uint64_t minor,const std::uint64_t patch,const std::uint64_t tweak) noexcept : m_major(major), m_minor(minor), m_patch(patch), m_tweak(tweak) {}
+  std::uint64_t major() const noexcept { return m_major;}
+  std::uint64_t minor() const noexcept { return m_minor;}
+  std::uint64_t patch() const noexcept { return m_patch;}
+  std::uint64_t tweak() const noexcept { return m_tweak;}
 private:
-  std::uint32_t m_major{@PROJECT_VERSION_MAJOR@};
-  std::uint32_t m_minor{@PROJECT_VERSION_MINOR@};
-  std::uint32_t m_patch{@PROJECT_VERSION_PATCH@};
-  std::uint32_t m_tweak{@PROJECT_VERSION_TWEAK@};
+  std::uint64_t m_major{@PROJECT_VERSION_MAJOR@};
+  std::uint64_t m_minor{@PROJECT_VERSION_MINOR@};
+  std::uint64_t m_patch{@PROJECT_VERSION_PATCH@};
+  std::uint64_t m_tweak{@PROJECT_VERSION_TWEAK@};
 };
 
 }
