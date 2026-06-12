@@ -24,7 +24,7 @@ public:
 
   void add_websocket_callback( const std::function<void( const Log& msg )>& f );
 
-  void setVerbosity( const yaodaq::verbosity::level level )
+  void setVerbosity( const yaodaq::verbosity::level level ) noexcept
   {
     m_verbosity = level;
     // just in case spdlog change the numbers;
@@ -70,32 +70,32 @@ public:
 
   yaodaq::verbosity::level getVerbosity() const noexcept { return m_verbosity; }
 
-  template<typename... Args> void trace( const std::string_view& str, Args&&... args ) const noexcept
+  template<typename... Args> void trace( const std::string_view str, Args&&... args ) const noexcept
   {
     if( m_logger ) m_logger->trace( fmt::runtime( str ), std::forward<Args>( args )... );
     if( m_logger_websocket ) m_logger_websocket->trace( fmt::runtime( str ), std::forward<Args>( args )... );
   }
-  template<typename... Args> void debug( const std::string_view& str, Args&&... args ) const noexcept
+  template<typename... Args> void debug( const std::string_view str, Args&&... args ) const noexcept
   {
     if( m_logger ) m_logger->debug( fmt::runtime( str ), std::forward<Args>( args )... );
     if( m_logger_websocket ) m_logger_websocket->debug( fmt::runtime( str ), std::forward<Args>( args )... );
   }
-  template<typename... Args> void info( const std::string_view& str, Args&&... args ) const noexcept
+  template<typename... Args> void info( const std::string_view str, Args&&... args ) const noexcept
   {
     if( m_logger ) m_logger->info( fmt::runtime( str ), std::forward<Args>( args )... );
     if( m_logger_websocket ) m_logger_websocket->info( fmt::runtime( str ), std::forward<Args>( args )... );
   }
-  template<typename... Args> void warn( const std::string_view& str, Args&&... args ) const noexcept
+  template<typename... Args> void warn( const std::string_view str, Args&&... args ) const noexcept
   {
     if( m_logger ) m_logger->warn( fmt::runtime( str ), std::forward<Args>( args )... );
     if( m_logger_websocket ) m_logger_websocket->warn( fmt::runtime( str ), std::forward<Args>( args )... );
   }
-  template<typename... Args> void error( const std::string_view& str, Args&&... args ) const noexcept
+  template<typename... Args> void error( const std::string_view str, Args&&... args ) const noexcept
   {
     if( m_logger ) m_logger->error( fmt::runtime( str ), std::forward<Args>( args )... );
     if( m_logger_websocket ) m_logger_websocket->error( fmt::runtime( str ), std::forward<Args>( args )... );
   }
-  template<typename... Args> void critical( const std::string_view& str, Args&&... args ) const noexcept
+  template<typename... Args> void critical( const std::string_view str, Args&&... args ) const noexcept
   {
     if( m_logger ) m_logger->critical( fmt::runtime( str ), std::forward<Args>( args )... );
     if( m_logger_websocket ) m_logger_websocket->critical( fmt::runtime( str ), std::forward<Args>( args )... );
@@ -104,27 +104,27 @@ public:
 protected:
   friend class Client;
   friend class Server;
-  template<typename... Args> void trace_without_websocket( const std::string_view& str, Args&&... args ) const noexcept
+  template<typename... Args> void trace_without_websocket( const std::string_view str, Args&&... args ) const noexcept
   {
     if( m_logger ) m_logger->trace( fmt::runtime( str ), std::forward<Args>( args )... );
   }
-  template<typename... Args> void debug_without_websocket( const std::string_view& str, Args&&... args ) const noexcept
+  template<typename... Args> void debug_without_websocket( const std::string_view str, Args&&... args ) const noexcept
   {
     if( m_logger ) m_logger->debug( fmt::runtime( str ), std::forward<Args>( args )... );
   }
-  template<typename... Args> void info_without_websocket( const std::string_view& str, Args&&... args ) const noexcept
+  template<typename... Args> void info_without_websocket( const std::string_view str, Args&&... args ) const noexcept
   {
     if( m_logger ) m_logger->info( fmt::runtime( str ), std::forward<Args>( args )... );
   }
-  template<typename... Args> void warn_without_websocket( const std::string_view& str, Args&&... args ) const noexcept
+  template<typename... Args> void warn_without_websocket( const std::string_view str, Args&&... args ) const noexcept
   {
     if( m_logger ) m_logger->warn( fmt::runtime( str ), std::forward<Args>( args )... );
   }
-  template<typename... Args> void error_without_websocket( const std::string_view& str, Args&&... args ) const noexcept
+  template<typename... Args> void error_without_websocket( const std::string_view str, Args&&... args ) const noexcept
   {
     if( m_logger ) m_logger->error( fmt::runtime( str ), std::forward<Args>( args )... );
   }
-  template<typename... Args> void critical_without_websocket( const std::string_view& str, Args&&... args ) const noexcept
+  template<typename... Args> void critical_without_websocket( const std::string_view str, Args&&... args ) const noexcept
   {
     if( m_logger ) m_logger->critical( fmt::runtime( str ), std::forward<Args>( args )... );
   }
@@ -139,30 +139,30 @@ private:
 class LoggableBase
 {
 protected:
-  void setLogger( std::shared_ptr<Logging> log ) { m_log = std::move( log ); }
+  void setLogger( std::shared_ptr<Logging> log ) noexcept { m_log = std::move( log ); }
 
 public:
-  template<typename... Args> void trace( const std::string_view& str, Args&&... args ) const noexcept
+  template<typename... Args> void trace( const std::string_view str, Args&&... args ) const noexcept
   {
     if( m_log ) m_log->trace( str, std::forward<Args>( args )... );
   }
-  template<typename... Args> void debug( const std::string_view& str, Args&&... args ) const noexcept
+  template<typename... Args> void debug( const std::string_view str, Args&&... args ) const noexcept
   {
     if( m_log ) m_log->debug( str, std::forward<Args>( args )... );
   }
-  template<typename... Args> void info( const std::string_view& str, Args&&... args ) const noexcept
+  template<typename... Args> void info( const std::string_view str, Args&&... args ) const noexcept
   {
     if( m_log ) m_log->info( str, std::forward<Args>( args )... );
   }
-  template<typename... Args> void warn( const std::string_view& str, Args&&... args ) const noexcept
+  template<typename... Args> void warn( const std::string_view str, Args&&... args ) const noexcept
   {
     if( m_log ) m_log->warn( str, std::forward<Args>( args )... );
   }
-  template<typename... Args> void error( const std::string_view& str, Args&&... args ) const noexcept
+  template<typename... Args> void error( const std::string_view str, Args&&... args ) const noexcept
   {
     if( m_log ) m_log->error( str, std::forward<Args>( args )... );
   }
-  template<typename... Args> void critical( const std::string_view& str, Args&&... args ) const noexcept
+  template<typename... Args> void critical( const std::string_view str, Args&&... args ) const noexcept
   {
     if( m_log ) m_log->critical( str, std::forward<Args>( args )... );
   }
@@ -175,30 +175,30 @@ class Loggable
 {
 public:
   explicit Loggable( const Identifier& id ) : m_id( id.id() ) {}
-  void setLogger( std::shared_ptr<Logging> log ) { m_log = std::move( log ); }
+  void setLogger( std::shared_ptr<Logging> log ) noexcept { m_log = std::move( log ); }
 
 protected:
-  template<typename... Args> void trace( const std::string_view& str, Args&&... args ) const noexcept
+  template<typename... Args> void trace( const std::string_view str, Args&&... args ) const noexcept
   {
-    if( m_log ) m_log->info( "[{}] {}", m_id, fmt::format( fmt::runtime( str ), std::forward<Args>( args )... ) );
+    if( m_log ) m_log->trace( "[{}] {}", m_id, fmt::format( fmt::runtime( str ), std::forward<Args>( args )... ) );
   }
-  template<typename... Args> void debug( const std::string_view& str, Args&&... args ) const noexcept
+  template<typename... Args> void debug( const std::string_view str, Args&&... args ) const noexcept
   {
     if( m_log ) m_log->debug( "[{}] {}", m_id, fmt::format( fmt::runtime( str ), std::forward<Args>( args )... ) );
   }
-  template<typename... Args> void info( const std::string_view& str, Args&&... args ) const noexcept
+  template<typename... Args> void info( const std::string_view str, Args&&... args ) const noexcept
   {
     if( m_log ) m_log->info( "[{}] {}", m_id, fmt::format( fmt::runtime( str ), std::forward<Args>( args )... ) );
   }
-  template<typename... Args> void warn( const std::string_view& str, Args&&... args ) const noexcept
+  template<typename... Args> void warn( const std::string_view str, Args&&... args ) const noexcept
   {
     if( m_log ) m_log->warn( "[{}] {}", m_id, fmt::format( fmt::runtime( str ), std::forward<Args>( args )... ) );
   }
-  template<typename... Args> void error( const std::string_view& str, Args&&... args ) const noexcept
+  template<typename... Args> void error( const std::string_view str, Args&&... args ) const noexcept
   {
     if( m_log ) m_log->error( "[{}] {}", m_id, fmt::format( fmt::runtime( str ), std::forward<Args>( args )... ) );
   }
-  template<typename... Args> void critical( const std::string_view& str, Args&&... args ) const noexcept
+  template<typename... Args> void critical( const std::string_view str, Args&&... args ) const noexcept
   {
     if( m_log ) m_log->critical( "[{}] {}", m_id, fmt::format( fmt::runtime( str ), std::forward<Args>( args )... ) );
   }

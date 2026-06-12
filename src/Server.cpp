@@ -22,7 +22,8 @@
 
 yaodaq::Server::~Server() noexcept
 {
-  info( "Stopping server" );
+  Cleaner::instance().remove( this );
+  debug( "~Server called" );
   m_server.stop();
   ix::uninitNetSystem();
 }

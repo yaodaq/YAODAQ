@@ -168,13 +168,10 @@ void yaodaq::Client::onMessage( const std::string& str, const std::size_t size, 
 
 void yaodaq::Client::onClose( const Close& close )
 {
-  //if(m_client.getReadyState() != ix::ReadyState::Closed && m_client.getReadyState() != ix::ReadyState::Closing)
-  //{
   send( close );
   if( close.remote() ) warn( "closing by remote: {} ({})", close.reason(), close.code() );
   else
     info( "closing: {} ({})", close.reason(), close.code() );
-  //}
 }
 
 void yaodaq::Client::onReject( const Reject& reject )
@@ -247,7 +244,7 @@ void yaodaq::Client::onLog( const std::unique_ptr<Log> log )
   }
 }
 
-void yaodaq::Client::send( const Message& message, const send_as as ) noexcept
+YAODAQ_API void yaodaq::Client::send( const std::string_view str, const send_as as ) noexcept
 {
   static const ix::OnProgressCallback callback{ [this]( int current, int total ) noexcept -> bool
                                                 {
@@ -260,17 +257,40 @@ void yaodaq::Client::send( const Message& message, const send_as as ) noexcept
   {
     case send_as::utf8:
     {
-      const auto raw = m_json_codec.encode( message );
-      ret            = m_client.sendUtf8Text( ix::IXWebSocketSendData( reinterpret_cast<const char*>( raw.data() ), raw.size() ), callback );
+      ret = m_client.sendUtf8Text( ix::IXWebSocketSendData( str.data(), str.size() ), callback );
       break;
     }
     case send_as::binary:
     {
-      const auto raw = m_json_codec.encode( message );
-      ret            = m_client.sendBinary( ix::IXWebSocketSendData( reinterpret_cast<const char*>( raw.data() ), raw.size() ), callback );
+      ret = m_client.sendBinary( ix::IXWebSocketSendData( str.data(), str.size() ), callback );
+      break;
+    }
+    case send_as::text:
+    {
+      ret = m_client.sendText( str.data(), callback );
       break;
     }
   }
+  if( ret.success ) m_log->debug_without_websocket( "sent successful, payload: {}, wire_size:{}", ret.payloadSize, ret.wireSize );
+  else
+  {
+    const std::string error_message = fmt::format( "Error while sending to server, payload: {}, wire_size:{}{}:\n{}", ret.payloadSize, ret.wireSize, ret.compressionError ? " (compression error)" : "", Formatter::format( str ) );
+    m_log->error_without_websocket( error_message );
+    const Log  log( spdlog::details::log_msg( identifier().id(), spdlog::level::err, error_message ) );
+    const auto raw = m_json_codec.encode( log );
+    m_client.sendUtf8Text( ix::IXWebSocketSendData( reinterpret_cast<const char*>( raw.data() ), raw.size() ), callback );
+  }
+}
+
+void yaodaq::Client::send( const Message& message ) noexcept
+{
+  static const ix::OnProgressCallback callback{ [this]( int current, int total ) noexcept -> bool
+                                                {
+                                                  m_log->debug_without_websocket( "sent {}/{} ({}%)", current + 1, total, ( current + 1 ) * 100.0 / total );
+                                                  return true;
+                                                } };
+  const auto                          raw = m_json_codec.encode( message );
+  ix::WebSocketSendInfo               ret = m_client.sendUtf8Text( ix::IXWebSocketSendData( reinterpret_cast<const char*>( raw.data() ), raw.size() ), callback );
   if( ret.success ) m_log->debug_without_websocket( "sent successful, payload: {}, wire_size:{}", ret.payloadSize, ret.wireSize );
   else
   {

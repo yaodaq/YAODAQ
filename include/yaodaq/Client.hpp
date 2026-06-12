@@ -12,6 +12,7 @@
 #include <functional>
 #include <ixwebsocket/IXWebSocket.h>
 #include <new>
+#include <span>
 #include <string>
 #include <string_view>
 
@@ -35,8 +36,21 @@ public:
     close();
     return true;
   }
+  enum class send_as : std::uint8_t
+  {
+    utf8   = 1,
+    text   = 2,
+    binary = 3,
+  };
+  YAODAQ_API void send( std::span<const std::byte> raw ) noexcept
+  {
+    const std::string_view sv( std::bit_cast<const char*>( raw.data() ), raw.size() );
+    send( sv, send_as::binary );
+  }
+  YAODAQ_API void send( const std::string_view, const send_as as = send_as::utf8 ) noexcept;
 
 protected:
+  YAODAQ_API void          send( const Message& message ) noexcept;
   std::shared_ptr<Logging> get_logger() const noexcept { return m_log; }
   YAODAQ_API ix::WebSocket& getWebsocketClient() noexcept { return m_client; }
   YAODAQ_API void           start()
@@ -71,13 +85,6 @@ private:
   YAODAQ_INTERNAL void onPing( const Ping& ping );
   YAODAQ_INTERNAL void onPong( const Pong& pong );
   YAODAQ_INTERNAL void onLog( const std::unique_ptr<Log> log );
-
-  enum class send_as : std::uint8_t
-  {
-    utf8   = 1,
-    binary = 2,
-  };
-  YAODAQ_INTERNAL void send( const Message& message, const send_as as = send_as::utf8 ) noexcept;
 };
 
 }  // namespace yaodaq

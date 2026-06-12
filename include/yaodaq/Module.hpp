@@ -345,7 +345,6 @@ public:
     Cleaner::instance().remove( this );
   }
 
-  YAODAQ_API void send( const nlohmann::json& json ) { send( json.dump() ); }
   YAODAQ_API void setRun( const std::function<bool()>& fun ) noexcept { m_onrun = fun; }
 
 protected:
@@ -485,6 +484,7 @@ protected:
       default: return Transition::refused;
     }
   }
+  void send_to_server( const std::string_view str ) { send( str ); }
 
 private:
   enum class WorkerState : int

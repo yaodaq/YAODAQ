@@ -1,5 +1,5 @@
 
-#include "yaodaq/WebSocketTransport.hpp"
+#include "yaodaq/transport/WebSocket.hpp"
 
 #include <CLI/CLI.hpp>
 #include <atomic>
@@ -189,9 +189,9 @@ private:
         std::unique_lock<std::mutex> lock( m_mutex );
         m_cv.wait_for( lock, std::chrono::seconds( 1 ), [this]() { return !buffer.empty() || !m_running; } );
       }
-      //flush();
+      flush();
     }
-    //flush();
+    flush();
   }
 
   // ========================================================
@@ -264,9 +264,9 @@ public:
     writer.setHost( "192.168.50.18" );
     writer.setPort( "3306" );
 
-    //writer.connect();
-    //writer.preload();
-    //writer.start();
+    writer.connect();
+    writer.preload();
+    writer.start();
 
     info( "Finding the key" );
 
@@ -300,7 +300,7 @@ public:
   {
     std::function<bool()> fun = [this]() -> bool
     {
-      std::this_thread::sleep_for( std::chrono::milliseconds( 50 ) );
+      std::this_thread::sleep_for( std::chrono::milliseconds( 20 ) );
 
       nlohmann::json json{ { "i", m_key },
                            { "t", "request" },
@@ -309,7 +309,7 @@ public:
                            { "r", "xhr" } };
 
       std::unique_ptr<yaodaq::RawData> raw = std::make_unique<yaodaq::RawData>( yaodaq::RawDataBuilder::from_text( json.dump(), "iseg" ) );
-      send( std::move( raw ) );
+      send_to_device( std::move( raw ) );
 
       return true;
     };
@@ -519,7 +519,7 @@ try
     return app.exit( e );
   }
 
-  yaodaq::BoardConfig cfg( std::make_unique<yaodaq::Connector>( std::make_unique<WebSocket>(), std::make_unique<yaodaq::JSONCodec>() ) );
+  yaodaq::BoardConfig cfg( std::make_unique<yaodaq::Connector>( std::make_unique<WebSocketTransport>(), std::make_unique<yaodaq::JSONCodec>() ) );
 
   cfg.setPort( port ).setHost( host ).verbosity( verbosity );
   cfg.transportParameters().set( "url", "ws://192.168.50.119:8080" );

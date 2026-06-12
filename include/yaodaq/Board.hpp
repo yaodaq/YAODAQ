@@ -84,7 +84,7 @@ public:
     debug( "~Board called" );
     Cleaner::instance().remove( this );
   }
-  YAODAQ_API void send( std::unique_ptr<Message> msg ) { m_connector->send( std::move( msg ) ); }
+  YAODAQ_API void send_to_device( std::unique_ptr<Message> msg ) { m_connector->send( std::move( msg ) ); }
 
   YAODAQ_API std::future<std::unique_ptr<Message>> request( std::unique_ptr<Message> msg ) { return m_connector->request( std::move( msg ) ); }
 
