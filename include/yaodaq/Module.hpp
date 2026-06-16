@@ -44,12 +44,12 @@ public:
 
   YAODAQ_API virtual bool connect()
   {
-    m_State.setId( State::ID::Connected );
+    m_State.setId( State::Type::Connected );
     return true;
   }
   YAODAQ_API virtual bool disconnect()
   {
-    m_State.setId( State::ID::Disconnected );
+    m_State.setId( State::Type::Disconnected );
     return true;
   }
 
@@ -58,13 +58,13 @@ public:
   {
     info( "Linking" );
     yaodaq::Client::start();
-    m_State.setId( State::ID::Linked );
+    m_State.setId( State::Type::Linked );
     return true;
   }
 
   YAODAQ_API bool initialize()
   {
-    Transition transition{ allowTransition( State::ID::Initialized ) };
+    Transition transition{ allowTransition( State::Type::Initialized ) };
     if( transition == Transition::alreadyDone ) return true;
     else if( transition == Transition::allowed )
     {
@@ -73,7 +73,7 @@ public:
       if( ret )
       {
         std::unique_lock lk( m_mutex );
-        m_State.setId( State::ID::Initialized );
+        m_State.setId( State::Type::Initialized );
       }
       return ret;
     }
@@ -86,7 +86,7 @@ public:
 
   YAODAQ_API bool configure()
   {
-    Transition transition{ allowTransition( State::ID::Configured ) };
+    Transition transition{ allowTransition( State::Type::Configured ) };
     if( transition == Transition::alreadyDone ) return true;
     else if( transition == Transition::allowed )
     {
@@ -95,7 +95,7 @@ public:
       if( ret )
       {
         std::unique_lock lk( m_mutex );
-        m_State.setId( State::ID::Configured );
+        m_State.setId( State::Type::Configured );
       }
       return ret;
     }
@@ -108,7 +108,7 @@ public:
 
   YAODAQ_API bool start()
   {
-    Transition transition{ allowTransition( State::ID::Started ) };
+    Transition transition{ allowTransition( State::Type::Started ) };
     if( transition == Transition::alreadyDone ) return true;
     if( transition != Transition::allowed )
     {
@@ -123,7 +123,7 @@ public:
     {
       info( "No run function set, marking module as Started without launching worker thread" );
       m_worker_state.store( WorkerState::Running );
-      m_State.setId( State::ID::Started );
+      m_State.setId( State::Type::Started );
       return true;
     }
 
@@ -133,7 +133,7 @@ public:
       info( "Starting Module Worker" );
 
       m_worker_state.store( WorkerState::Running );
-      m_State.setId( State::ID::Started );
+      m_State.setId( State::Type::Started );
 
       m_worker = std::thread(
         [this]()
@@ -187,7 +187,7 @@ public:
 
   YAODAQ_API bool pause()
   {
-    Transition transition{ allowTransition( State::ID::Paused ) };
+    Transition transition{ allowTransition( State::Type::Paused ) };
     if( transition == Transition::alreadyDone ) return true;
     if( transition != Transition::allowed )
     {
@@ -200,7 +200,7 @@ public:
     // Update state safely
     {
       std::unique_lock lk( m_mutex );
-      m_State.setId( State::ID::Paused );
+      m_State.setId( State::Type::Paused );
 
       // Only pause worker thread if it exists
       if( m_worker.joinable() ) { m_worker_state.store( WorkerState::Paused ); }
@@ -213,7 +213,7 @@ public:
 
   YAODAQ_API bool resume()
   {
-    Transition transition{ allowTransition( State::ID::Started ) };
+    Transition transition{ allowTransition( State::Type::Started ) };
     if( transition == Transition::alreadyDone ) return true;
     if( transition != Transition::allowed )
     {
@@ -225,7 +225,7 @@ public:
 
     {
       std::unique_lock lk( m_mutex );
-      m_State.setId( State::ID::Started );
+      m_State.setId( State::Type::Started );
 
       // Only resume worker thread if it exists
       if( m_worker.joinable() ) { m_worker_state.store( WorkerState::Running ); }
@@ -238,7 +238,7 @@ public:
 
   YAODAQ_API bool stop()
   {
-    Transition transition{ allowTransition( State::ID::Stopped ) };
+    Transition transition{ allowTransition( State::Type::Stopped ) };
     if( transition == Transition::alreadyDone ) return true;
     if( transition != Transition::allowed )
     {
@@ -258,7 +258,7 @@ public:
     {
       std::unique_lock lk( m_mutex );
       m_worker_state.store( WorkerState::Stopped );
-      m_State.setId( State::ID::Stopped );
+      m_State.setId( State::Type::Stopped );
     }
 
     cv.notify_all();  // Notify the worker thread if it exists
@@ -271,7 +271,7 @@ public:
 
   YAODAQ_API bool clear()
   {
-    Transition transition{ allowTransition( State::ID::Cleared ) };
+    Transition transition{ allowTransition( State::Type::Cleared ) };
     if( transition == Transition::alreadyDone ) return true;
     else if( transition == Transition::allowed )
     {
@@ -280,7 +280,7 @@ public:
       if( ret )
       {
         std::unique_lock lk( m_mutex );
-        m_State.setId( State::ID::Cleared );
+        m_State.setId( State::Type::Cleared );
       }
       return ret;
     }
@@ -293,7 +293,7 @@ public:
 
   YAODAQ_API bool release()
   {
-    Transition transition{ allowTransition( State::ID::Linked ) };
+    Transition transition{ allowTransition( State::Type::Released ) };
     if( transition == Transition::alreadyDone ) return true;
     else if( transition == Transition::allowed )
     {
@@ -302,13 +302,13 @@ public:
       if( ret )
       {
         std::unique_lock lk( m_mutex );
-        m_State.setId( State::ID::Linked );
+        m_State.setId( State::Type::Released );
       }
       return ret;
     }
     else
     {
-      warn( "{} to {} unauthorised", getStateStr(), "Linked" );
+      warn( "{} to {} unauthorised", getStateStr(), "Released" );
       return false;
     }
   }
@@ -321,7 +321,7 @@ public:
     if( ret )
     {
       std::unique_lock lk( m_mutex );
-      m_State.setId( State::ID::Linked );
+      m_State.setId( State::Type::Linked );
     }
     return ret;
   }
@@ -404,90 +404,39 @@ protected:
 
   State      m_State;
   std::mutex m_mutex;
-  enum class Transition : int
+  enum class Transition : std::uint8_t
   {
     allowed     = true,
     refused     = false,
     alreadyDone = 2,
   };
-  Transition allowTransition( const State::ID& state )
+  inline static const std::unordered_map<State::Type, std::unordered_set<State::Type>> allowed = { { State::Type::Linked, { State::Type::Initialized } },
+                                                                                                   { State::Type::Initialized, { State::Type::Connected, State::Type::Released } },
+                                                                                                   { State::Type::Connected, { State::Type::Configured, State::Type::Disconnected } },
+                                                                                                   { State::Type::Configured, { State::Type::Started, State::Type::Cleared } },
+                                                                                                   { State::Type::Started, { State::Type::Paused, State::Type::Stopped } },
+                                                                                                   { State::Type::Paused, { State::Type::Stopped, State::Type::Started } },
+                                                                                                   { State::Type::Stopped, { State::Type::Started, State::Type::Cleared } },
+                                                                                                   { State::Type::Cleared, { State::Type::Disconnected, State::Type::Configured } },
+                                                                                                   { State::Type::Disconnected, { State::Type::Connected, State::Type::Released } },
+                                                                                                   { State::Type::Released, { State::Type::Initialized } } };
+  Transition                                                                           allowTransition( const State::Type to )
   {
-    if( state == getState().id() )
+    const State::Type current{ getState().type() };
+    if( to == current )
     {
       warn( "Already in state '{}'", m_State.str() );
       return Transition::alreadyDone;
     }
-    switch( state )
-    {
-      case State::ID::Initialized:
-      {
-        if( getState().id() == State::ID::Linked ) return Transition::allowed;
-        else if( getState().id() == State::ID::Released )
-          return Transition::allowed;
-        else
-          return Transition::refused;
-      }
-      case State::ID::Connected:
-      {
-        if( getState().id() == State::ID::Initialized ) return Transition::allowed;
-        else
-          return Transition::refused;
-      }
-      case State::ID::Configured:
-      {
-        if( getState().id() == State::ID::Connected ) return Transition::allowed;
-        else
-          return Transition::refused;
-      }
-      case State::ID::Started:
-      {
-        if( getState().id() == State::ID::Configured ) return Transition::allowed;
-        else if( getState().id() == State::ID::Paused )
-          return Transition::allowed;
-        else if( getState().id() == State::ID::Stopped )
-          return Transition::allowed;
-        else
-          return Transition::refused;
-      }
-      case State::ID::Paused:
-      {
-        if( getState().id() == State::ID::Started ) return Transition::allowed;
-        else
-          return Transition::refused;
-      }
-      case State::ID::Stopped:
-      {
-        if( getState().id() == State::ID::Started ) return Transition::allowed;
-        else if( getState().id() == State::ID::Paused )
-          return Transition::allowed;
-        else
-          return Transition::refused;
-      }
-      case State::ID::Cleared:
-      {
-        if( getState().id() == State::ID::Stopped ) return Transition::allowed;
-        else
-          return Transition::refused;
-      }
-      case State::ID::Disconnected:
-      {
-        if( getState().id() == State::ID::Cleared ) return Transition::allowed;
-        else
-          return Transition::refused;
-      }
-      case State::ID::Released:
-      {
-        if( getState().id() == State::ID::Disconnected ) return Transition::allowed;
-        else
-          return Transition::refused;
-      }
-      default: return Transition::refused;
-    }
+    const auto it = allowed.find( current );
+    if( it == allowed.end() ) return Transition::refused;
+    return it->second.contains( to ) ? Transition::allowed : Transition::refused;
   }
+
   void send_to_server( const std::string_view str ) { send( str ); }
 
 private:
-  enum class WorkerState : int
+  enum class WorkerState : std::uint8_t
   {
     Running,
     Paused,

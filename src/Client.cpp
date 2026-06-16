@@ -251,7 +251,7 @@ YAODAQ_API void yaodaq::Client::send( const std::string_view str, const send_as 
                                                   m_log->debug_without_websocket( "sent {}/{} ({}%)", current + 1, total, ( current + 1 ) * 100.0 / total );
                                                   return true;
                                                 } };
-  if( m_client.getReadyState() == ix::ReadyState::Closed || m_client.getReadyState() == ix::ReadyState::Closing ) return;
+  if( m_client.getReadyState() != ix::ReadyState::Open ) return;
   ix::WebSocketSendInfo ret;
   switch( as )
   {
@@ -289,8 +289,9 @@ void yaodaq::Client::send( const Message& message ) noexcept
                                                   m_log->debug_without_websocket( "sent {}/{} ({}%)", current + 1, total, ( current + 1 ) * 100.0 / total );
                                                   return true;
                                                 } };
-  const auto                          raw = m_json_codec.encode( message );
-  ix::WebSocketSendInfo               ret = m_client.sendUtf8Text( ix::IXWebSocketSendData( reinterpret_cast<const char*>( raw.data() ), raw.size() ), callback );
+  if( m_client.getReadyState() != ix::ReadyState::Open ) return;
+  const auto            raw = m_json_codec.encode( message );
+  ix::WebSocketSendInfo ret = m_client.sendUtf8Text( ix::IXWebSocketSendData( reinterpret_cast<const char*>( raw.data() ), raw.size() ), callback );
   if( ret.success ) m_log->debug_without_websocket( "sent successful, payload: {}, wire_size:{}", ret.payloadSize, ret.wireSize );
   else
   {

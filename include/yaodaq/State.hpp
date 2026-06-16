@@ -10,7 +10,7 @@ namespace yaodaq
 class State
 {
 public:
-  enum class ID : std::uint8_t
+  enum class Type : std::uint8_t
   {
     Empty = 0,
     Linked,
@@ -24,12 +24,15 @@ public:
     Disconnected,
     Released,
   };
-  YAODAQ_API void setId( const State::ID& id ) { m_id = id; }
-  YAODAQ_API State::ID id() const noexcept { return m_id; }
+  using underlying = std::underlying_type_t<State::Type>;
+  YAODAQ_API void                  setId( const State::Type id ) noexcept { m_type = id; }
+  YAODAQ_API constexpr State::Type type() const noexcept { return m_type; }
   YAODAQ_API std::string str() const;
+  friend bool            operator==( const State& lhs, State::Type rhs ) noexcept { return lhs.m_type == rhs; }
+  friend bool            operator!=( const State& lhs, State::Type rhs ) noexcept { return !( lhs == rhs ); }
 
 private:
-  State::ID m_id{ State::ID::Empty };
+  State::Type m_type{ State::Type::Empty };
 };
 
 }  // namespace yaodaq

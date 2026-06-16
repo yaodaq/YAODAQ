@@ -33,7 +33,7 @@ public:
     m_connector->setCodecParameters( m_config.codecParameters() );
     m_connector->setTransportParameters( m_config.transportParameters() );
     m_connector->setLogger( this->get_logger() );
-    Transition transition{ allowTransition( State::ID::Connected ) };
+    Transition transition{ allowTransition( State::Type::Connected ) };
     if( transition == Transition::alreadyDone ) return true;
     else if( transition == Transition::allowed )
     {
@@ -45,7 +45,7 @@ public:
       if( ret )
       {
         std::unique_lock lk( m_mutex );
-        m_State.setId( State::ID::Connected );
+        m_State.setId( State::Type::Connected );
       }
       return ret;
     }
@@ -57,7 +57,7 @@ public:
   };
   YAODAQ_API bool disconnect() final
   {
-    Transition transition{ allowTransition( State::ID::Disconnected ) };
+    Transition transition{ allowTransition( State::Type::Disconnected ) };
     if( transition == Transition::alreadyDone ) return true;
     else if( transition == Transition::allowed )
     {
@@ -68,7 +68,7 @@ public:
       if( ret )
       {
         std::unique_lock lk( m_mutex );
-        m_State.setId( State::ID::Disconnected );
+        m_State.setId( State::Type::Disconnected );
       }
       return ret;
     }
