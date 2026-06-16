@@ -68,17 +68,14 @@ void yaodaq::Client::handleMessage( const ix::WebSocketMessagePtr& msg ) noexcep
       }
       case ix::WebSocketMessageType::Open:
       {
-        Open open( msg->openInfo );
-        onOpen( open );
+        onOpen( Open( msg->openInfo ) );
         break;
       }
       case ix::WebSocketMessageType::Close:
       {
         if( WebSocketCloseConstant::isRejected( msg->closeInfo.code ) ) { onReject( Reject( msg->closeInfo ) ); }
         else
-        {
           onClose( Close( msg->closeInfo ) );
-        }
         break;
       }
       case ix::WebSocketMessageType::Error:
