@@ -298,7 +298,7 @@ public:
 
   bool on_connect() override
   {
-    std::function<bool()> fun = [this]() -> bool
+    std::function<bool( std::stop_token )> fun = [this]( std::stop_token stop ) -> bool
     {
       std::this_thread::sleep_for( std::chrono::milliseconds( 20 ) );
 

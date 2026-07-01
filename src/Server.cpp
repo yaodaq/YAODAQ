@@ -229,6 +229,13 @@ void yaodaq::Server::onMessage( std::shared_ptr<ix::ConnectionState> connectionS
       onLog( connectionState, webSocket, log );
       break;
     }
+    case Message::Type::RawData:
+    {
+      std::cout << "sending raw data" << std::endl;
+      std::unique_ptr<RawData> req( dynamic_cast<RawData*>( mess.release() ) );
+      onRawData( connectionState, webSocket, std::move( req ) );
+      break;
+    }
   }
 }
 
@@ -237,6 +244,8 @@ void yaodaq::Server::onLog( std::shared_ptr<ix::ConnectionState> connectionState
   // Log the message with the original level, logger, and source location
   sendToLoggers( log );
 }
+
+void yaodaq::Server::onRawData( std::shared_ptr<ix::ConnectionState> connectionState, ix::WebSocket& webSocket, std::unique_ptr<RawData> raw ) { sendExcept( *raw.get(), webSocket ); }
 
 /**
  * @brief

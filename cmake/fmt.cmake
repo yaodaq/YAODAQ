@@ -8,7 +8,7 @@ if(NOT DEFINED FMT_REPOSITORY)
 endif()
 
 if(NOT DEFINED FMT_TAG)
-  set(FMT_TAG "12.1.0")
+  set(FMT_TAG "12.2.0")
 endif()
 
 CPMAddPackage(NAME fmt

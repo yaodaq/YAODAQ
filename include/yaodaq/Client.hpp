@@ -47,7 +47,8 @@ public:
     const std::string_view sv( std::bit_cast<const char*>( raw.data() ), raw.size() );
     send( sv, send_as::binary );
   }
-  YAODAQ_API void send( const std::string_view, const send_as as = send_as::utf8 ) noexcept;
+  YAODAQ_API void         send( const std::string_view, const send_as as = send_as::utf8 ) noexcept;
+  YAODAQ_API virtual void onRawData( const std::unique_ptr<RawData> raw );
 
 protected:
   YAODAQ_API void          send( const Message& message ) noexcept;

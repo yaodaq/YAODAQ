@@ -34,7 +34,7 @@ try
   yaodaq::Module module( cfg, name );
   if( name == "loop" )
     module.setRun(
-      [&module]() -> bool
+      [&module]( std::stop_token stop ) -> bool
       {
         static int event{ 0 };
         module.trace( "trace {}", event );

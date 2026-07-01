@@ -3,7 +3,6 @@
 #include <future>
 #include <iostream>
 #include <mutex>
-#include <simdjson.h>
 #include <string>
 #include <unordered_map>
 #include <vector>

@@ -115,72 +115,57 @@ public:
       warn( "{} to {} unauthorised", getStateStr(), "Started" );
       return false;
     }
-
-    std::unique_lock lk( m_mutex );
-
-    // If no run function is set, just update state and return
-    if( !m_onrun )
+    info( "Starting Module" );
+    if( !on_start() ) return false;
     {
-      info( "No run function set, marking module as Started without launching worker thread" );
-      m_worker_state.store( WorkerState::Running );
+      std::scoped_lock lk( m_mutex );
       m_State.setId( State::Type::Started );
+    }
+    // No run callback -> only update state
+    if( !m_onrun ) return true;
+    // Already running?
+    if( m_worker.joinable() )
+    {
+      info( "Worker already running" );
       return true;
     }
 
-    // Start worker only if not running
-    if( !m_worker.joinable() )
-    {
-      info( "Starting Module Worker" );
-
-      m_worker_state.store( WorkerState::Running );
-      m_State.setId( State::Type::Started );
-
-      m_worker = std::thread(
-        [this]()
+    info( "Launching worker thread" );
+    m_worker = std::jthread(
+      [this]( std::stop_token stop )
+      {
+        try
         {
-          while( true )
+          while( !stop.stop_requested() )
           {
-            std::unique_lock lk( m_mutex );
-            cv.wait( lk, [this]() { return m_worker_state.load() != WorkerState::Paused; } );
+            {
+              std::unique_lock lk( m_mutex );
 
-            if( m_worker_state.load() == WorkerState::Stopped ) break;
-            lk.unlock();
+              cv.wait( lk, [this, &stop] { return stop.stop_requested() || m_worker_state != WorkerState::Paused; } );
 
-            try
-            {
-              if( m_onrun && !m_onrun() )
-              {
-                error( "Run function returned false, stopping worker." );
-                m_worker_state.store( WorkerState::Stopped );
-                break;
-              }
+              if( stop.stop_requested() ) break;
             }
-            catch( const std::exception& e )
+
+            if( !m_onrun( stop ) )
             {
-              error( "Exception in run(): {}", e.what() );
-              m_worker_state.store( WorkerState::Stopped );
-              break;
-            }
-            catch( ... )
-            {
-              error( "Unknown exception in run()" );
-              m_worker_state.store( WorkerState::Stopped );
+              info( "Run function requested exit." );
               break;
             }
           }
+        }
+        catch( const std::exception& e )
+        {
+          error( "Exception in run(): {}", e.what() );
+        }
+        catch( ... )
+        {
+          error( "Unknown exception in run()" );
+        }
 
-          info( "Worker thread exiting" );
-        } );
-    }
-    else
-    {
-      // Worker already running, just resume if paused
-      if( m_worker_state.load() == WorkerState::Paused )
-      {
-        m_worker_state.store( WorkerState::Running );
-        cv.notify_all();
-      }
-    }
+        info( "Worker thread exited" );
+      } );
+
+    m_worker_state.store( WorkerState::Running );
 
     return true;
   }
@@ -260,11 +245,9 @@ public:
       m_worker_state.store( WorkerState::Stopped );
       m_State.setId( State::Type::Stopped );
     }
-
-    cv.notify_all();  // Notify the worker thread if it exists
-
-    // Join worker if it was started
-    if( m_worker.joinable() ) { m_worker.join(); }
+    m_worker.request_stop();
+    cv.notify_all();
+    if( m_worker.joinable() ) m_worker.join();
 
     return true;
   }
@@ -343,9 +326,12 @@ public:
   {
     debug( "~Module called" );
     Cleaner::instance().remove( this );
+    m_worker.request_stop();
+    cv.notify_all();
+    if( m_worker.joinable() ) m_worker.join();
   }
 
-  YAODAQ_API void setRun( const std::function<bool()>& fun ) noexcept { m_onrun = fun; }
+  YAODAQ_API void setRun( const std::function<bool( std::stop_token )>& fun ) noexcept { m_onrun = fun; }
 
 protected:
   bool cleanup() override
@@ -442,10 +428,10 @@ private:
     Paused,
     Stopped
   };
-  std::atomic<WorkerState> m_worker_state{ WorkerState::Stopped };
-  std::condition_variable  cv;
-  std::thread              m_worker;
-  std::function<bool()>    m_onrun;
+  std::atomic<WorkerState>               m_worker_state{ WorkerState::Stopped };
+  std::condition_variable                cv;
+  std::jthread                           m_worker;
+  std::function<bool( std::stop_token )> m_onrun;
 };
 
 }  // namespace yaodaq

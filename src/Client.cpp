@@ -160,7 +160,19 @@ void yaodaq::Client::onMessage( const std::string& str, const std::size_t size, 
       onLog( std::move( req ) );
       break;
     }
+    case Message::Type::RawData:
+    {
+      std::unique_ptr<RawData> req( dynamic_cast<RawData*>( msg.release() ) );
+      onRawData( std::move( req ) );
+    }
   }
+}
+
+void yaodaq::Client::onRawData( const std::unique_ptr<RawData> raw )
+{
+  if( m_identifier.component().role() == Component::Role::Logger ) { info( "Received rawdata with topic :{}\n{}", raw->topic(), std::string( reinterpret_cast<const char*>( raw->raw().data() ), raw->raw().size() ) ); }
+  else
+    warn( "You subscribe to RawData with topic {} but you didn't overloaded onRawData", raw->topic() );
 }
 
 void yaodaq::Client::onClose( const Close& close )

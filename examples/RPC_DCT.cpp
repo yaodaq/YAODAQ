@@ -5,6 +5,7 @@
 #include <cpp-terminal/input.hpp>
 #include <cpp-terminal/iostream.hpp>
 #include <cpp-terminal/terminal.hpp>
+#include <fcntl.h>
 #include <filesystem>
 #include <fmt/ranges.h>
 #include <fmt/std.h>
@@ -16,40 +17,58 @@
 class DCT : public yaodaq::Module
 {
 public:
-  DCT( yaodaq::Config cfg, const std::string_view name ) : yaodaq::Module( cfg, "DCT", "MPI" ) {}
-  virtual bool run()
+  DCT( yaodaq::Config cfg, const std::string_view name ) : yaodaq::Module( cfg, "DCT", "MPI" )
   {
-    std::size_t retries{ 0 };
-    std::string filePath = makeFileName( expectedIndex );
-    while( !fileExists( filePath ) ) std::this_thread::sleep_for( std::chrono::milliseconds( 1 ) );
-    auto lastSize = std::filesystem::file_size( filePath );
-    while( true )
+    setRun( [this]( std::stop_token stop ) { return run( stop ); } );
+  }
+
+  virtual ~DCT()
+  {
+    info( "DCT shutdown" );
+
+    stopVivado();
+
+    if( m_vivado_thread.joinable() )
     {
-      std::this_thread::sleep_for( std::chrono::milliseconds( 2 ) );
-      auto newSize = std::filesystem::file_size( filePath );
-      if( newSize == lastSize ) break;
-      lastSize = newSize;
+      m_vivado_thread.request_stop();
+      m_vivado_thread.join();
     }
-    do
+
+    info( "DCT shutdown complete" );
+  }
+  virtual bool run( std::stop_token stop )
+  {
+    while( !stop.stop_requested() )
     {
+      std::cout << "SSSSSS runingngngngngng" << std::endl;
+      std::size_t retries{ 0 };
+      std::string filePath = makeFileName( expectedIndex );
+      while( !stop.stop_requested() && !fileExists( filePath ) ) std::this_thread::sleep_for( std::chrono::milliseconds( 1 ) );
+      auto lastSize = std::filesystem::file_size( filePath );
+      while( !stop.stop_requested() )
+      {
+        std::this_thread::sleep_for( std::chrono::milliseconds( 2 ) );
+        auto newSize = std::filesystem::file_size( filePath );
+        if( newSize == lastSize ) break;
+        lastSize = newSize;
+      }
       info( "reading and parsing {}", filePath );
       try
       {
         csv::CSVReader reader( filePath.c_str() );
         nlohmann::json json;
-        json["yaodaq"]         = true;
-        json["type"]           = "rawdata";
         nlohmann::json bcids   = nlohmann::json::array();
         nlohmann::json payload = nlohmann::json::array();
         for( auto& row: reader )
         {
-          payload.push_back( std::stol( row["elink_out_tmp[27:0]"].get<std::string>(), nullptr, 16 ) );
-          bcids.push_back( std::stol( row["bcid320[11:0]"].get<std::string>(), nullptr, 16 ) );
+          payload.push_back( row["elink_out_tmp[27:0]"].get<std::string>() );
+          bcids.push_back( row["bcid320[11:0]"].get<std::string>() );
         }
         json["rawdata"]["bcouts"] = bcids;
         json["rawdata"]["words"]  = payload;
-        send( json.dump() );
-        std::filesystem::remove( filePath );
+        std::cout << json.dump( 2 ) << std::endl;
+        send( yaodaq::RawDataBuilder::from_text( json.dump(), "event" ) );
+        //std::filesystem::remove( filePath );
         warn( "removed: {}", filePath );
       }
       catch( const std::exception& e )
@@ -65,14 +84,22 @@ public:
       }
       ++expectedIndex;
       return true;
-    } while( true );
+    }
+    return true;
   }
 
   bool on_start() override
   {
+    std::cout << "FFFFFFFFFFFFFFFFFFFFFFFFff" << std::endl;
+
     createTempDirectory();
-    info( "DCT Rawdata (csv) will be written in {}", m_temp.c_str() );
-    std::string   script = fmt::format( R"(set nEvts {}
+    std::string base = m_temp;
+    //set inputPath {}
+    //set outputPath {}
+    if( !base.ends_with( '/' ) ) base += '/';
+    info( "DCT Rawdata (csv) will be written in {}", m_temp );
+    // ---- Build TCL script as a raw string template ----
+    std::string script = fmt::format( R"(set nEvts {}
     set inputPath {}
     # channel mask
     # . layer2. layer1. layer0
@@ -122,19 +149,17 @@ public:
     }}
     close_hw_manager
     exit)",
-                                        m_events, m_binary_path.c_str(), m_temp.c_str() );
-    std::ofstream script_file( std::string( m_temp.c_str() ) + std::string( "script.tcl" ) );
+                                      m_events, m_binary_path.c_str(), m_temp.c_str() );
+
+    // ---- Write file ----
+    std::ofstream script_file( base + "script.tcl" );
     script_file << script;
     script_file.close();
-    info( "Vivado script has been written and will be launched !" );
-    //std::string path{fmt::format("export PATH=$PATH:{}",m_vivado_path)};
-    //std::string command = fmt::format(
-    //"{} && vivado -mode batch -source \"{}/script.tcl\"",
-    //path,
-    //m_temp.string()
-    //);
 
-    auto result = runProcessCapture( "vivado", { "-mode", "batch", "-source", ( m_temp / "script.tcl" ).string() } );
+    info( "Vivado script has been written and will be launched!" );
+    if( !m_vivado_path.ends_with( '/' ) ) m_vivado_path += '/';
+
+    auto result = runProcessCapture( m_vivado_thread, fmt::format( "{}vivado", m_vivado_path ), { "-mode", "batch", "-source", ( m_temp / "script.tcl" ).string() } );
 
     Term::terminal.setOptions( Term::Option::Raw, Term::Option::Cursor );
     if( result.exitCode != 0 )
@@ -152,6 +177,12 @@ public:
   void setEventNumbers( const std::size_t event ) { m_events = event; }
   void setVivadoPath( const std::string& vivado ) { m_vivado_path = vivado; }
 
+  virtual bool on_stop()
+  {
+    stopVivado();
+    return true;
+  }
+
 private:
   struct ProcessResult
   {
@@ -159,20 +190,22 @@ private:
     std::string output;
   };
 
-  ProcessResult runProcessCapture( const std::string& exe, const std::vector<std::string>& args )
+  ProcessResult runProcessCapture( std::jthread& m_vivado_thread, const std::string& exe, const std::vector<std::string>& args )
   {
     info( "Running : {} {}", exe, fmt::join( args, " " ) );
     int pipefd[2];
-    pipe( pipefd );  // pipefd[0] = read, pipefd[1] = write
+    if( pipe( pipefd ) < 0 )  // pipefd[0] = read, pipefd[1] = write
+      return { -1, "pipe failed" };
 
     pid_t pid = fork();
-
     if( pid < 0 ) return { -1, "fork failed" };
 
     if( pid == 0 )
     {
       // CHILD
-
+      // Create a new process group
+      // Create a new session + process group (VERY IMPORTANT)
+      if( setsid() < 0 ) _exit( 127 );
       ::dup2( pipefd[1], STDOUT_FILENO );
       ::dup2( pipefd[1], STDERR_FILENO );
 
@@ -190,50 +223,55 @@ private:
 
       ::_exit( 127 );
     }
-
+    m_vivado_pid = pid;
     // PARENT
     ::close( pipefd[1] );
-
-    std::string line;
-    char        tmp[4096];
-
-    ssize_t n;
-    while( ( n = read( pipefd[0], tmp, sizeof( tmp ) ) ) > 0 )
+    ::fcntl( pipefd[0], F_SETFL, O_NONBLOCK );
+    if( m_vivado_thread.joinable() )
     {
-      for( ssize_t i = 0; i < n; ++i )
+      m_vivado_thread.request_stop();
+      m_vivado_thread.join();
+    }
+    m_vivado_thread = std::jthread(
+      [this, fd = pipefd[0]]( std::stop_token st ) mutable
       {
-        char c = tmp[i];
+        std::string line;
+        char        tmp[4096];
+        ssize_t     n;
 
-        if( c == '\n' )
+        while( !st.stop_requested() )
         {
-          if( !line.empty() )
+          ssize_t n = read( fd, tmp, sizeof( tmp ) );
+
+          if( n > 0 )
           {
-            info( "Vivado: {}", line );
-            line.clear();
+            for( ssize_t i = 0; i < n; ++i )
+            {
+              char c = tmp[i];
+              if( c == '\n' )
+              {
+                if( !line.empty() )
+                {
+                  info( "Vivado: {}", line );
+                  line.clear();
+                }
+              }
+              else
+                line += c;
+            }
+          }
+          else
+          {
+            std::this_thread::sleep_for( std::chrono::milliseconds( 2 ) );
           }
         }
-        else
-        {
-          line += c;
-        }
-      }
-    }
 
-    // flush last partial line
-    if( !line.empty() ) { info( "Vivado: {}", line ); }
+        if( !line.empty() ) info( "Vivado: {}", line );
 
-    ::close( pipefd[0] );
+        ::close( fd );
+      } );
 
-    int status = 0;
-    waitpid( pid, &status, 0 );
-
-    int code = -1;
-
-    if( WIFEXITED( status ) ) code = WEXITSTATUS( status );
-    else if( WIFSIGNALED( status ) )
-      code = 128 + WTERMSIG( status );
-
-    return { code, "" };
+    return { 0, "" };
   }
 
   std::size_t m_events{ 1000 };
@@ -244,6 +282,7 @@ private:
   {
     char  dirTemplate[] = "/tmp/DCTRawData_XXXXXX";
     char* result        = mkdtemp( dirTemplate );
+    std::cout << result << std::endl;
     if( result )
     {
       m_temp = result;
@@ -257,6 +296,33 @@ private:
   std::filesystem::path m_temp;
   std::string           m_binary_path{ "./" };
   std::string           m_vivado_path{ "/tools/Xilinx/2025.1.1/Vivado/bin" };
+  pid_t                 m_vivado_pid{ -1 };
+  std::jthread          m_vivado_thread;
+  void                  stopVivado()
+  {
+    if( m_vivado_pid <= 0 ) return;
+
+    info( "Stopping Vivado process group" );
+
+    kill( -m_vivado_pid, SIGTERM );
+
+    for( int i = 0; i < 20; ++i )
+    {
+      if( waitpid( m_vivado_pid, nullptr, WNOHANG ) == m_vivado_pid )
+      {
+        m_vivado_pid = -1;
+        return;
+      }
+      std::this_thread::sleep_for( std::chrono::milliseconds( 100 ) );
+    }
+
+    warn( "Vivado not responding → SIGKILL" );
+
+    kill( -m_vivado_pid, SIGKILL );
+    waitpid( m_vivado_pid, nullptr, 0 );
+
+    m_vivado_pid = -1;
+  }
 };
 
 int main( int argc, char* argv[] )
@@ -269,11 +335,11 @@ try
   app.add_option( "-i,--ip", host, "IP of the server" ) /*->check( CLI::ValidIPV4 )*/;
   int port{ 8888 };
   app.add_option( "-p,--port", port, "Port to listen" )->check( CLI::Range( 0, 65535 ) );
-  std::string path_binary{ "./" };
+  std::string path_binary{ "/home/user/Desktop/Mattia_python/bi_dct_data_acquisition_update_M/BI_DCT_FW/" };
   app.add_option( "--path", path_binary, "binaries path to load to the DCT" );
   std::size_t event_number{ 1000 };
   app.add_option( "-e,--events", event_number, "Number of events to take" );
-  std::string vivado_path{ "/tools/Xilinx/2025.1.1/Vivado/bin" };
+  std::string vivado_path{ "/opt/vivado/2025.2/Vivado/bin/" };
   app.add_option( "--vivado", vivado_path, "Vivado installation path" );
   try
   {
@@ -323,13 +389,13 @@ try
 }
 catch( const yaodaq::Exception& exception )
 {
-  //spdlog::error( "{}", exception.what() );
+  Term::cerr << Term::color_fg( Term::Color::Name::Red ) << exception.what() << Term::color_fg( Term::Color::Name::Default ) << std::endl;
 }
 catch( const std::exception& exception )
 {
-  //spdlog::error( "{}", exception.what() );
+  Term::cerr << Term::color_fg( Term::Color::Name::Red ) << exception.what() << Term::color_fg( Term::Color::Name::Default ) << std::endl;
 }
 catch( ... )
 {
-  //spdlog::error( "Exception thrown" );
+  Term::cerr << Term::color_fg( Term::Color::Name::Red ) << "error" << Term::color_fg( Term::Color::Name::Default ) << std::endl;
 }
