@@ -529,7 +529,7 @@ try
   board.dispatcher().subscribe<yaodaq::RawData>(
     [&board]( const yaodaq::RawData& msg )
     {
-      std::string_view  text( reinterpret_cast<const char*>( msg.raw().data() ), msg.raw().size() );
+      std::string_view  text( reinterpret_cast<const char*>( msg.payload().data() ), msg.payload().size() );
       std::vector<Info> info = parse( text );
       for( std::size_t i = 0; i != info.size(); ++i )
       {

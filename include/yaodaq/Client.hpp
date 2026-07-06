@@ -70,7 +70,7 @@ private:
   YAODAQ_API explicit Client() noexcept = delete;
   Identifier               m_identifier;
   ix::WebSocket            m_client;
-  JSONCodec                m_json_codec;
+  YAODAQJSONCodec          m_json_codec;
   std::shared_ptr<Logging> m_log;
   YAODAQ_INTERNAL void     handleMessage( const ix::WebSocketMessagePtr& msg ) noexcept;
 

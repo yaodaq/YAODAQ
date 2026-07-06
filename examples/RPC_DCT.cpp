@@ -57,17 +57,18 @@ public:
       {
         csv::CSVReader reader( filePath.c_str() );
         nlohmann::json json;
-        nlohmann::json bcids   = nlohmann::json::array();
-        nlohmann::json payload = nlohmann::json::array();
+        nlohmann::json raw_hits = nlohmann::json::array();
         for( auto& row: reader )
         {
-          payload.push_back( row["elink_out_tmp[27:0]"].get<std::string>() );
-          bcids.push_back( row["bcid320[11:0]"].get<std::string>() );
+          if( row["elink_out_tmp[27:0]"].get<std::string>() == "5555555" ) continue;
+          nlohmann::json raw_hit = nlohmann::json::object();
+          raw_hit["word"]        = row["elink_out_tmp[27:0]"].get<std::string>();
+          raw_hit["bcid"]        = row["bcid320[11:0]"].get<std::string>();
+          raw_hits.push_back( raw_hit );
         }
-        json["rawdata"]["bcouts"] = bcids;
-        json["rawdata"]["words"]  = payload;
-        std::cout << json.dump( 2 ) << std::endl;
-        send( yaodaq::RawDataBuilder::from_text( json.dump(), "event" ) );
+        json = raw_hits;
+        info( "sending {}", json.dump( 1 ) );
+        send( yaodaq::RawDataBuilder::from_text( json.dump(), "MPI::DCT::Singlets::RawData" ) );
         //std::filesystem::remove( filePath );
         warn( "removed: {}", filePath );
       }

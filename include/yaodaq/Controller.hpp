@@ -98,10 +98,10 @@ public:
     bool ret = link();
     return ret;
   }
+  YAODAQ_API virtual void onRawData( const std::unique_ptr<RawData> raw ) final {}
   YAODAQ_API explicit Controller() noexcept = delete;
   YAODAQ_API virtual ~Controller() noexcept = default;
 
-protected:
 private:
   virtual void onResponse( const std::string& ) override final;
   virtual void Send( const std::string_view request ) override final;

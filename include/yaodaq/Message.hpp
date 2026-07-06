@@ -267,7 +267,7 @@ public:
   explicit RawData( std::string_view topic ) : Message( Message::Type::RawData ), m_topic( topic ) {}
   explicit RawData( std::span<const std::byte> raw_data, std::string_view topic ) : Message( Message::Type::RawData ), m_topic( topic ), m_payload( raw_data.begin(), raw_data.end() ) {}
   std::string_view           topic() const noexcept { return m_topic; }
-  std::span<const std::byte> raw() const noexcept { return m_payload; }
+  std::span<const std::byte> payload() const noexcept { return m_payload; }
 
 private:
   std::string            m_topic;
