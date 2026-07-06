@@ -40,7 +40,6 @@ public:
   {
     while( !stop.stop_requested() )
     {
-      std::cout << "SSSSSS runingngngngngng" << std::endl;
       std::size_t retries{ 0 };
       std::string filePath = makeFileName( expectedIndex );
       while( !stop.stop_requested() && !fileExists( filePath ) ) std::this_thread::sleep_for( std::chrono::milliseconds( 1 ) );
@@ -66,8 +65,9 @@ public:
           raw_hit["bcid"]        = row["bcid320[11:0]"].get<std::string>();
           raw_hits.push_back( raw_hit );
         }
-        json = raw_hits;
-        info( "sending {}", json.dump( 1 ) );
+        json["event_number"] = static_cast<int>( expectedIndex.load() );
+        json["rawdata"]      = raw_hits;
+        info( "sending {}", yaodaq::Formatter::format( json.dump() ) );
         send( yaodaq::RawDataBuilder::from_text( json.dump(), "MPI::DCT::Singlets::RawData" ) );
         //std::filesystem::remove( filePath );
         warn( "removed: {}", filePath );

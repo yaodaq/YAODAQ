@@ -15,9 +15,14 @@ find_package(ROOT)
 add_executable(DCT RPC_DCT.cpp)
 target_link_libraries(DCT PRIVATE yaodaq::yaodaq CLI11::CLI11 cpp-terminal::cpp-terminal spdlog::spdlog csv)
 
+add_library(Data SHARED)
+target_compile_features(Data PUBLIC cxx_std_20)
+root_generate_dictionary(RawData_Dict RawData.hpp Data.hpp MODULE Data LINKDEF LinkDef.h)
+
 add_executable(FileWriter DCT_FileWriter.cpp)
-target_link_libraries(FileWriter PRIVATE yaodaq::yaodaq CLI11::CLI11 cpp-terminal::cpp-terminal spdlog::spdlog ROOT::Core ROOT::RIO ROOT::ROOTNTuple)
+target_link_libraries(FileWriter PRIVATE Data yaodaq::yaodaq CLI11::CLI11 cpp-terminal::cpp-terminal spdlog::spdlog ROOT::Core ROOT::RIO ROOT::ROOTNTuple)
 # Attach dictionaries to the executable. First, tell it where to look for headers required by the dictionaries:
 target_include_directories(FileWriter PRIVATE $<BUILD_INTERFACE:${PROJECT_SOURCE_DIR}/example>)
-# Then generate dictionaries and add them as a dependency of the executable (via the MODULE parameter):
-ROOT_GENERATE_DICTIONARY(RawDataDict RawData.hpp Data.hpp MODULE FileWriter LINKDEF LinkDef.h)
+
+add_executable(Analysor Analysor.cpp)
+target_link_libraries(Analysor PRIVATE yaodaq::yaodaq Data CLI11::CLI11 cpp-terminal::cpp-terminal spdlog::spdlog ROOT::Core ROOT::RIO)
