@@ -138,8 +138,8 @@ void yaodaq::Client::onOpen( const Open& open )
 
 void yaodaq::Client::onMessage( const std::string& str, const std::size_t size, const bool binary )
 {
-  auto                     bytes = std::span{ reinterpret_cast<const std::byte*>( str.data() ), str.size() };
-  std::unique_ptr<Message> msg   = m_json_codec.decode( bytes );
+  TransportPacket          packet( ByteBufferView( reinterpret_cast<const std::byte*>( str.data() ), str.size() ), "websocket" );
+  std::unique_ptr<Message> msg = m_json_codec.decode( packet );
   switch( msg->type() )
   {
     case Message::Type::RPCRequest:

@@ -1,6 +1,7 @@
 #pragma once
 #include "yaodaq/Exception.hpp"
 #include "yaodaq/Export.hpp"
+#include "yaodaq/Types.hpp"
 #include "yaodaq/Version.hpp"
 
 #include <chrono>

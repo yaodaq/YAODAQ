@@ -37,100 +37,109 @@ try
   Term::cout << Term::color_fg( Term::Color::Name::Red ) << "Press " << std::to_string( nbrCTLC ) << " times CTRL+C to stop" << Term::color_fg( Term::Color::Name::Default ) << std::endl;
   while( true )
   {
-    Term::Event event = Term::read_event();
-    switch( event.type() )
+    try
     {
-      case Term::Event::Type::Key:
+      Term::Event event = Term::read_event();
+      switch( event.type() )
       {
-        Term::Key key( event );
-        if( key == Term::Key::Ctrl_Q )
+        case Term::Event::Type::Key:
         {
-          --nbrCTLC;
-          if( nbrCTLC == 0 ) return 0;
+          Term::Key key( event );
+          if( key == Term::Key::Ctrl_Q )
+          {
+            --nbrCTLC;
+            if( nbrCTLC == 0 ) return 0;
+            else
+              Term::cout << Term::color_fg( Term::Color::Name::Red ) << "Press Ctrl+Q " << std::to_string( nbrCTLC ) << " times to quit" << Term::color_fg( Term::Color::Name::Default ) << std::endl;
+          }
+          else if( key == Term::Key::s )
+          {
+            Term::cout << controller.CallMethod( "getState" ).pretty_format() << std::endl;
+            nbrCTLC = 3;
+          }
+          else if( key == Term::Key::Ctrl_I )
+          {
+            Term::cout << controller.initialize().tabulate() << std::endl;
+            nbrCTLC = 3;
+          }
+          else if( key == Term::Key::Ctrl_L )
+          {
+            Term::cout << controller.connect().tabulate() << std::endl;
+            nbrCTLC = 3;
+          }
+          else if( key == Term::Key::Ctrl_C )
+          {
+            Term::cout << controller.configure().tabulate() << std::endl;
+            nbrCTLC = 3;
+          }
+          else if( key == Term::Key::Ctrl_S )
+          {
+            Term::cout << controller.start().tabulate() << std::endl;
+            nbrCTLC = 3;
+          }
+          else if( key == Term::Key::p )
+          {
+            Term::cout << controller.pause().tabulate() << std::endl;
+            nbrCTLC = 3;
+          }
+          else if( key == Term::Key::r )
+          {
+            Term::cout << controller.resume().tabulate() << std::endl;
+            nbrCTLC = 3;
+          }
+          else if( key == Term::Key::Ctrl_K )
+          {
+            Term::cout << controller.stop().tabulate() << std::endl;
+            nbrCTLC = 3;
+          }
+          else if( key == Term::Key::Ctrl_Z )
+          {
+            Term::cout << controller.clear().tabulate() << std::endl;
+            nbrCTLC = 3;
+          }
+          else if( key == Term::Key::Ctrl_D )
+          {
+            Term::cout << controller.disconnect().tabulate() << std::endl;
+            nbrCTLC = 3;
+          }
+          else if( key == Term::Key::Ctrl_R )
+          {
+            Term::cout << controller.release().tabulate() << std::endl;
+            nbrCTLC = 3;
+          }
+          else if( key == Term::Key::h )
+          {
+            Term::cout << controller.CallMethod( "listProcedures" ).pretty_format() << std::endl;
+            nbrCTLC = 3;
+          }
           else
-            Term::cout << Term::color_fg( Term::Color::Name::Red ) << "Press Ctrl+Q " << std::to_string( nbrCTLC ) << " times to quit" << Term::color_fg( Term::Color::Name::Default ) << std::endl;
-        }
-        else if( key == Term::Key::s )
-        {
-          Term::cout << controller.CallMethod( "getState" ).pretty_format() << std::endl;
-          nbrCTLC = 3;
-        }
-        else if( key == Term::Key::Ctrl_I )
-        {
-          Term::cout << controller.initialize().tabulate() << std::endl;
-          nbrCTLC = 3;
-        }
-        else if( key == Term::Key::Ctrl_L )
-        {
-          Term::cout << controller.connect().tabulate() << std::endl;
-          nbrCTLC = 3;
-        }
-        else if( key == Term::Key::Ctrl_C )
-        {
-          Term::cout << controller.configure().tabulate() << std::endl;
-          nbrCTLC = 3;
-        }
-        else if( key == Term::Key::Ctrl_S )
-        {
-          Term::cout << controller.start().tabulate() << std::endl;
-          nbrCTLC = 3;
-        }
-        else if( key == Term::Key::p )
-        {
-          Term::cout << controller.pause().tabulate() << std::endl;
-          nbrCTLC = 3;
-        }
-        else if( key == Term::Key::r )
-        {
-          Term::cout << controller.resume().tabulate() << std::endl;
-          nbrCTLC = 3;
-        }
-        else if( key == Term::Key::Ctrl_K )
-        {
-          Term::cout << controller.stop().tabulate() << std::endl;
-          nbrCTLC = 3;
-        }
-        else if( key == Term::Key::Ctrl_Z )
-        {
-          Term::cout << controller.clear().tabulate() << std::endl;
-          nbrCTLC = 3;
-        }
-        else if( key == Term::Key::Ctrl_D )
-        {
-          Term::cout << controller.disconnect().tabulate() << std::endl;
-          nbrCTLC = 3;
-        }
-        else if( key == Term::Key::Ctrl_R )
-        {
-          Term::cout << controller.release().tabulate() << std::endl;
-          nbrCTLC = 3;
-        }
-        else if( key == Term::Key::h )
-        {
-          Term::cout << controller.CallMethod( "listProcedures" ).pretty_format() << std::endl;
-          nbrCTLC = 3;
-        }
-        else
-        {
-          nbrCTLC = 3;
-          Term::cout << "Press :\n";
-          Term::cout << "h : list procedures\n";
-          Term::cout << "s : list states\n";
+          {
+            nbrCTLC = 3;
+            Term::cout << "Press :\n";
+            Term::cout << "h : list procedures\n";
+            Term::cout << "s : list states\n";
 
-          Term::cout << "Ctrl+I : initialize\n";
-          Term::cout << "Ctrl+L : connect\n";
-          Term::cout << "Ctrl+C : configure\n";
-          Term::cout << "Ctrl+S : start\n";
-          Term::cout << "p : pause\n";
-          Term::cout << "r : resume\n";
-          Term::cout << "Ctrl+K : stop\n";
-          Term::cout << "Ctrl+Z : clear\n";
-          Term::cout << "Ctrl+D : disconnect\n";
-          Term::cout << "Ctrl+R : release\n" << std::endl;
+            Term::cout << "Ctrl+I : initialize\n";
+            Term::cout << "Ctrl+L : connect\n";
+            Term::cout << "Ctrl+C : configure\n";
+            Term::cout << "Ctrl+S : start\n";
+            Term::cout << "p : pause\n";
+            Term::cout << "r : resume\n";
+            Term::cout << "Ctrl+K : stop\n";
+            Term::cout << "Ctrl+Z : clear\n";
+            Term::cout << "Ctrl+D : disconnect\n";
+            Term::cout << "Ctrl+R : release\n" << std::endl;
+          }
+          break;
         }
-        break;
+        default: break;
       }
-      default: break;
+    }
+    catch( const jsonrpc::exception& exception )
+    {
+      if( exception.code() == jsonrpc::timeout ) { Term::cerr << exception.what() << std::endl; }
+      else
+        throw;
     }
   };
   return 0;

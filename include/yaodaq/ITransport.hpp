@@ -2,6 +2,7 @@
 #include "yaodaq/Export.hpp"
 #include "yaodaq/Logging.hpp"
 #include "yaodaq/Parameters.hpp"
+#include "yaodaq/Types.hpp"
 
 #include <cstddef>
 #include <optional>
@@ -22,11 +23,11 @@ public:
 
   YAODAQ_API virtual void write( std::span<const std::byte> data ) = 0;
 
-  YAODAQ_API virtual std::optional<std::vector<std::byte>> read()             = 0;
-  YAODAQ_API virtual bool                                  verifyParameters() = 0;
-  YAODAQ_API void                                          setParameters( const Parameters& params ) noexcept { m_params = params; }
-  YAODAQ_API const Parameters&                             getParameters() const noexcept { return m_params; }
-  YAODAQ_API Parameters&                                   getParameters() noexcept { return m_params; }
+  YAODAQ_API virtual std::vector<TransportPacket> read()             = 0;
+  YAODAQ_API virtual bool                         verifyParameters() = 0;
+  YAODAQ_API void                                 setParameters( const Parameters& params ) noexcept { m_params = params; }
+  YAODAQ_API const Parameters&                    getParameters() const noexcept { return m_params; }
+  YAODAQ_API Parameters&                          getParameters() noexcept { return m_params; }
 
 private:
   Parameters m_params;

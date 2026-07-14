@@ -109,63 +109,80 @@ public:
   YAODAQ_API bool start()
   {
     Transition transition{ allowTransition( State::Type::Started ) };
+
     if( transition == Transition::alreadyDone ) return true;
+
     if( transition != Transition::allowed )
     {
       warn( "{} to {} unauthorised", getStateStr(), "Started" );
       return false;
     }
+
     info( "Starting Module" );
-    if( !on_start() ) return false;
+
     {
       std::scoped_lock lk( m_mutex );
       m_State.setId( State::Type::Started );
+      m_worker_state.store( WorkerState::Running );
     }
-    // No run callback -> only update state
-    if( !m_onrun ) return true;
-    // Already running?
-    if( m_worker.joinable() )
+
+    // Start worker first
+    if( m_onrun && !m_worker.joinable() )
     {
-      info( "Worker already running" );
-      return true;
-    }
+      info( "Launching worker thread" );
 
-    info( "Launching worker thread" );
-    m_worker = std::jthread(
-      [this]( std::stop_token stop )
-      {
-        try
+      m_worker = std::jthread(
+        [this]( std::stop_token stop )
         {
-          while( !stop.stop_requested() )
+          try
           {
+            while( !stop.stop_requested() )
             {
-              std::unique_lock lk( m_mutex );
+              {
+                std::unique_lock lk( m_mutex );
 
-              cv.wait( lk, [this, &stop] { return stop.stop_requested() || m_worker_state != WorkerState::Paused; } );
+                cv.wait( lk, [this, &stop] { return stop.stop_requested() || m_worker_state != WorkerState::Paused; } );
 
-              if( stop.stop_requested() ) break;
-            }
+                if( stop.stop_requested() ) break;
+              }
 
-            if( !m_onrun( stop ) )
-            {
-              info( "Run function requested exit." );
-              break;
+              if( !m_onrun( stop ) )
+              {
+                info( "Run function requested exit." );
+                break;
+              }
             }
           }
-        }
-        catch( const std::exception& e )
-        {
-          error( "Exception in run(): {}", e.what() );
-        }
-        catch( ... )
-        {
-          error( "Unknown exception in run()" );
-        }
+          catch( const std::exception& e )
+          {
+            error( "Exception in run(): {}", e.what() );
+          }
+          catch( ... )
+          {
+            error( "Unknown exception in run()" );
+          }
 
-        info( "Worker thread exited" );
-      } );
+          info( "Worker thread exited" );
+        } );
+    }
 
-    m_worker_state.store( WorkerState::Running );
+    // Now the worker exists
+    if( !on_start() )
+    {
+      error( "on_start() failed" );
+
+      if( m_worker.joinable() )
+      {
+        m_worker.request_stop();
+        cv.notify_all();
+        m_worker.join();
+      }
+
+      std::scoped_lock lk( m_mutex );
+      m_State.setId( State::Type::Configured );
+
+      return false;
+    }
 
     return true;
   }

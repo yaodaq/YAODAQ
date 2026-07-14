@@ -52,7 +52,13 @@ public:
     m_client.sendUtf8Text( ix::IXWebSocketSendData( reinterpret_cast<const char*>( raw.data() ), raw.size() ) );  //NOSONAR
   }
 
-  YAODAQ_API std::optional<std::vector<std::byte>> read() override { return m_incoming.pop(); }
+  YAODAQ_API std::vector<yaodaq::TransportPacket> read() override
+  {
+    const auto re = m_incoming.pop();
+    if( re.has_value() ) return { *re };
+    else
+      return {};
+  }
 
   YAODAQ_API bool verifyParameters() final
   {
@@ -61,9 +67,9 @@ public:
   }
 
 private:
-  ix::WebSocket                           m_client;
-  ThreadSafeQueue<std::vector<std::byte>> m_incoming;
-  void                                    onMessage( const ix::WebSocketMessagePtr& msg ) noexcept  //NOSONAR
+  ix::WebSocket                            m_client;
+  ThreadSafeQueue<yaodaq::TransportPacket> m_incoming;
+  void                                     onMessage( const ix::WebSocketMessagePtr& msg ) noexcept  //NOSONAR
   {
     switch( msg->type )
     {
@@ -97,7 +103,7 @@ private:
       case ix::WebSocketMessageType::Message:
       {
         trace( "Received {} bytes{}", msg->wireSize, msg->binary ? "binary" : "" );
-        m_incoming.push( std::vector<std::byte>( reinterpret_cast<const std::byte*>( msg->str.data() ), reinterpret_cast<const std::byte*>( msg->str.data() ) + msg->str.size() ) );
+        m_incoming.push( yaodaq::TransportPacket( std::vector<std::byte>( reinterpret_cast<const std::byte*>( msg->str.data() ), reinterpret_cast<const std::byte*>( msg->str.data() ) + msg->str.size() ), "websocket" ) );
         break;
       }
       default: break;

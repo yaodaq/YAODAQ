@@ -206,8 +206,8 @@ void yaodaq::Server::onReject( std::shared_ptr<ix::ConnectionState> connectionSt
 
 void yaodaq::Server::onMessage( std::shared_ptr<ix::ConnectionState> connectionState, ix::WebSocket& webSocket, const std::string& str, const std::size_t size, const bool binary )
 {
-  std::span<const std::byte> m_bytes{ reinterpret_cast<const std::byte*>( str.data() ), str.size() };
-  std::unique_ptr<Message>   mess = m_json_codec.decode( m_bytes );
+  const TransportPacket    packet( ByteBufferView( reinterpret_cast<const std::byte*>( str.data() ), str.size() ), "websocket" );
+  std::unique_ptr<Message> mess = m_json_codec.decode( packet );
   switch( mess->type() )
   {
     case Message::Type::RPCRequest:

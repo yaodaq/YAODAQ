@@ -17,10 +17,11 @@ class ICodec : public Loggable
 {
 public:
   YAODAQ_API ICodec( const std::string_view name, const std::string_view type ) : Loggable( Identifier( Component::Role::Codec, type, name ) ) {}
-  YAODAQ_API virtual ~ICodec() noexcept                                                       = default;
-  YAODAQ_API virtual std::vector<std::byte>   encode( const Message& msg ) const              = 0;
-  YAODAQ_API virtual std::unique_ptr<Message> decode( std::span<const std::byte> data ) const = 0;
+  YAODAQ_API virtual ~ICodec() noexcept                                                   = default;
+  YAODAQ_API virtual std::vector<std::byte>   encode( const Message& msg ) const          = 0;
+  YAODAQ_API virtual std::unique_ptr<Message> decode( const TransportPacket& data ) const = 0;
   YAODAQ_API void                             setParameters( const Parameters& params ) noexcept { m_params = params; }
+  YAODAQ_API virtual void                     reset() {}
 
 private:
   Parameters m_params;

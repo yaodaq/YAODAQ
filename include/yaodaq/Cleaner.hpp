@@ -11,7 +11,7 @@ namespace yaodaq
 
 class Client;
 class Server;
-
+//class ProcessTransport;
 class Cleaner
 {
 public:
@@ -24,6 +24,8 @@ public:
   YAODAQ_API static bool add( Server* s );
   YAODAQ_API static void remove( Client* c );
   YAODAQ_API static void remove( Server* c );
+  //YAODAQ_API static bool add( ProcessTransport* c );
+  //YAODAQ_API static void remove( ProcessTransport* c );
   YAODAQ_API static void clean();
 
 private:
@@ -36,6 +38,7 @@ private:
   inline static std::mutex           m_mutex;
   inline static std::vector<Client*> m_clients;
   inline static std::vector<Server*> m_server;
+  //inline static std::vector<ProcessTransport*> m_process;
 };
 
 }  // namespace yaodaq

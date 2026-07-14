@@ -37,17 +37,20 @@ public:
     if( transition == Transition::alreadyDone ) return true;
     else if( transition == Transition::allowed )
     {
+      bool good = true;
       info( "Connecting" );
-      bool ret = on_connect();
-      if( !ret ) return false;
-      m_connector->setLogger( this->get_logger() );
-      ret = m_connector->connect();
-      if( ret )
+      good = pre_connect();
+      if( !good ) return false;
+      good = m_connector->connect();
+      if( !good ) return false;
       {
         std::unique_lock lk( m_mutex );
         m_State.setId( State::Type::Connected );
       }
-      return ret;
+      good = post_connect();
+      if( !good ) return false;
+      else
+        return true;
     }
     else
     {
@@ -61,16 +64,20 @@ public:
     if( transition == Transition::alreadyDone ) return true;
     else if( transition == Transition::allowed )
     {
+      bool good = true;
       info( "Disconnecting" );
-      bool ret = on_disconnect();
-      if( !ret ) return false;
-      ret = m_connector->disconnect();
-      if( ret )
+      good = pre_disconnect();
+      if( !good ) return false;
+      good = m_connector->disconnect();
+      if( !good ) return false;
       {
         std::unique_lock lk( m_mutex );
         m_State.setId( State::Type::Disconnected );
       }
-      return ret;
+      good = post_disconnect();
+      if( !good ) return false;
+      else
+        return true;
     }
     else
     {
@@ -91,8 +98,10 @@ public:
   YAODAQ_API Dispatcher& dispatcher() { return m_connector->dispatcher(); }
 
 protected:
-  virtual bool            on_connect() { return true; };
-  virtual bool            on_disconnect() { return true; };
+  virtual bool            pre_connect() { return true; };
+  virtual bool            post_connect() { return true; };
+  virtual bool            pre_disconnect() { return true; };
+  virtual bool            post_disconnect() { return true; };
   YAODAQ_API virtual bool cleanup() final
   {
     debug( "Board cleanup" );

@@ -2,6 +2,7 @@
 
 #include "yaodaq/Client.hpp"
 #include "yaodaq/Server.hpp"
+
 bool yaodaq::Cleaner::add( Client* c )
 {
   std::lock_guard lock( m_mutex );
@@ -37,6 +38,24 @@ bool yaodaq::Cleaner::add( Server* s )
     return true;
   }
 }
+
+/*bool yaodaq::Cleaner::add( ProcessTransport* s )
+{
+  std::lock_guard lock( m_mutex );
+
+  auto it = std::find( m_process.begin(), m_process.end(), s );
+  if( it != m_process.end() )
+  {
+    *it = s;  // replace existing pointer
+    return true;
+  }
+  else
+  {
+    m_process.push_back( s );
+    return true;
+  }
+}*/
+
 void yaodaq::Cleaner::remove( Client* c )
 {
   std::lock_guard lock( m_mutex );
@@ -59,6 +78,18 @@ void yaodaq::Cleaner::remove( Server* s )
     m_server.erase( it );  // then remove from vector
   }
 }
+
+/*void yaodaq::Cleaner::remove( ProcessTransport* s )
+{
+  std::lock_guard lock( m_mutex );
+  auto it = std::find( m_process.begin(), m_process.end(), s );
+  if( it != m_process.end() )
+  {
+    s->cleanup();          // cleanup first
+    m_process.erase( it );  // then remove from vector
+  }
+}*/
+
 void yaodaq::Cleaner::clean()
 {
   std::cout << "cleaning" << std::endl;

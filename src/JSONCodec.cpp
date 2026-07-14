@@ -113,11 +113,11 @@ std::vector<std::byte> yaodaq::JSONCodec::encode( const yaodaq::Message& msg ) c
   return { reinterpret_cast<const std::byte*>( j.data() ), reinterpret_cast<const std::byte*>( j.data() + j.size() ) };
 }
 
-std::unique_ptr<yaodaq::Message> yaodaq::JSONCodec::decode( std::span<const std::byte> data ) const
+std::unique_ptr<yaodaq::Message> yaodaq::JSONCodec::decode( const TransportPacket& data ) const
 {
-  if( data.empty() ) return nullptr;
+  if( data.payload.empty() ) return nullptr;
   thread_local simdjson::dom::parser parser;
-  auto                               doc = parser.parse( reinterpret_cast<const char*>( data.data() ), data.size() );
+  auto                               doc = parser.parse( reinterpret_cast<const char*>( data.payload.data() ), data.payload.size() );
   if( doc.error() ) throw std::runtime_error( simdjson::error_message( doc.error() ) );
   simdjson::dom::element json = doc.value();
 
@@ -147,10 +147,10 @@ std::unique_ptr<yaodaq::Message> yaodaq::JSONCodec::decode( std::span<const std:
   // Raw payload
   //
   auto meta = json["meta"];
-  if( meta.error() ) return std::make_unique<RawData>( data, "unknown" );
+  if( meta.error() ) return std::make_unique<RawData>( data.payload, data.channel );
 
   std::string_view type_str;
-  if( meta["type"].get( type_str ) ) return std::make_unique<RawData>( data, "unknown" );
+  if( meta["type"].get( type_str ) ) return std::make_unique<RawData>( data.payload, data.channel );
 
   auto type = magic_enum::enum_cast<Message::Type>( type_str, magic_enum::case_insensitive ).value_or( Message::Type::Unknown );
 
@@ -307,7 +307,7 @@ std::unique_ptr<yaodaq::Message> yaodaq::JSONCodec::decode( std::span<const std:
       msg = std::make_unique<Log>( logger_name, static_cast<int>( level ), message, logger_time, filename, funcname, static_cast<std::uint32_t>( line ), static_cast<std::uint32_t>( column ) );
       break;
     }
-    default: return std::make_unique<RawData>( data, "unknown" );
+    default: return std::make_unique<RawData>( data.payload, data.channel );
   }
   msg->setMeta( uuid, time, ver );
   return msg;
@@ -424,11 +424,11 @@ std::vector<std::byte> yaodaq::YAODAQJSONCodec::encode( const yaodaq::Message& m
   return { reinterpret_cast<const std::byte*>( j.data() ), reinterpret_cast<const std::byte*>( j.data() + j.size() ) };
 }
 
-std::unique_ptr<yaodaq::Message> yaodaq::YAODAQJSONCodec::decode( std::span<const std::byte> data ) const
+std::unique_ptr<yaodaq::Message> yaodaq::YAODAQJSONCodec::decode( const TransportPacket& data ) const
 {
-  if( data.empty() ) return nullptr;
+  if( data.payload.empty() ) return nullptr;
   thread_local simdjson::dom::parser parser;
-  auto                               doc = parser.parse( reinterpret_cast<const char*>( data.data() ), data.size() );
+  auto                               doc = parser.parse( reinterpret_cast<const char*>( data.payload.data() ), data.payload.size() );
   if( doc.error() ) throw std::runtime_error( simdjson::error_message( doc.error() ) );
   simdjson::dom::element json = doc.value();
   //
@@ -457,10 +457,10 @@ std::unique_ptr<yaodaq::Message> yaodaq::YAODAQJSONCodec::decode( std::span<cons
   // Raw payload
   //
   auto meta = json["meta"];
-  if( meta.error() ) return std::make_unique<RawData>( data, "unknown" );
+  if( meta.error() ) return std::make_unique<RawData>( data.payload, data.channel );
 
   std::string_view type_str;
-  if( meta["type"].get( type_str ) ) return std::make_unique<RawData>( data, "unknown" );
+  if( meta["type"].get( type_str ) ) return std::make_unique<RawData>( data.payload, data.channel );
 
   auto type = magic_enum::enum_cast<Message::Type>( type_str, magic_enum::case_insensitive ).value_or( Message::Type::Unknown );
 
@@ -627,7 +627,7 @@ std::unique_ptr<yaodaq::Message> yaodaq::YAODAQJSONCodec::decode( std::span<cons
       for( auto v: arr ) { str.push_back( uint64_t( v ) ); }
       return std::make_unique<RawData>( RawDataBuilder::from_text( str, topic ) );
     }
-    default: return std::make_unique<RawData>( data, "unknown" );
+    default: return std::make_unique<RawData>( data.payload, data.channel );
   }
   msg->setMeta( uuid, time, ver );
   return msg;

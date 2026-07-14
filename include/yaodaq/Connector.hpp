@@ -50,13 +50,12 @@ public:
     }
 
     trace( "Parameters for connector verified:\n{}", yaodaq::Formatter::format( m_transport->getParameters() ) );
+    m_codec->reset();
 
     if( !m_transport->open() ) return false;
-
     try
     {
-      m_running = true;
-
+      m_running      = true;
       m_readerThread = std::thread( &Connector::readerLoop, this );
       m_writerThread = std::thread( &Connector::writerLoop, this );
     }
@@ -83,18 +82,12 @@ public:
   YAODAQ_API bool disconnect()
   {
     if( !m_running ) return true;
-
     m_running = false;
-
     m_outgoing.shutdown();
-    m_transactions.shutdown();
-
     m_transport->close();
-
     if( m_readerThread.joinable() ) m_readerThread.join();
-
     if( m_writerThread.joinable() ) m_writerThread.join();
-
+    m_transactions.shutdown();
     return true;
   }
 
@@ -131,8 +124,7 @@ private:
       while( m_running )
       {
         auto msgOpt = m_outgoing.pop();
-        if( !msgOpt.has_value() ) break;
-
+        if( !msgOpt.has_value() ) continue;  //or continue ?!!?!?!
         auto& msg = msgOpt.value();
         auto  raw = m_codec->encode( *msg );
         m_transport->write( raw );
@@ -152,39 +144,48 @@ private:
     {
       while( m_running )
       {
-        std::optional<std::vector<std::byte>> raw;
+        std::vector<TransportPacket> raw;
         try
         {
           raw = m_transport->read();
-          if( !raw.has_value() ) break;
+          if( raw.empty() ) continue;
         }
         catch( ... )
         {
           std::cout << "OUPSSSSSSSSSSSSS " << std::endl;
           continue;
         }
-        std::unique_ptr<yaodaq::Message> msg;
-        msg = m_codec->decode( *raw );
 
-        // TransactionManager consumes or returns ownership
-
-        try
+        for( std::size_t i = 0; i != raw.size(); ++i )
         {
-          if( msg ) msg = m_transactions.resolve( std::move( msg ) );
-        }
-        catch( ... )
-        {
-          std::cout << "OUPSSSS transaction" << std::endl;
-          continue;
-        }
-        try
-        {
-          if( msg ) { m_dispatcher.dispatch( *msg.get() ); }
-        }
-        catch( ... )
-        {
-          std::cout << "OUPPP dispatch" << std::endl;
-          continue;
+          std::unique_ptr<yaodaq::Message> msg;
+          try
+          {
+            msg = m_codec->decode( raw[i] );
+          }
+          catch( ... )
+          {
+            error( "decoding error" );
+          }
+          // TransactionManager consumes or returns ownership
+          try
+          {
+            if( msg ) msg = m_transactions.resolve( std::move( msg ) );
+          }
+          catch( ... )
+          {
+            std::cout << "OUPSSSS transaction" << std::endl;
+            continue;
+          }
+          try
+          {
+            if( msg ) { m_dispatcher.dispatch( *msg.get() ); }
+          }
+          catch( ... )
+          {
+            std::cout << "OUPPP dispatch" << std::endl;
+            continue;
+          }
         }
       }
     }

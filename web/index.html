@@ -1,0 +1,591 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+
+<meta charset="UTF-8">
+<title>YAODAQ WebSocket Debug Monitor</title>
+
+<style>
+
+body {
+    background:#202124;
+    color:#eeeeee;
+    font-family:Arial,Helvetica,sans-serif;
+    margin:20px;
+}
+
+.toolbar {
+
+    display:flex;
+    flex-wrap:wrap;
+    gap:10px;
+    align-items:center;
+
+    background:#303030;
+    padding:15px;
+    border-radius:8px;
+}
+
+input {
+
+    background:#444;
+    color:white;
+    border:1px solid #666;
+    padding:8px;
+}
+
+
+button {
+
+    background:#1976d2;
+    color:white;
+    border:0;
+    padding:8px 15px;
+    cursor:pointer;
+}
+
+
+button:hover {
+    background:#2196f3;
+}
+
+
+#status {
+
+    padding:8px;
+    border-radius:4px;
+    margin-left:auto;
+}
+
+
+.connected {
+    background:#2e7d32;
+}
+
+
+.disconnected {
+    background:#b71c1c;
+}
+
+
+.message {
+
+    margin-top:15px;
+    padding:15px;
+    border-radius:8px;
+    background:#2d2d2d;
+
+}
+
+
+pre {
+
+    background:#111;
+    padding:12px;
+    color:#90ee90;
+    white-space:pre-wrap;
+    overflow:auto;
+
+}
+
+
+.rx {
+
+    color:#00ffff;
+
+}
+
+
+.error {
+
+    color:#ff6666;
+
+}
+
+
+</style>
+
+</head>
+<body>
+<h1>YAODAQ WebSocket Monitor</h1>
+<div class="toolbar">
+
+<label>Host</label>
+<input id="host" value="localhost">
+
+<label>Port</label>
+<input id="port" value="9002">
+
+<label>URI</label>
+<input id="uri" value="/">
+
+<button onclick="connect()">Connect</button>
+<button onclick="disconnect()">Disconnect</button>
+<button onclick="clearMessages()">Clear</button>
+
+
+<div id="status" class="disconnected">
+Disconnected
+</div>
+
+
+</div>
+
+<div id="messages"></div>
+
+<script>
+let ws=null;
+const messages = document.getElementById("messages");
+function connect()
+{
+    disconnect();
+    let host = document.getElementById("host").value;
+    let port = document.getElementById("port").value;
+    let uri = document.getElementById("uri").value;
+    if(!uri.startsWith("/")) uri="/"+uri;
+    let protocol = location.protocol==="https:" ?"wss" :"ws";
+    let url = `${protocol}://${host}:${port}${uri}`;
+    addMessage( "CONNECT", url);
+    ws = new WebSocket(url);
+    ws.binaryType="arraybuffer";
+    ws.onopen=()=>{
+        setStatus("Connected", true);
+        addMessage("CONNECTED",url);
+    };
+
+
+
+    ws.onerror=(e)=>{
+
+        addMessage(
+            "WEBSOCKET ERROR",
+            e
+        );
+
+    };
+
+
+
+    ws.onclose=()=>{
+
+        setStatus(
+            "Disconnected",
+            false
+        );
+
+        addMessage(
+            "CLOSED",
+            ""
+        );
+
+    };
+
+
+
+    ws.onmessage =
+        receiveMessage;
+
+}
+
+
+
+
+
+function disconnect()
+{
+  if(ws)
+  {
+    ws.close();
+    ws=null;
+  }
+}
+
+function receiveMessage(event)
+{
+    let text="";
+    if(typeof event.data==="string")
+    {
+
+        text=event.data;
+
+
+        addMessage(
+            "TEXT FRAME",
+            text
+        );
+
+    }
+    else
+    {
+
+        let bytes =
+            new Uint8Array(
+                event.data
+            );
+
+
+        let hex =
+            Array.from(bytes)
+            .slice(0,64)
+            .map(
+                x=>x
+                .toString(16)
+                .padStart(2,"0")
+            )
+            .join(" ");
+
+
+
+        addMessage(
+            "BINARY FRAME",
+            "size="+bytes.length+
+            "\n\nfirst bytes:\n"+
+            hex
+        );
+
+
+
+        text =
+            new TextDecoder()
+            .decode(bytes);
+
+
+        addMessage(
+            "UTF8 DECODE",
+            text
+        );
+
+    }
+
+
+
+    let msg;
+
+
+    try
+    {
+
+        msg =
+            JSON.parse(text);
+
+    }
+    catch(e)
+    {
+
+        addMessage(
+            "NOT JSON",
+            text,
+            true
+        );
+
+        return;
+
+    }
+
+
+
+    parseYAODAQ(msg);
+
+}
+
+
+
+
+
+
+
+function parseYAODAQ(msg)
+{
+
+
+    if(
+        msg.jsonrpc==="2.0"
+    )
+    {
+
+        handleRPC(msg);
+
+        addMessage(
+            "JSON RPC",
+            msg
+        );
+
+        return;
+
+    }
+
+
+
+    if(!msg.meta)
+    {
+
+        addMessage(
+            "NORMAL JSON",
+            msg
+        );
+
+        return;
+
+    }
+
+
+
+    let type =
+        String(
+            msg.meta.type
+        )
+        .toLowerCase();
+
+
+
+    switch(type)
+    {
+
+        case "open":
+            addMessage("OPEN",msg);
+            break;
+
+
+        case "close":
+            addMessage("CLOSE",msg);
+            break;
+
+
+        case "reject":
+            addMessage("REJECT",msg);
+            break;
+
+
+        case "error":
+            addMessage("ERROR",msg);
+            break;
+
+
+        case "exception":
+            addMessage("EXCEPTION",msg);
+            break;
+
+
+        case "log":
+            addMessage("LOG",msg);
+            break;
+
+
+        case "ping":
+            addMessage("PING",msg);
+            break;
+
+
+        case "pong":
+            addMessage("PONG",msg);
+            break;
+
+
+        case "rpcrequest":
+            addMessage("RPC REQUEST",msg);
+            break;
+
+
+        case "rpcresponse":
+            addMessage("RPC RESPONSE",msg);
+            break;
+
+
+        case "rawdata":
+            parseRawData(msg);
+            break;
+
+
+        default:
+
+            addMessage(
+                "UNKNOWN TYPE "+msg.meta.type,
+                msg
+            );
+
+            break;
+
+    }
+
+}
+
+
+
+
+
+
+
+function parseRawData(msg)
+{
+
+    let bytes =
+        new Uint8Array(
+            msg.payload || []
+        );
+
+
+    let text =
+        new TextDecoder()
+        .decode(bytes);
+
+
+
+    let result =
+    {
+        meta:msg.meta,
+        bytes:bytes.length,
+        string:text
+    };
+
+
+
+    try
+    {
+
+        result.json =
+            JSON.parse(text);
+
+    }
+    catch(e)
+    {
+
+        result.json =
+            "not json";
+
+    }
+
+
+
+    addMessage(
+        "RAW DATA",
+        result
+    );
+
+}
+
+
+
+
+
+
+
+function handleRPC(msg)
+{
+
+    if(
+        ws &&
+        msg.method &&
+        msg.id!==undefined
+    )
+    {
+
+        ws.send(
+            JSON.stringify(
+            {
+                jsonrpc:"2.0",
+                id:msg.id,
+                result:true
+            })
+        );
+
+    }
+
+}
+
+
+
+
+
+
+
+function addMessage(title,obj,error=false)
+{
+
+    let div =
+        document.createElement("div");
+
+
+    div.className="message";
+
+
+
+    let h =
+        document.createElement("h3");
+
+
+    h.textContent=title;
+
+
+
+    let pre =
+        document.createElement("pre");
+
+
+    if(typeof obj==="string")
+        pre.textContent=obj;
+    else
+        pre.textContent=
+            JSON.stringify(
+                obj,
+                null,
+                2
+            );
+
+
+
+    if(error)
+        pre.className="error";
+
+
+    div.appendChild(h);
+    div.appendChild(pre);
+
+
+    messages.prepend(div);
+
+}
+
+
+
+
+
+
+
+function setStatus(text,ok)
+{
+
+    let s =
+        document.getElementById("status");
+
+
+    s.textContent=text;
+
+
+    s.className =
+        ok
+        ?"connected"
+        :"disconnected";
+
+}
+
+
+
+
+
+
+
+function clearMessages()
+{
+
+    messages.innerHTML="";
+
+}
+
+
+</script>
+
+
+</body>
+
+</html>

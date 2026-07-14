@@ -1,48 +1,41 @@
+#include "Data.hpp"
+#include "RawData.hpp"
+#include "fmt/chrono.h"
+#include "fmt/std.h"
+
 #include <CLI/CLI.hpp>
+#include <TBufferJSON.h>
+#include <chrono>
 #include <cpp-terminal/color.hpp>
 #include <cpp-terminal/input.hpp>
 #include <cpp-terminal/iostream.hpp>
 #include <cpp-terminal/terminal.hpp>
-#include <yaodaq/Module.hpp>
 #include <filesystem>
-#include <chrono>
-#include "fmt/chrono.h"
-#include "fmt/std.h"
 #include <memory>
-#include "RawData.hpp"
-#include "Data.hpp"
-#include <TBufferJSON.h>
-
+#include <yaodaq/Module.hpp>
 
 class Analyser : public yaodaq::Module
 {
 public:
-  Analyser( yaodaq::Config cfg, const std::string_view name ) : yaodaq::Module( cfg, "MyLovelyAnalyser", "Analyser" )
-  {
-  }
-  ~Analyser() override
-  {
-  }
+  Analyser( yaodaq::Config cfg, const std::string_view name ) : yaodaq::Module( cfg, "MyLovelyAnalyser", "Analyser" ) {}
+  ~Analyser() override {}
   void onRawData( const std::unique_ptr<yaodaq::RawData> raw ) override
   {
-    
-    if(raw->topic()=="MPI::DCT::Singlets::Events")
+    if( raw->topic() == "MPI::DCT::Singlets::Events" )
     {
-    
-    std::string raw2(reinterpret_cast<const char*>(raw->payload().data()),raw->payload().size());
-    auto obj = TBufferJSON::FromJSON<DCT::Event>(raw2);
-        info("Event {}",obj->event_number);
-        for(std::size_t i=0; i!=obj->hits.size();++i) warn("layer: {}, side: {}, strip: {}, rise: {}",obj->hits[i].getLayer(), obj->hits[i].getSide(), obj->hits[i].getStrip(),obj->hits[i].getRise());
-        warn("{} trigger hits, {} hits",obj->trigger_hits.size(),obj->hits.size());
-        info("END Event {}",obj->event_number);
-     ++m_event;
-    }   
+      std::string raw2( reinterpret_cast<const char*>( raw->payload().data() ), raw->payload().size() );
+      auto        obj = TBufferJSON::FromJSON<DCT::Event>( raw2 );
+      info( "Event {}", obj->event_number );
+      for( std::size_t i = 0; i != obj->hits.size(); ++i ) warn( "layer: {}, side: {}, strip: {}, rise: {}", obj->hits[i].getLayer(), obj->hits[i].getSide(), obj->hits[i].getStrip(), obj->hits[i].getRise() );
+      warn( "{} trigger hits, {} hits", obj->trigger_hits.size(), obj->hits.size() );
+      info( "END Event {}", obj->event_number );
+      ++m_event;
+    }
   }
+
 private:
-  std::uint64_t m_event{0};
+  std::uint64_t m_event{ 0 };
 };
-
-
 
 int main( int argc, char* argv[] )
 try
