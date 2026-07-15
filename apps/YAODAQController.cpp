@@ -54,7 +54,7 @@ try
           }
           else if( key == Term::Key::s )
           {
-            Term::cout << controller.CallMethod( "getState" ).pretty_format() << std::endl;
+            Term::cout << controller.CallMethod( "getState" ).tabulate() << std::endl;
             nbrCTLC = 3;
           }
           else if( key == Term::Key::Ctrl_I )
@@ -109,7 +109,7 @@ try
           }
           else if( key == Term::Key::h )
           {
-            Term::cout << controller.CallMethod( "listProcedures" ).pretty_format() << std::endl;
+            Term::cout << controller.CallMethod( "listProcedures" ).tabulate() << std::endl;
             nbrCTLC = 3;
           }
           else

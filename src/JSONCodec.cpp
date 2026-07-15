@@ -417,6 +417,13 @@ std::vector<std::byte> yaodaq::YAODAQJSONCodec::encode( const yaodaq::Message& m
       //std::cout<<json.dump(2)<<std::endl;
       break;
     }
+    case Message::Type::StateUpdate:
+    {
+      auto const& state_update        = dynamic_cast<const StateUpdate&>( msg );
+      json["payload"]["state"]        = state_update.state().str();
+      json["payload"]["state_number"] = state_update.state().type();
+      break;
+    }
   }
 
   const std::string j = json.dump();
@@ -626,6 +633,12 @@ std::unique_ptr<yaodaq::Message> yaodaq::YAODAQJSONCodec::decode( const Transpor
       std::string str;
       for( auto v: arr ) { str.push_back( uint64_t( v ) ); }
       return std::make_unique<RawData>( RawDataBuilder::from_text( str, topic ) );
+    }
+    case Message::Type::StateUpdate:
+    {
+      std::uint64_t state{ 0 };
+      payload["state_number"].get( state );
+      return std::make_unique<StateUpdate>( State( static_cast<State::Type>( state ) ) );
     }
     default: return std::make_unique<RawData>( data.payload, data.channel );
   }

@@ -3,11 +3,13 @@
 #include "yaodaq/Component.hpp"
 #include "yaodaq/Export.hpp"
 #include "yaodaq/State.hpp"
+#include "yaodaq/Utilities.hpp"
 
 #include <atomic>
 #include <chrono>
 #include <condition_variable>
 #include <cstdint>
+#include <limits>
 #include <string_view>
 #include <thread>
 
@@ -36,6 +38,7 @@ public:
     Add( "getState", jsonrpc::GetHandle( &yaodaq::Module::getStateStr, *this ) );
     Add( "connect", jsonrpc::GetHandle( &yaodaq::Module::connect, *this ) );
     Add( "disconnect", jsonrpc::GetHandle( &yaodaq::Module::disconnect, *this ) );
+    Add( "setMaxNumberEvents", jsonrpc::GetHandle( &yaodaq::Module::setMaxNumberEvents, *this ) );
   }
   Module( const Module& )            = delete;
   Module& operator=( const Module& ) = delete;
@@ -44,12 +47,12 @@ public:
 
   YAODAQ_API virtual bool connect()
   {
-    m_State.setId( State::Type::Connected );
+    updateState( State::Type::Connected );
     return true;
   }
   YAODAQ_API virtual bool disconnect()
   {
-    m_State.setId( State::Type::Disconnected );
+    updateState( State::Type::Disconnected );
     return true;
   }
 
@@ -57,8 +60,15 @@ public:
   YAODAQ_API bool link()
   {
     info( "Linking" );
+    Transition transition{ allowTransition( State::Type::Linked ) };
+    if( transition == Transition::alreadyDone ) return true;
+    if( transition != Transition::allowed )
+    {
+      warn( "{} to {} unauthorised", getStateStr(), "Linked" );
+      return false;
+    }
     yaodaq::Client::start();
-    m_State.setId( State::Type::Linked );
+    updateState( State::Type::Linked );
     return true;
   }
 
@@ -70,11 +80,7 @@ public:
     {
       info( "Initializing" );
       bool ret = on_initialize();
-      if( ret )
-      {
-        std::unique_lock lk( m_mutex );
-        m_State.setId( State::Type::Initialized );
-      }
+      if( ret ) { updateState( State::Type::Initialized ); }
       return ret;
     }
     else
@@ -92,11 +98,7 @@ public:
     {
       info( "Configuring" );
       bool ret = on_configure();
-      if( ret )
-      {
-        std::unique_lock lk( m_mutex );
-        m_State.setId( State::Type::Configured );
-      }
+      if( ret ) { updateState( State::Type::Configured ); }
       return ret;
     }
     else
@@ -109,9 +111,7 @@ public:
   YAODAQ_API bool start()
   {
     Transition transition{ allowTransition( State::Type::Started ) };
-
     if( transition == Transition::alreadyDone ) return true;
-
     if( transition != Transition::allowed )
     {
       warn( "{} to {} unauthorised", getStateStr(), "Started" );
@@ -121,8 +121,7 @@ public:
     info( "Starting Module" );
 
     {
-      std::scoped_lock lk( m_mutex );
-      m_State.setId( State::Type::Started );
+      updateState( State::Type::Started );
       m_worker_state.store( WorkerState::Running );
     }
 
@@ -136,6 +135,7 @@ public:
         {
           try
           {
+            auto last_report = std::chrono::steady_clock::now();
             while( !stop.stop_requested() )
             {
               {
@@ -146,10 +146,27 @@ public:
                 if( stop.stop_requested() ) break;
               }
 
-              if( !m_onrun( stop ) )
+              if( !m_onrun( stop ) ) { error( "on_run failed!" ); }
+              else
               {
-                info( "Run function requested exit." );
-                break;
+                const auto count = m_event.fetch_add( 1, std::memory_order_relaxed ) + 1;
+                // Update progress every 500 ms
+                const auto now   = std::chrono::steady_clock::now();
+                if( now - last_report >= std::chrono::milliseconds( 500 ) )
+                {
+                  last_report = now;
+                  info( "Events {}", progressBar( count, m_max_event ) );
+                }
+                if( count >= m_max_event )
+                {
+                  info( "Maximum number of events ({}) reached.", m_max_event.load() );
+                  {
+                    m_worker_state.store( WorkerState::Stopped );
+                    updateState( State::Type::Finished );
+                    m_event.store( 0 );
+                  }
+                  break;
+                }
               }
             }
           }
@@ -178,8 +195,7 @@ public:
         m_worker.join();
       }
 
-      std::scoped_lock lk( m_mutex );
-      m_State.setId( State::Type::Configured );
+      updateState( State::Type::Configured );
 
       return false;
     }
@@ -201,8 +217,7 @@ public:
 
     // Update state safely
     {
-      std::unique_lock lk( m_mutex );
-      m_State.setId( State::Type::Paused );
+      updateState( State::Type::Paused );
 
       // Only pause worker thread if it exists
       if( m_worker.joinable() ) { m_worker_state.store( WorkerState::Paused ); }
@@ -226,8 +241,7 @@ public:
     info( "Resuming Module" );
 
     {
-      std::unique_lock lk( m_mutex );
-      m_State.setId( State::Type::Started );
+      updateState( State::Type::Started );
 
       // Only resume worker thread if it exists
       if( m_worker.joinable() ) { m_worker_state.store( WorkerState::Running ); }
@@ -258,13 +272,13 @@ public:
     }
 
     {
-      std::unique_lock lk( m_mutex );
       m_worker_state.store( WorkerState::Stopped );
-      m_State.setId( State::Type::Stopped );
+      updateState( State::Type::Stopped );
     }
     m_worker.request_stop();
     cv.notify_all();
     if( m_worker.joinable() ) m_worker.join();
+    m_event.store( 0, std::memory_order_relaxed );
 
     return true;
   }
@@ -277,11 +291,7 @@ public:
     {
       info( "Clearing" );
       bool ret = on_clear();
-      if( ret )
-      {
-        std::unique_lock lk( m_mutex );
-        m_State.setId( State::Type::Cleared );
-      }
+      if( ret ) { updateState( State::Type::Cleared ); }
       return ret;
     }
     else
@@ -299,11 +309,7 @@ public:
     {
       info( "Releasing" );
       bool ret = on_release();
-      if( ret )
-      {
-        std::unique_lock lk( m_mutex );
-        m_State.setId( State::Type::Released );
-      }
+      if( ret ) { updateState( State::Type::Released ); }
       return ret;
     }
     else
@@ -318,23 +324,19 @@ public:
     info( "Relinking" );
     stop();
     bool ret = link();
-    if( ret )
-    {
-      std::unique_lock lk( m_mutex );
-      m_State.setId( State::Type::Linked );
-    }
+    if( ret ) { updateState( State::Type::Linked ); }
     return ret;
   }
 
   YAODAQ_API State getState() noexcept
   {
-    std::scoped_lock lk( m_mutex );
+    std::scoped_lock lock( m_mutex );
     return m_State;
   }
 
   YAODAQ_API std::string getStateStr()
   {
-    std::scoped_lock lk( m_mutex );
+    std::scoped_lock lock( m_mutex );
     return m_State.str();
   }
 
@@ -349,15 +351,28 @@ public:
   }
 
   YAODAQ_API void setRun( const std::function<bool( std::stop_token )>& fun ) noexcept { m_onrun = fun; }
+  void            setMaxNumberEvents( std::uint64_t max ) noexcept { m_max_event.store( max, std::memory_order_relaxed ); }
 
 protected:
+  std::uint64_t event() { return m_event.load(); }
+  void          updateState( const State::Type type )
+  {
+    State state( State::Type::Empty );
+
+    {
+      std::scoped_lock lock( m_mutex );
+      m_State.setId( type );
+      state = m_State;
+    }
+
+    send( StateUpdate( state ) );
+  }
   bool cleanup() override
   {
     info( "Module cleanup" );
     if( m_worker.joinable() )
     {
       {
-        std::unique_lock lk( m_mutex );
         m_worker_state.store( WorkerState::Stopped );
       }
       cv.notify_all();
@@ -405,7 +420,7 @@ protected:
   virtual bool on_release() { return true; }
   virtual bool post_release() { return true; }
 
-  State      m_State;
+  State      m_State{ State::Type::Empty };
   std::mutex m_mutex;
   enum class Transition : std::uint8_t
   {
@@ -413,13 +428,15 @@ protected:
     refused     = false,
     alreadyDone = 2,
   };
-  inline static const std::unordered_map<State::Type, std::unordered_set<State::Type>> allowed = { { State::Type::Linked, { State::Type::Initialized } },
+  inline static const std::unordered_map<State::Type, std::unordered_set<State::Type>> allowed = { { State::Type::Empty, { State::Type::Linked } },
+                                                                                                   { State::Type::Linked, { State::Type::Initialized } },
                                                                                                    { State::Type::Initialized, { State::Type::Connected, State::Type::Released } },
                                                                                                    { State::Type::Connected, { State::Type::Configured, State::Type::Disconnected } },
                                                                                                    { State::Type::Configured, { State::Type::Started, State::Type::Cleared } },
                                                                                                    { State::Type::Started, { State::Type::Paused, State::Type::Stopped } },
                                                                                                    { State::Type::Paused, { State::Type::Stopped, State::Type::Started } },
                                                                                                    { State::Type::Stopped, { State::Type::Started, State::Type::Cleared } },
+                                                                                                   { State::Type::Finished, { State::Type::Started, State::Type::Cleared } },
                                                                                                    { State::Type::Cleared, { State::Type::Disconnected, State::Type::Configured } },
                                                                                                    { State::Type::Disconnected, { State::Type::Connected, State::Type::Released } },
                                                                                                    { State::Type::Released, { State::Type::Initialized } } };
@@ -436,7 +453,8 @@ protected:
     return it->second.contains( to ) ? Transition::allowed : Transition::refused;
   }
 
-  void send_to_server( const std::string_view str ) { send( str ); }
+  void          send_to_server( const std::string_view str ) { send( str ); }
+  std::uint64_t getMaxNumberEvents() const noexcept { return m_max_event.load( std::memory_order_relaxed ); }
 
 private:
   enum class WorkerState : std::uint8_t
@@ -449,6 +467,8 @@ private:
   std::condition_variable                cv;
   std::jthread                           m_worker;
   std::function<bool( std::stop_token )> m_onrun;
+  std::atomic<std::uint64_t>             m_event{ 0 };
+  std::atomic<std::uint64_t>             m_max_event{ ( std::numeric_limits<std::uint64_t>::max )() };
 };
 
 }  // namespace yaodaq

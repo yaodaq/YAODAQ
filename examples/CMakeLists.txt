@@ -12,9 +12,6 @@ FetchContent_MakeAvailable(csv)
 
 find_package(ROOT)
 
-add_executable(DCT RPC_DCT.cpp)
-target_link_libraries(DCT PRIVATE yaodaq::yaodaq CLI11::CLI11 cpp-terminal::cpp-terminal spdlog::spdlog csv)
-
 add_library(Data SHARED)
 target_compile_features(Data PUBLIC cxx_std_20)
 root_generate_dictionary(RawData_Dict RawData.hpp Data.hpp MODULE Data LINKDEF LinkDef.h)

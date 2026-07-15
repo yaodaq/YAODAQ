@@ -21,7 +21,6 @@ public:
 
   YAODAQ_API std::string_view dump( std::size_t = 0 ) const { return m_raw; }
 
-  YAODAQ_API std::string pretty_format();
   YAODAQ_API std::string tabulate();
 
 protected:

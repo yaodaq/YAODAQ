@@ -65,6 +65,7 @@ protected:
     m_client.close();
   }
   YAODAQ_API virtual void onResponse( const std::string& ) { /* Standard client don't receive response !!  Only Controller has the right to ask */ }
+  YAODAQ_API virtual void onStateUpdate( const std::unique_ptr<StateUpdate> state_update );
 
 private:
   YAODAQ_API explicit Client() noexcept = delete;

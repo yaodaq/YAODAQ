@@ -34,7 +34,7 @@ public:
     while( !fileExists( file ) )
     {
       if( stop.stop_requested() ) return true;
-      std::this_thread::sleep_for( std::chrono::milliseconds( 100 ) );
+      std::this_thread::sleep_for( std::chrono::milliseconds( 20 ) );
     }
     auto lastSize = std::filesystem::file_size( file );
 
@@ -143,7 +143,7 @@ public:
     sendCommand( "puts __YAODAQ_CONFIGURE_VIVADO_FINISHED__" );
     while( !configure_finished.load() )
     {
-      std::this_thread::sleep_for( std::chrono::milliseconds( 10 ) );
+      std::this_thread::sleep_for( std::chrono::milliseconds( 100 ) );
       warn( "Waiting connect step to finish !" );
     }
     configure_finished.store( false );
@@ -263,6 +263,8 @@ int main( int argc, char* argv[] )
   app.add_option( "--firmware_path", firmware_path, "Firmware to burn the FPGA" );
   bool keep_raw_files{ false };
   app.add_flag( "-k,--keep_raw_files", keep_raw_files, "keep or delete raw files" );
+  std::uint64_t nbr_event{ ( std::numeric_limits<std::uint64_t>::max )() };
+  app.add_option( "-e,--number_events", nbr_event, "Number of event to take" );
   try
   {
     app.parse( argc, argv );
@@ -279,6 +281,7 @@ int main( int argc, char* argv[] )
   Vivado board( cfg, "MyVivado" );
   board.setFirmwarePath( firmware_path );
   board.setKeepRawFiles( keep_raw_files );
+  board.setMaxNumberEvents( nbr_event );
   board.link();
   board.dispatcher().subscribe<yaodaq::RawData>(
     [&board]( const yaodaq::RawData& msg )

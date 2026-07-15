@@ -43,10 +43,7 @@ public:
       if( !good ) return false;
       good = m_connector->connect();
       if( !good ) return false;
-      {
-        std::unique_lock lk( m_mutex );
-        m_State.setId( State::Type::Connected );
-      }
+      updateState( State::Type::Connected );
       good = post_connect();
       if( !good ) return false;
       else
@@ -70,10 +67,7 @@ public:
       if( !good ) return false;
       good = m_connector->disconnect();
       if( !good ) return false;
-      {
-        std::unique_lock lk( m_mutex );
-        m_State.setId( State::Type::Disconnected );
-      }
+      updateState( State::Type::Disconnected );
       good = post_disconnect();
       if( !good ) return false;
       else

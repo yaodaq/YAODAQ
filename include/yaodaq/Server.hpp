@@ -84,6 +84,7 @@ private:
   YAODAQ_INTERNAL void onPing( std::shared_ptr<ix::ConnectionState> connectionState, ix::WebSocket& webSocket, const Ping& ping );
   YAODAQ_INTERNAL void onPong( std::shared_ptr<ix::ConnectionState> connectionState, ix::WebSocket& webSocket, const Pong& pong );
   YAODAQ_INTERNAL void onError( std::shared_ptr<ix::ConnectionState> connectionState, ix::WebSocket& webSocket, const Error& error );
+  YAODAQ_INTERNAL void onStateUpdate( std::shared_ptr<ix::ConnectionState> connectionState, ix::WebSocket& webSocket, const std::unique_ptr<StateUpdate> state_update );
 
   std::mutex                                                                m_map_mutex;
   std::unordered_map<jsonrpc::id_t, std::shared_ptr<yaodaq::ServerRequest>> m_server_construct_response;

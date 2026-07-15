@@ -140,18 +140,6 @@ auto blue = []( const std::string_view s ) { return fmt::format( "{}", fmt::styl
 }  // namespace
 
 // ============================================================
-// PRETTY FORMAT
-// ============================================================
-
-std::string Response::pretty_format()
-{
-  static thread_local simdjson::dom::parser parser;
-  simdjson::dom::element                    root;
-  if( parser.parse( m_raw ).get( root ) != simdjson::SUCCESS ) { return fmt::format( fmt::fg( fmt::color::crimson ) | fmt::emphasis::bold, "Invalid JSON response\n" ); }
-  return Formatter::format( root );
-}
-
-// ============================================================
 // TABULATE
 // ============================================================
 
@@ -164,7 +152,7 @@ std::string Response::tabulate()
 
   if( root.type() != simdjson::dom::element_type::ARRAY ) { return fmt::format( fmt::fg( fmt::color::crimson ) | fmt::emphasis::bold, "Expected JSON-RPC batch array\n" ); }
 
-  const std::size_t width    = std::max( static_cast<std::size_t>( 80 ), static_cast<std::size_t>( Term::screen_size().columns() ) );
+  const std::size_t width    = static_cast<std::size_t>( Term::screen_size().columns() );
   const std::size_t NODE_W   = std::max( static_cast<std::size_t>( 30 ), static_cast<std::size_t>( width / 3 ) );
   const std::size_t RESULT_W = std::max( static_cast<std::size_t>( 20 ), static_cast<std::size_t>( width - NODE_W - 9 ) );
   const std::size_t CODE_W{ 10 };

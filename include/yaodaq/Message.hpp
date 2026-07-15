@@ -1,6 +1,7 @@
 #pragma once
 #include "yaodaq/Exception.hpp"
 #include "yaodaq/Export.hpp"
+#include "yaodaq/State.hpp"
 #include "yaodaq/Types.hpp"
 #include "yaodaq/Version.hpp"
 
@@ -53,6 +54,7 @@ public:
     RPCResponse,
     RawData,
     Data,
+    StateUpdate,
   };
   virtual ~Message() = default;
   YAODAQ_API void setMeta( const std::string_view uuid, const std::int64_t time, const Version version )
@@ -311,6 +313,17 @@ public:
 private:
   std::string                             m_payload;
   std::variant<std::int64_t, std::string> m_id;
+};
+
+class StateUpdate : public Message
+{
+public:
+  static constexpr Message::Type type = Message::Type::StateUpdate;
+  YAODAQ_API explicit StateUpdate( const State& state ) : Message( Message::Type::StateUpdate ), m_state( state ) {}
+  const State& state() const noexcept { return m_state; }
+
+private:
+  State m_state;
 };
 
 }  // namespace yaodaq

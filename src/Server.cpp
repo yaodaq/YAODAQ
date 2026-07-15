@@ -234,6 +234,11 @@ void yaodaq::Server::onMessage( std::shared_ptr<ix::ConnectionState> connectionS
       onRawData( connectionState, webSocket, str );
       break;
     }
+    case Message::Type::StateUpdate:
+    {
+      sendExcept( str, webSocket );
+      break;
+    }
   }
 }
 
@@ -241,6 +246,11 @@ void yaodaq::Server::onLog( std::shared_ptr<ix::ConnectionState> connectionState
 {
   // Log the message with the original level, logger, and source location
   sendToLoggers( log );
+}
+
+void yaodaq::Server::onStateUpdate( std::shared_ptr<ix::ConnectionState> connectionState, ix::WebSocket& webSocket, const std::unique_ptr<StateUpdate> state_update )
+{
+  // Log the message with the original level, logger, and source location
 }
 
 void yaodaq::Server::onRawData( std::shared_ptr<ix::ConnectionState> connectionState, ix::WebSocket& webSocket, const std::string& raw ) { sendExcept( raw, webSocket ); }

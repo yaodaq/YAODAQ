@@ -165,7 +165,17 @@ void yaodaq::Client::onMessage( const std::string& str, const std::size_t size, 
       std::unique_ptr<RawData> req( dynamic_cast<RawData*>( msg.release() ) );
       onRawData( std::move( req ) );
     }
+    case Message::Type::StateUpdate:
+    {
+      std::unique_ptr<StateUpdate> req( dynamic_cast<StateUpdate*>( msg.release() ) );
+      onStateUpdate( std::move( req ) );
+    }
   }
+}
+
+void yaodaq::Client::onStateUpdate( const std::unique_ptr<StateUpdate> state_update )
+{
+  if( m_identifier.component().role() == Component::Role::Logger ) { info( "state {}", state_update->state().str() ); }
 }
 
 void yaodaq::Client::onRawData( const std::unique_ptr<RawData> raw )

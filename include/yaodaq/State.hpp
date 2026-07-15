@@ -18,6 +18,7 @@ public:
     Connected,
     Configured,
     Started,
+    Finished,
     Paused,
     Stopped,
     Cleared,
@@ -25,6 +26,7 @@ public:
     Released,
   };
   using underlying = std::underlying_type_t<State::Type>;
+  YAODAQ_API explicit State( const State::Type type ) noexcept : m_type( type ) {}
   YAODAQ_API void                  setId( const State::Type id ) noexcept { m_type = id; }
   YAODAQ_API constexpr State::Type type() const noexcept { return m_type; }
   YAODAQ_API std::string str() const;
