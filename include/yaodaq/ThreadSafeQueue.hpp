@@ -23,10 +23,20 @@ public:
   {
     std::unique_lock<std::mutex> lock( m_mutex );
     m_cv.wait( lock, [&] { return m_shutdown || !m_queue.empty(); } );
-    if( m_queue.empty() ) return std::nullopt;
+    if( m_shutdown && m_queue.empty() ) return std::nullopt;
     T value = std::move( m_queue.front() );
     m_queue.pop();
     return value;
+  }
+
+  YAODAQ_API void reset()
+  {
+    {
+      std::lock_guard<std::mutex> lock( m_mutex );
+      m_shutdown = false;
+      std::queue<T>().swap( m_queue );
+    }
+    m_cv.notify_all();
   }
 
   YAODAQ_API void shutdown()

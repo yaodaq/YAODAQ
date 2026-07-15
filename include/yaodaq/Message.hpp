@@ -265,20 +265,22 @@ class RawData : public Message
 {
 public:
   static constexpr Message::Type type = Message::Type::RawData;
-  explicit RawData( std::string_view topic ) : Message( Message::Type::RawData ), m_topic( topic ) {}
-  explicit RawData( std::span<const std::byte> raw_data, std::string_view topic ) : Message( Message::Type::RawData ), m_topic( topic ), m_payload( raw_data.begin(), raw_data.end() ) {}
+  explicit RawData( std::span<const std::byte> raw_data, std::string_view topic, std::string_view correlation = {} ) : Message( Message::Type::RawData ), m_topic( topic ), m_payload( raw_data.begin(), raw_data.end() ), m_correlation_id( correlation ) {}
   std::string_view           topic() const noexcept { return m_topic; }
+  std::string_view           correlation_id() const noexcept { return m_correlation_id; }
   std::span<const std::byte> payload() const noexcept { return m_payload; }
 
 private:
   std::string            m_topic;
+  std::string            m_correlation_id;
   std::vector<std::byte> m_payload;
 };
 
 class RawDataBuilder
 {
 public:
-  static RawData from_text( const std::string_view text, const std::string_view topic ) { return RawData( std::span<const std::byte>( reinterpret_cast<const std::byte*>( text.data() ), text.size() ), topic ); }
+  static RawData from_text( const std::string_view text, const std::string_view topic, const std::string_view correlation = {} )
+  { return RawData( std::span<const std::byte>( reinterpret_cast<const std::byte*>( text.data() ), text.size() ), topic, correlation ); }
 };
 
 class RPCRequest : public Message

@@ -47,7 +47,14 @@ public:
     promise.set_value( std::move( msg ) );
     return nullptr;  // consumed by transaction
   }
+  YAODAQ_API void reset()
+  {
+    std::lock_guard<std::mutex> lock( m_mutex );
 
+    // Clear any remaining transactions.
+    // Pending promises should normally already be completed by shutdown().
+    m_pending.clear();
+  }
   YAODAQ_API void shutdown()
   {
     std::lock_guard<std::mutex> lock( m_mutex );

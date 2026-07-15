@@ -43,51 +43,64 @@ public:
 
   YAODAQ_API bool connect()
   {
-    if( !m_transport->verifyParameters() )
-    {
-      error( "Invalid connector parameters:\n{}", yaodaq::Formatter::format( m_transport->getParameters() ) );
-      return false;
-    }
-
-    trace( "Parameters for connector verified:\n{}", yaodaq::Formatter::format( m_transport->getParameters() ) );
-    m_codec->reset();
-
-    if( !m_transport->open() ) return false;
+    info( "Connector connect() called" );
     try
     {
-      m_running      = true;
+      m_outgoing.reset();
+      m_transactions.reset();
+      if( !m_transport->verifyParameters() )
+      {
+        error( "Invalid connector parameters:\n{}", yaodaq::Formatter::format( m_transport->getParameters() ) );
+        return false;
+      }
+      trace( "Parameters for connector verified:\n{}", yaodaq::Formatter::format( m_transport->getParameters() ) );
+      m_codec->reset();
+      info( "opening transport" );
+      if( !m_transport->open() )
+      {
+        error( "transport open failed" );
+        return false;
+      }
+      info( "transport opened" );
+
+      m_running.store( true );
+      info( "Starting threads" );
       m_readerThread = std::thread( &Connector::readerLoop, this );
       m_writerThread = std::thread( &Connector::writerLoop, this );
     }
     catch( const std::exception& e )
     {
-      m_running = false;
-
+      m_running.store( false );
       error( "Failed to start threads: {}", e.what() );
-
       return false;
     }
     catch( ... )
     {
-      m_running = false;
-
+      m_running.store( false );
       error( "Failed to start threads" );
-
       return false;
     }
-
     return true;
   }
 
   YAODAQ_API bool disconnect()
   {
     if( !m_running ) return true;
+
     m_running = false;
-    m_outgoing.shutdown();
+
+    // Unblock readerLoop()
     m_transport->close();
+
+    // Unblock writerLoop()
+    m_outgoing.shutdown();
+
     if( m_readerThread.joinable() ) m_readerThread.join();
+
     if( m_writerThread.joinable() ) m_writerThread.join();
+
     m_transactions.shutdown();
+
     return true;
   }
 

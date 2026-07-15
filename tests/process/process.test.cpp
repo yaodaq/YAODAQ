@@ -1,200 +1,254 @@
-#include "yaodaq/Connector.hpp"
 #include "yaodaq/transport/Process.hpp"
+
+#include "csv.hpp"
+#include "yaodaq/Board.hpp"
+#include "yaodaq/Connector.hpp"
 #include "yaodaq/codec/ProcessIOCodec.hpp"
+
 #include <CLI/CLI.hpp>
 #include <atomic>
 #include <chrono>
-#include <csignal>
-#include <fstream>
-#include <iostream>
-#include <thread>
-#include "yaodaq/Board.hpp"
-
 #include <cpp-terminal/color.hpp>
 #include <cpp-terminal/input.hpp>
 #include <cpp-terminal/iostream.hpp>
 #include <cpp-terminal/terminal.hpp>
+#include <csignal>
+#include <fstream>
+#include <iostream>
+#include <thread>
 
 class Vivado : public yaodaq::Board
 {
 public:
-  Vivado( yaodaq::BoardConfig& cfg, const std::string_view name ) : yaodaq::Board( cfg, name, "Vivado" )
-  {
-    this->setRun( fun );
-  }
+  Vivado( yaodaq::BoardConfig& cfg, const std::string_view name ) : yaodaq::Board( cfg, name, "Vivado" ) { this->setRun( fun ); }
   ~Vivado() final {}
   std::function<bool( std::stop_token )> fun = [this]( std::stop_token stop ) -> bool
   {
-    static std::size_t i=0;
-    info("Triggering event {}",i);
-    sendCommand("run_hw_ila [get_hw_ilas -of_objects [get_hw_devices xc7a200t_0] -filter {CELL_NAME=~\"ila_elinks_inst\"}]");
-    sendCommand("wait_on_hw_ila [get_hw_ilas -of_objects [get_hw_devices xc7a200t_0] -filter {CELL_NAME=~\"ila_elinks_inst\"}]");
-    sendCommand("upload_hw_ila_data [get_hw_ilas -of_objects [get_hw_devices xc7a200t_0] -filter {CELL_NAME=~\"ila_elinks_inst\"}]");
-    std::string filePath = fmt::format("./tmp_file_{}",i);
-    sendCommand(fmt::format("write_hw_ila_data -legacy_csv_file -force -quiet {} hw_ila_data_2",filePath));
-    filePath+=".csv";
-    while(!fileExists(filePath))
+    static std::size_t    i    = 0;
+    std::filesystem::path file = m_path / fmt::format( "event_{}.csv", i );
+    info( "Triggering event {}", i );
+    sendCommand( "run_hw_ila [get_hw_ilas -of_objects [get_hw_devices xc7a200t_0] -filter {CELL_NAME=~\"ila_elinks_inst\"}]" );
+    sendCommand( "wait_on_hw_ila [get_hw_ilas -of_objects [get_hw_devices xc7a200t_0] -filter {CELL_NAME=~\"ila_elinks_inst\"}]" );
+    sendCommand( "upload_hw_ila_data [get_hw_ilas -of_objects [get_hw_devices xc7a200t_0] -filter {CELL_NAME=~\"ila_elinks_inst\"}]" );
+    sendCommand( fmt::format( "write_hw_ila_data -legacy_csv_file -force -quiet {} hw_ila_data_2", file.c_str() ) );
+    while( !fileExists( file ) )
     {
-      if(stop.stop_requested()) return true;
-      std::this_thread::sleep_for(std::chrono::milliseconds(100));
+      if( stop.stop_requested() ) return true;
+      std::this_thread::sleep_for( std::chrono::milliseconds( 100 ) );
     }
-    auto lastSize = std::filesystem::file_size( filePath );
+    auto lastSize = std::filesystem::file_size( file );
 
     while( !stop.stop_requested() )
     {
       std::this_thread::sleep_for( std::chrono::milliseconds( 1 ) );
-      auto newSize = std::filesystem::file_size( filePath );
-      warn("File {} not yet finished",filePath);
+      auto newSize = std::filesystem::file_size( file );
       if( newSize == lastSize ) break;
       lastSize = newSize;
     }
-    info("Reading file {}",filePath);
+    if( !stop.stop_requested() ) readFile( file, i );
+
     ++i;
     return true;
-   };
+  };
 
-   bool pre_connect() override
-   {
-    info("pre-connect");
-    Term::terminal.setOptions(Term::Option::Raw,Term::Option::Cursor);
+  bool pre_connect() override
+  {
+    info( "pre-connect" );
+    Term::terminal.setOptions( Term::Option::Raw, Term::Option::Cursor );
     return true;
-   }
+  }
 
-   bool post_connect() override
-   {
-     info("post_connect()");
-     sendCommand("open_hw_manager");
-     sendCommand("connect_hw_server");
-     sendCommand("open_hw_target");
-     sendCommand("get_hw_devices");
-     sendCommand("puts __YAODAQ_CONNECT_VIVADO_FINISHED__");
-     while(!connect_finished.load())
-     {
-      std::this_thread::sleep_for( std::chrono::milliseconds( 10 ) );
-      warn("Waiting configure step to finish !");
-     }
-     connect_finished.store(false);
-     return true;
-   }
-
-   bool pre_disconnect() override
-   {
-    info("pre_disconnect()");
-    Term::terminal.setOptions(Term::Option::Raw,Term::Option::Cursor);
-    sendCommand("close_hw_target");
-    sendCommand("disconnect_hw_server");
-    sendCommand("close_hw_manager");
-    sendCommand("puts __YAODAQ_DISCONNECT_VIVADO_FINISHED__");
-    sendCommand("exit");
-    while(!disconnect_finished.load())
+  bool post_connect() override
+  {
+    info( "post_connect()" );
+    sendCommand( "open_hw_manager" );
+    sendCommand( "connect_hw_server" );
+    sendCommand( "open_hw_target" );
+    sendCommand( "puts __YAODAQ_CONNECT_VIVADO_FINISHED__" );
+    while( !connect_finished.load() )
     {
-      std::this_thread::sleep_for( std::chrono::milliseconds( 10 ) );
-      warn("Waiting disconnect step to finish !");
+      std::this_thread::sleep_for( std::chrono::milliseconds( 100 ) );
+      warn( "Waiting configure step to finish !" );
     }
-    disconnect_finished.store(false);
+    connect_finished.store( false );
     return true;
-   }
+  }
 
-   bool post_disconnect() override
-   {
-    info("running post_disconnect()");
-    Term::terminal.setOptions(Term::Option::Raw,Term::Option::Cursor);
+  bool pre_disconnect() override
+  {
+    info( "pre_disconnect()" );
+    Term::terminal.setOptions( Term::Option::Raw, Term::Option::Cursor );
+    sendCommand( "close_hw_target" );
+    sendCommand( "disconnect_hw_server" );
+    sendCommand( "close_hw_manager" );
+    sendCommand( "puts __YAODAQ_DISCONNECT_VIVADO_FINISHED__" );
+    sendCommand( "exit" );
+    while( !disconnect_finished.load() )
+    {
+      std::this_thread::sleep_for( std::chrono::milliseconds( 100 ) );
+      warn( "Waiting disconnect step to finish !" );
+    }
+    disconnect_finished.store( false );
     return true;
-   }
+  }
 
-   bool on_configure() override
-   {
-    Term::terminal.setOptions(Term::Option::Raw,Term::Option::Cursor);
-    sendCommand("current_hw_device [get_hw_devices xc7a200t_0]");
-    sendCommand("refresh_hw_device -update_hw_probes false [lindex [get_hw_devices xc7a200t_0] 0]");
-    sendCommand(fmt::format("set_property PROBES.FILE {}/top.ltx [get_hw_devices xc7a200t_0]",m_firmware_path));
-    sendCommand(fmt::format("set_property FULL_PROBES.FILE {}/top.ltx [get_hw_devices xc7a200t_0]",m_firmware_path));
-    sendCommand(fmt::format("set_property PROGRAM.FILE {}/top.bit [get_hw_devices xc7a200t_0]",m_firmware_path));
-    sendCommand("program_hw_devices [get_hw_devices xc7a200t_0]");
-    sendCommand("refresh_hw_device [lindex [get_hw_devices xc7a200t_0] 0]");
-    sendCommand("set daq_window 128");
-    sendCommand("set eta1_1 000000000000000000000000");
-    sendCommand("set eta1_2 000000000000000000000000");
-    sendCommand("set eta1_3 000000000000000000000000");
-    sendCommand("set eta1_4 000000000000000000000000");
-    sendCommand("set eta1_5 000000000000000000000000");
-    sendCommand("set eta1_6 000000000000000000000000");
+  bool post_disconnect() override
+  {
+    info( "running post_disconnect()" );
+    Term::terminal.setOptions( Term::Option::Raw, Term::Option::Cursor );
+    return true;
+  }
+
+  bool on_configure() override
+  {
+    Term::terminal.setOptions( Term::Option::Raw, Term::Option::Cursor );
+    sendCommand( "current_hw_device [get_hw_devices xc7a200t_0]" );
+    sendCommand( "refresh_hw_device -update_hw_probes false [lindex [get_hw_devices xc7a200t_0] 0]" );
+    sendCommand( fmt::format( "set_property PROBES.FILE {}/top.ltx [get_hw_devices xc7a200t_0]", m_firmware_path ) );
+    sendCommand( fmt::format( "set_property FULL_PROBES.FILE {}/top.ltx [get_hw_devices xc7a200t_0]", m_firmware_path ) );
+    sendCommand( fmt::format( "set_property PROGRAM.FILE {}/top.bit [get_hw_devices xc7a200t_0]", m_firmware_path ) );
+    sendCommand( "program_hw_devices [get_hw_devices xc7a200t_0]" );
+    sendCommand( "refresh_hw_device [lindex [get_hw_devices xc7a200t_0] 0]" );
+    sendCommand( "set daq_window 128" );
+    sendCommand( "set eta1_1 000000000000000000000000" );
+    sendCommand( "set eta1_2 000000000000000000000000" );
+    sendCommand( "set eta1_3 000000000000000000000000" );
+    sendCommand( "set eta1_4 000000000000000000000000" );
+    sendCommand( "set eta1_5 000000000000000000000000" );
+    sendCommand( "set eta1_6 000000000000000000000000" );
 
     //#          . layer2. layer1. layer0
-    sendCommand("set eta2_1 000000000000000000000000");
-    sendCommand("set eta2_2 000000000000000000000000");
-    sendCommand("set eta2_3 000000000000000000000000");
-    sendCommand("set eta2_4 000000000000000000000000");
-    sendCommand("set eta2_5 000000000000000000000000");
-    sendCommand("set eta2_6 000000000000000000000000");
+    sendCommand( "set eta2_1 000000000000000000000000" );
+    sendCommand( "set eta2_2 000000000000000000000000" );
+    sendCommand( "set eta2_3 000000000000000000000000" );
+    sendCommand( "set eta2_4 000000000000000000000000" );
+    sendCommand( "set eta2_5 000000000000000000000000" );
+    sendCommand( "set eta2_6 000000000000000000000000" );
 
-    sendCommand("set mask_eta1 $eta1_6$eta1_5$eta1_4$eta1_3$eta1_2$eta1_1");
-    sendCommand("set mask_eta2 $eta2_6$eta2_5$eta2_4$eta2_3$eta2_2$eta2_1");
+    sendCommand( "set mask_eta1 $eta1_6$eta1_5$eta1_4$eta1_3$eta1_2$eta1_1" );
+    sendCommand( "set mask_eta2 $eta2_6$eta2_5$eta2_4$eta2_3$eta2_2$eta2_1" );
 
-    sendCommand("display_hw_ila_data [ get_hw_ila_data hw_ila_data_2 -of_objects [get_hw_ilas -of_objects [get_hw_devices xc7a200t_0] -filter {CELL_NAME=~\"ila_elinks_inst\"}]]");
-    sendCommand("set_property CONTROL.DATA_DEPTH $daq_window [get_hw_ilas -of_objects [get_hw_devices xc7a200t_0] -filter {CELL_NAME=~\"ila_elinks_inst\"}]");
-    sendCommand("set_property CONTROL.TRIGGER_POSITION 30 [get_hw_ilas -of_objects [get_hw_devices xc7a200t_0] -filter {CELL_NAME=~\"ila_elinks_inst\"}]");
-    sendCommand("set_property TRIGGER_COMPARE_VALUE eq1'bR [get_hw_probes SMA_in_buf  -of_objects [get_hw_ilas -of_objects [get_hw_devices xc7a200t_0] -filter {CELL_NAME=~\"ila_elinks_inst\"}]]");
+    sendCommand( "display_hw_ila_data [ get_hw_ila_data hw_ila_data_2 -of_objects [get_hw_ilas -of_objects [get_hw_devices xc7a200t_0] -filter {CELL_NAME=~\"ila_elinks_inst\"}]]" );
+    sendCommand( "set_property CONTROL.DATA_DEPTH $daq_window [get_hw_ilas -of_objects [get_hw_devices xc7a200t_0] -filter {CELL_NAME=~\"ila_elinks_inst\"}]" );
+    sendCommand( "set_property CONTROL.TRIGGER_POSITION 30 [get_hw_ilas -of_objects [get_hw_devices xc7a200t_0] -filter {CELL_NAME=~\"ila_elinks_inst\"}]" );
+    sendCommand( "set_property TRIGGER_COMPARE_VALUE eq1'bR [get_hw_probes SMA_in_buf  -of_objects [get_hw_ilas -of_objects [get_hw_devices xc7a200t_0] -filter {CELL_NAME=~\"ila_elinks_inst\"}]]" );
 
-    sendCommand("set_property OUTPUT_VALUE_RADIX BINARY [get_hw_probes channel_mask_left -of_objects [get_hw_vios -of_objects [get_hw_devices xc7a200t_0] -filter {CELL_NAME=~\"ctrl_word_vio\"}]]");
-    sendCommand("set_property OUTPUT_VALUE $mask_eta1 [get_hw_probes channel_mask_left -of_objects [get_hw_vios -of_objects [get_hw_devices xc7a200t_0]	-filter	{CELL_NAME=~\"ctrl_word_vio\"}]]");
-    sendCommand("commit_hw_vio [get_hw_probes channel_mask_left -of_objects [get_hw_vios -of_objects [get_hw_devices xc7a200t_0]	-filter	{CELL_NAME=~\"ctrl_word_vio\"}]]");
+    sendCommand( "set_property OUTPUT_VALUE_RADIX BINARY [get_hw_probes channel_mask_left -of_objects [get_hw_vios -of_objects [get_hw_devices xc7a200t_0] -filter {CELL_NAME=~\"ctrl_word_vio\"}]]" );
+    sendCommand( "set_property OUTPUT_VALUE $mask_eta1 [get_hw_probes channel_mask_left -of_objects [get_hw_vios -of_objects [get_hw_devices xc7a200t_0]	-filter	{CELL_NAME=~\"ctrl_word_vio\"}]]" );
+    sendCommand( "commit_hw_vio [get_hw_probes channel_mask_left -of_objects [get_hw_vios -of_objects [get_hw_devices xc7a200t_0]	-filter	{CELL_NAME=~\"ctrl_word_vio\"}]]" );
 
-    sendCommand("set_property OUTPUT_VALUE_RADIX BINARY [get_hw_probes channel_mask_right -of_objects [get_hw_vios -of_objects [get_hw_devices xc7a200t_0] -filter {CELL_NAME=~\"ctrl_word_vio\"}]]");
-    sendCommand("set_property OUTPUT_VALUE $mask_eta2 [get_hw_probes channel_mask_right -of_objects [get_hw_vios -of_objects [get_hw_devices xc7a200t_0]  -filter {CELL_NAME=~\"ctrl_word_vio\"}]]");
-    sendCommand("commit_hw_vio [get_hw_probes channel_mask_right -of_objects [get_hw_vios -of_objects [get_hw_devices xc7a200t_0] -filter {CELL_NAME=~\"ctrl_word_vio\"}]]");
-    sendCommand("puts __YAODAQ_CONFIGURE_VIVADO_FINISHED__");
-    while(!configure_finished.load())
+    sendCommand( "set_property OUTPUT_VALUE_RADIX BINARY [get_hw_probes channel_mask_right -of_objects [get_hw_vios -of_objects [get_hw_devices xc7a200t_0] -filter {CELL_NAME=~\"ctrl_word_vio\"}]]" );
+    sendCommand( "set_property OUTPUT_VALUE $mask_eta2 [get_hw_probes channel_mask_right -of_objects [get_hw_vios -of_objects [get_hw_devices xc7a200t_0]  -filter {CELL_NAME=~\"ctrl_word_vio\"}]]" );
+    sendCommand( "commit_hw_vio [get_hw_probes channel_mask_right -of_objects [get_hw_vios -of_objects [get_hw_devices xc7a200t_0] -filter {CELL_NAME=~\"ctrl_word_vio\"}]]" );
+    sendCommand( "puts __YAODAQ_CONFIGURE_VIVADO_FINISHED__" );
+    while( !configure_finished.load() )
     {
       std::this_thread::sleep_for( std::chrono::milliseconds( 10 ) );
-      warn("Waiting connect step to finish !");
+      warn( "Waiting connect step to finish !" );
     }
-    configure_finished.store(false);
+    configure_finished.store( false );
     return true;
-   }
+  }
 
-   bool on_start() override
-   {
-    Term::terminal.setOptions(Term::Option::Raw,Term::Option::Cursor);
-    return true;
-   }
+  bool on_start() override
+  {
+    Term::terminal.setOptions( Term::Option::Raw, Term::Option::Cursor );
+    return createTempDirectory();
+  }
 
-  void setFirmwarePath(const std::string_view path) noexcept
+  void                     setFirmwarePath( const std::string_view path ) noexcept { m_firmware_path = path; }
+  void                     setVivadoConfigured() { configure_finished.store( true ); }
+  void                     setVivadoConnected() { connect_finished.store( true ); }
+  void                     setVivadoDisconnected() { disconnect_finished.store( true ); }
+  std::vector<std::string> splitMessage( const std::string_view message )
   {
-    m_firmware_path=path;
+    // split by line and remove INFO:
+    std::vector<std::string> lines;
+    std::string              re = std::string( message );
+    std::istringstream       iss( re );
+    std::string              line;
+    while( std::getline( iss, line ) )
+    {
+      // Remove trailing whitespace characters
+      while( !line.empty() && std::isspace( static_cast<unsigned char>( line.back() ) ) ) { line.pop_back(); }
+
+      if( !line.empty() ) { lines.push_back( std::move( line ) ); }
+    }
+    return lines;
   }
-  void setVivadoConfigured()
-  {
-    configure_finished.store(true);
-  }
-  void setVivadoConnected()
-  {
-    connect_finished.store(true);
-  }
-  void setVivadoDisconnected()
-  {
-    disconnect_finished.store(true);
-  }
+  void setKeepRawFiles( const bool keep ) { keep_raw_files = keep; }
+  bool KeepRawFiles() const noexcept { return keep_raw_files; }
+
 private:
-  bool fileExists( const std::string& path ) { return std::filesystem::exists( path ); }
-
-  std::atomic<bool> connect_finished{false};
-  std::atomic<bool> configure_finished{false};
-  std::atomic<bool> disconnect_finished{false};
-  std::string m_firmware_path;
-  void sendCommand(const std::string_view command)
+  bool readFile( const std::filesystem::path& file, const std::size_t i )
   {
-    const std::string com = std::string(command)+'\n';
+    info( "Reading file {}", file.c_str() );
+    try
+    {
+      csv::CSVReader reader( file.c_str() );
+      nlohmann::json json;
+      nlohmann::json raw_hits = nlohmann::json::array();
+      for( auto& row: reader )
+      {
+        if( row["elink_out_tmp[27:0]"].get<std::string>() == "5555555" ) continue;
+        nlohmann::json raw_hit = nlohmann::json::object();
+        raw_hit["word"]        = row["elink_out_tmp[27:0]"].get<std::string>();
+        raw_hit["bcid"]        = row["bcid320[11:0]"].get<std::string>();
+        raw_hits.push_back( raw_hit );
+      }
+      json["event_number"] = static_cast<int>( i );
+      json["rawdata"]      = raw_hits;
+      send( yaodaq::RawDataBuilder::from_text( json.dump(), "MPI::DCT::Singlets::RawData" ) );
+      if( !KeepRawFiles() )
+      {
+        if( std::filesystem::remove( file ) ) info( "removed {}", file.c_str() );
+        else
+          error( "can't remove {}", file.c_str() );
+      }
+      return true;
+    }
+    catch( const std::exception& e )
+    {
+      error( "problem reading/parsing {}: {}", file.c_str(), e.what() );
+      return false;
+    }
+    catch( ... )
+    {
+      error( "problem reading/parsing {}", file.c_str() );
+      return false;
+    }
+  }
+  bool fileExists( const std::string& path ) { return std::filesystem::exists( path ); }
+  bool createTempDirectory()
+  {
+    char  dirTemplate[] = "/tmp/DCTRawData_XXXXXX";
+    char* result        = mkdtemp( dirTemplate );
+    if( result )
+    {
+      m_path = result;
+      return true;
+    }
+    return false;
+  }
+  std::filesystem::path m_path;
+
+  std::atomic<bool> connect_finished{ false };
+  std::atomic<bool> configure_finished{ false };
+  std::atomic<bool> disconnect_finished{ false };
+  std::string       m_firmware_path;
+  bool              keep_raw_files{ false };
+  void              sendCommand( const std::string_view command )
+  {
+    const std::string                com = std::string( command ) + '\n';
     //info("Sending command: {}",com);
     std::unique_ptr<yaodaq::RawData> raw = std::make_unique<yaodaq::RawData>( yaodaq::RawDataBuilder::from_text( com, "command" ) );
     send_to_device( std::move( raw ) );
   }
 };
 
-
 int main( int argc, char* argv[] )
 {
-  Term::terminal.setOptions(Term::Option::Raw,Term::Option::Cursor);
+  Term::terminal.setOptions( Term::Option::Raw, Term::Option::Cursor );
   CLI::App app{ "DCT" };
   argv = app.ensure_utf8( argv );
   std::string name{ "controller" };
@@ -205,8 +259,10 @@ int main( int argc, char* argv[] )
   app.add_option( "-p,--port", port, "Port to listen" )->check( CLI::Range( 0, 65535 ) );
   yaodaq::verbosity::level verbosity{ yaodaq::verbosity::level::info };
   app.add_option( "--verbosity", verbosity, "Verbosity" )->transform( CLI::CheckedTransformer( yaodaq::verbosity::map, CLI::ignore_case ) );
-  std::string firmware_path{"/home/user/Desktop/Mattia_python/bi_dct_data_acquisition_update_M/BI_DCT_FW/"};
-  app.add_option("--firmware_path",firmware_path,"Firmware to burn the FPGA");
+  std::string firmware_path{ "/home/user/Desktop/Mattia_python/bi_dct_data_acquisition_update_M/BI_DCT_FW/" };
+  app.add_option( "--firmware_path", firmware_path, "Firmware to burn the FPGA" );
+  bool keep_raw_files{ false };
+  app.add_flag( "-k,--keep_raw_files", keep_raw_files, "keep or delete raw files" );
   try
   {
     app.parse( argc, argv );
@@ -216,44 +272,49 @@ int main( int argc, char* argv[] )
     return app.exit( e );
   }
 
-  yaodaq::BoardConfig cfg( std::make_unique<yaodaq::Connector>( 
-    std::make_unique<yaodaq::ProcessTransport>("Vivado"), 
-    std::make_unique<yaodaq::ProcessIOCodec>("Vivado","puts \"{}\"\n") 
-  ) );
-  
-  cfg.transportParameters().set("executable",std::string("/opt/vivado/2025.2/Vivado/bin/vivado"))
-        .set("args",yaodaq::Parameters::string_list{"-nojournal","-nolog","-verbose", "-mode","tcl"});
+  yaodaq::BoardConfig cfg( std::make_unique<yaodaq::Connector>( std::make_unique<yaodaq::ProcessTransport>( "Vivado" ), std::make_unique<yaodaq::ProcessIOCodec>( "Vivado", "puts \"{}\"\n" ) ) );
+
+  cfg.transportParameters().set( "executable", std::string( "/opt/vivado/2025.2/Vivado/bin/vivado" ) ).set( "args", yaodaq::Parameters::string_list{ "-nojournal", "-nolog", "-verbose", "-mode", "tcl" } );
   cfg.setPort( port ).setHost( host ).verbosity( verbosity );
-  Vivado board(cfg,"MyVivado");
-  board.setFirmwarePath(firmware_path);
+  Vivado board( cfg, "MyVivado" );
+  board.setFirmwarePath( firmware_path );
+  board.setKeepRawFiles( keep_raw_files );
   board.link();
-  board.dispatcher().subscribe<yaodaq::RawData>([&board]( const yaodaq::RawData& msg )
-  {
-    std::string_view  text( reinterpret_cast<const char*>( msg.payload().data() ), msg.payload().size() );
-    if(text.find("__YAODAQ_CONFIGURE_VIVADO_FINISHED__") != std::string_view::npos)
+  board.dispatcher().subscribe<yaodaq::RawData>(
+    [&board]( const yaodaq::RawData& msg )
     {
-      board.setVivadoConfigured();
-    }
-    else if(text.find("__YAODAQ_CONNECT_VIVADO_FINISHED__") != std::string_view::npos)
-    {
-      board.setVivadoConnected();
-    }
-    else if(text.find("__YAODAQ_DISCONNECT_VIVADO_FINISHED__") != std::string_view::npos)
-    {
-      board.setVivadoDisconnected();
-    }
-    if(text.find("INFO:") != std::string_view::npos)
-    {
-      board.info(fmt::format("Vivado: {}", fmt::styled(text, fmt::fg(fmt::color::green))));
-    }
-    else if(msg.topic()=="stdout") board.info(text);
-    else if(msg.topic()=="stderr" ) board.error(text);
-  });
+      std::string_view text( reinterpret_cast<const char*>( msg.payload().data() ), msg.payload().size() );
+      if( text.find( "__YAODAQ_CONFIGURE_VIVADO_FINISHED__" ) != std::string_view::npos ) { board.setVivadoConfigured(); }
+      else if( text.find( "__YAODAQ_CONNECT_VIVADO_FINISHED__" ) != std::string_view::npos ) { board.setVivadoConnected(); }
+      else if( text.find( "__YAODAQ_DISCONNECT_VIVADO_FINISHED__" ) != std::string_view::npos ) { board.setVivadoDisconnected(); }
+      else if( text.find( "INFO:" ) != std::string_view::npos )
+      {
+        std::vector<std::string>   lines  = board.splitMessage( text );
+        constexpr std::string_view prefix = "INFO:";
+        for( std::size_t i = 0; i != lines.size(); ++i )
+        {
+          if( lines[i].starts_with( prefix ) )
+          {
+            lines[i].erase( 0, prefix.size() );
+            // Remove optional leading whitespace
+            while( !lines[i].empty() && std::isspace( static_cast<unsigned char>( lines[i].front() ) ) ) lines[i].erase( lines[i].begin() );
+          }
+          if( !lines[i].empty() ) { board.info( "{}", lines[i] ); }
+        }
+      }
+      else if( msg.topic() == "stdout" )
+      {
+        std::vector<std::string> lines = board.splitMessage( text );
+        for( std::size_t i = 0; i != lines.size(); ++i ) { board.info( lines[i] ); }
+      }
+      else if( msg.topic() == "stderr" )
+        board.error( text );
+    } );
 
   std::size_t nbrCTLC{ 3 };
   Term::cout << Term::color_fg( Term::Color::Name::Red ) << "Press " << std::to_string( nbrCTLC ) << " times CTRL+Q to stop" << Term::color_fg( Term::Color::Name::Default ) << std::endl;
 
- while( true )
+  while( true )
   {
     Term::Event event = Term::read_event();
 
@@ -282,5 +343,5 @@ int main( int argc, char* argv[] )
       default: break;
     }
   }
-    return 0;
+  return 0;
 }
