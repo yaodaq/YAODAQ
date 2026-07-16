@@ -34,7 +34,7 @@ public:
     while( !fileExists( file ) )
     {
       if( stop.stop_requested() ) return true;
-      std::this_thread::sleep_for( std::chrono::milliseconds( 20 ) );
+      std::this_thread::sleep_for( std::chrono::milliseconds( 1 ) );
     }
     auto lastSize = std::filesystem::file_size( file );
 
@@ -67,7 +67,7 @@ public:
     sendCommand( "puts __YAODAQ_CONNECT_VIVADO_FINISHED__" );
     while( !connect_finished.load() )
     {
-      std::this_thread::sleep_for( std::chrono::milliseconds( 100 ) );
+      std::this_thread::sleep_for( std::chrono::milliseconds( 500 ) );
       warn( "Waiting configure step to finish !" );
     }
     connect_finished.store( false );
@@ -85,7 +85,7 @@ public:
     sendCommand( "exit" );
     while( !disconnect_finished.load() )
     {
-      std::this_thread::sleep_for( std::chrono::milliseconds( 100 ) );
+      std::this_thread::sleep_for( std::chrono::milliseconds( 500 ) );
       warn( "Waiting disconnect step to finish !" );
     }
     disconnect_finished.store( false );
@@ -143,7 +143,7 @@ public:
     sendCommand( "puts __YAODAQ_CONFIGURE_VIVADO_FINISHED__" );
     while( !configure_finished.load() )
     {
-      std::this_thread::sleep_for( std::chrono::milliseconds( 100 ) );
+      std::this_thread::sleep_for( std::chrono::milliseconds( 500 ) );
       warn( "Waiting connect step to finish !" );
     }
     configure_finished.store( false );

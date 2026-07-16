@@ -30,63 +30,92 @@ using TFilePtr = std::unique_ptr<TFile, TFileDeleter>;
 
 class FileWriter : public yaodaq::Module
 {
+private:
+  bool create_models()
+  {
+    m_rawdata_model = std::move( ROOT::RNTupleModel::Create() );
+    if( !m_rawdata_model ) return false;
+    m_intermediate_data_model = std::move( ROOT::RNTupleModel::Create() );
+    if( !m_intermediate_data_model ) return false;
+    m_data_model = std::move( ROOT::RNTupleModel::Create() );
+    if( !m_data_model ) return false;
+    return true;
+  }
+  bool create_fields()
+  {
+    m_rawdata = m_rawdata_model->MakeField<std::vector<DCT::RawData>>( "raw_data" );
+    if( !m_rawdata )
+    {
+      error( "m_rawdata_model->MakeField<std::vector<DCT::RawData>>( \"raw_data\" ) failed" );
+      return false;
+    }
+
+    m_intermediate_event = m_intermediate_data_model->MakeField<DCT::IntermediateEvent>( "intermediate_event" );
+    if( !m_intermediate_event )
+    {
+      error( "m_intermediate_data_model->MakeField<std::vector<std::uint32_t>>(\"event\") failed" );
+      return false;
+    }
+
+    m_event = m_data_model->MakeField<DCT::Event>( "event" );
+    if( !m_event )
+    {
+      error( "m_data_model->MakeField<DCT::Event>(\"event\");" );
+      return false;
+    }
+    return true;
+  }
+
 public:
   FileWriter( yaodaq::Config cfg, const std::string_view name ) : yaodaq::Module( cfg, "DCT", "FileWriter" )
   {
     ROOT::Experimental::DisableObjectAutoRegistration();
     ROOT::EnableImplicitMT();
-    m_model         = std::move( ROOT::RNTupleModel::Create() );
-    m_model_decoded = std::move( ROOT::RNTupleModel::Create() );
-    m_model_event   = std::move( ROOT::RNTupleModel::Create() );
+    if( !create_models() ) throw yaodaq::Exception( "Model creations failed !" );
     Term::terminal.setOptions( Term::Option::Raw, Term::Option::Cursor );  //ROOT is doing bad stufs
   }
   ~FileWriter() override {}
-  bool on_initialize() override
-  {
-    m_word = m_model->MakeField<std::vector<std::uint32_t>>( "word" );
-    if( !m_word )
-    {
-      error( "m_model->MakeField<std::uint32_t>(\"word\") failed" );
-      return false;
-    }
-    m_bcid = m_model->MakeField<std::vector<std::uint32_t>>( "bcid" );
-    if( !m_bcid )
-    {
-      error( "m_model->MakeField<std::uint32_t>(\"bcid\") failed" );
-      return false;
-    }
-
-    m_event = m_model_decoded->MakeField<DCT::PreProcessedEvent>( "event" );
-    if( !m_event )
-    {
-      error( "m_model_decoded->MakeField<std::vector<std::uint32_t>>(\"event\") failed" );
-      return false;
-    }
-
-    m_real_event = m_model_event->MakeField<DCT::Event>( "event" );
-    if( !m_real_event )
-    {
-      error( "m_real_event = m_model_event->MakeField<DCT::Event>(\"event\");" );
-      return false;
-    }
-
-    return true;
-  }
+  bool on_initialize() override { return create_fields(); }
 
   bool on_stop() override
   {
     info( "Closing m_writer" );
-    if( m_writer ) { m_writer.reset( nullptr ); }
+    if( m_rawdata_writer ) { m_rawdata_writer.reset( nullptr ); }
     else
-      error( "Writer is nullptr" );
-    if( m_writer_decoded ) { m_writer_decoded.reset( nullptr ); }
+      error( "Writer for raw_data is nullptr" );
+    if( m_intermediate_writer ) { m_intermediate_writer.reset( nullptr ); }
     else
-      error( "Writer_decoded is nullptr" );
+      error( "Writer intermediate data is nullptr" );
     if( m_event_writer ) { m_event_writer.reset( nullptr ); }
     else
-      error( "m_event_writer  is nullptr" );
+      error( "Writer for event is nullptr" );
+    m_run_number.fetch_add( 1 );
     return true;
   }
+
+  bool on_start() override
+  {
+    if( !create_models() ) return false;
+    if( !create_fields() ) return false;
+    // raw_data
+    m_rawdata_file = m_path / m_folder / add_root_extension( m_name + "_raw_data_Run" + std::to_string( m_run_number.load() ) );
+    info( "Creating ROOT file: {}", m_rawdata_file );
+    m_rawdata_writer = ROOT::RNTupleWriter::Recreate( std::move( m_rawdata_model ), "raw_data", m_rawdata_file.string() );
+    if( m_rawdata_writer ) m_rawdata_writer->EnableMetrics();
+
+    // intermediate_data
+    m_intermediate_data_file = m_path / m_folder / add_root_extension( m_name + "_intermediate_data_Run" + std::to_string( m_run_number.load() ) );
+    info( "Creating ROOT file: {}", m_intermediate_data_file );
+    m_intermediate_writer = ROOT::RNTupleWriter::Recreate( std::move( m_intermediate_data_model ), "intermediate_data", m_intermediate_data_file.string() );
+    if( m_intermediate_writer ) m_intermediate_writer->EnableMetrics();
+
+    m_data_file = m_path / m_folder / add_root_extension( m_name + "_hits_Run" + std::to_string( m_run_number.load() ) );
+    info( "Creating ROOT file: {}", m_data_file );
+    m_event_writer = ROOT::RNTupleWriter::Recreate( std::move( m_data_model ), "hits", m_data_file.string() );
+    if( m_event_writer ) m_event_writer->EnableMetrics();
+    return true;
+  }
+
   bool on_configure() override
   {
     generate_folder_name();
@@ -105,104 +134,111 @@ public:
         return false;
       }
     }
-    std::filesystem::path filename = m_path / m_folder / add_root_extension( m_name );
     std::filesystem::create_directories( m_path / m_folder );
-    info( "Creating ROOT file: {}", filename );
-    m_writer = ROOT::RNTupleWriter::Recreate( std::move( m_model ), "raw_data", filename.string() );
-
-    std::filesystem::path filename_decoded = m_path / m_folder / add_root_extension( m_name + "_decoded" );
-    info( "Creating ROOT file: {}", filename_decoded );
-    m_writer_decoded = ROOT::RNTupleWriter::Recreate( std::move( m_model_decoded ), "raw_data_decoded", filename_decoded.string() );
-
-    std::filesystem::path filename_hits = m_path / m_folder / add_root_extension( m_name + "_hits" );
-    info( "Creating ROOT file: {}", filename_hits );
-    m_event_writer = ROOT::RNTupleWriter::Recreate( std::move( m_model_event ), "hits", filename_hits.string() );
 
     Term::terminal.setOptions( Term::Option::Raw, Term::Option::Cursor );  //ROOT is doing bad stufs
     return true;
   }
-  void setTitle( const std::string_view title ) { m_title = title; }
+
   void setName( const std::string_view name ) { m_name = name; }
+
   void setPath( const std::string_view path )
   {
     m_path = path;
     if( !std::filesystem::exists( m_path ) || !m_path.is_absolute() || !m_path.filename().empty() ) throw yaodaq::Exception( "Path must be absolute and must exist" );
   }
+
   void onRawData( const std::unique_ptr<yaodaq::RawData> raw ) override
   {
     if( raw->topic() == "MPI::DCT::Singlets::RawData" )
     {
-      std::string_view j( reinterpret_cast<const char*>( raw->payload().data() ), raw->payload().size() );
-      nlohmann::json   json = nlohmann::json::parse( j );  //  TODO use simdjson
-      info( "Decoding event {}", json["event_number"].get<std::uint64_t>() );
-      clear();
-      DCT::PreProcessedEvent pre_events( json["event_number"].get<std::uint64_t>() );
-      DCT::Event             events( json["event_number"].get<std::uint64_t>() );
+      const std::string_view j( reinterpret_cast<const char*>( raw->payload().data() ), raw->payload().size() );
+      const nlohmann::json   json = nlohmann::json::parse( j );  //  TODO use simdjson
+
+      const std::uint64_t event_number{ json["event_number"].get<std::uint64_t>() };
+      info( "Decoding event {}", event_number );
+
+      // just some hints of how many hits will be stored (approximation but can but goo to reserve upfront the vectors)
+      const std::size_t         estimated_hits_number = json["rawdata"].size();
+      std::vector<DCT::RawData> raw;
+      raw.reserve( event_number );
+
+      DCT::IntermediateEvent intermediate( event_number );
+      intermediate.reserve_hits( estimated_hits_number );
+
+      DCT::Event event( event_number );
+      event.reserve_hits( estimated_hits_number );
 
       for( const auto& element: json["rawdata"] )
       {
         const std::uint32_t word{ static_cast<std::uint32_t>( std::stoul( element["word"].get<std::string>(), nullptr, 16 ) ) };
         const std::uint32_t bcid{ static_cast<std::uint32_t>( std::stoul( element["bcid"].get<std::string>(), nullptr, 16 ) ) };
-        fill( word, bcid );
-        DCT::DecodedRawData raw_data( word, bcid );
-        if( raw_data.is_trigger() )
-        {
-          warn( "{} bcid: {}, word: {}, rising: {}, falling: {}, raw_bcid: {}, time1: {}, time2: {}, channel: {}", fmt::styled( "TRIGGER!", fmt::fg( fmt::color::red ) | fmt::emphasis::bold ), bcid, word, raw_data.is_raise(), raw_data.is_fall(),
-                raw_data.get_bcid(), raw_data.get_eta1_fine_time(), raw_data.get_eta2_fine_time(), raw_data.get_channel() );
-          pre_events.triggers.push_back( raw_data );
-          events.push_back( raw_data );
-        }
-        else
-        {
-          warn( "bcid: {}, word: {}, rising: {}, falling: {}, raw_bcid: {}, time1: {}, time2: {}, channel: {}", bcid, word, raw_data.is_raise(), raw_data.is_fall(), raw_data.get_bcid(), raw_data.get_eta1_fine_time(), raw_data.get_eta2_fine_time(),
-                raw_data.get_channel() );
-          pre_events.hits.push_back( raw_data );
-          events.push_back( raw_data );
-        }
+        raw.emplace_back( word, bcid );
+        const DCT::DecodedRawData raw_data( word, bcid );  // intermediate step;
+        intermediate.hits.push_back( raw_data );
+        event.push_back( raw_data );
+
+        std::string name = raw_data.is_trigger() ? "Trigger" : fmt::format( "Channel {:>3}", raw_data.get_channel() );
+
+        auto style = raw_data.is_trigger() ? fmt::fg( fmt::color::red ) | fmt::emphasis::bold : fmt::fg( fmt::color::white );
+
+        fmt::print( "{:<11} {}: bcid {:>3}, time_η1: {:>2}, time_η2: {:>2}\n", fmt::styled( name, style ),
+                    raw_data.is_raise() ? fmt::styled( "↥", fmt::fg( fmt::color::red ) | fmt::emphasis::bold ) : fmt::styled( "↧", fmt::fg( fmt::color::green ) | fmt::emphasis::bold ), raw_data.get_bcid(), raw_data.get_eta1_fine_time(),
+                    raw_data.get_eta2_fine_time() );
       }
-      if( m_writer ) m_writer->Fill();
-      if( m_writer_decoded )
-      {
-        *m_event = pre_events;
-        m_writer_decoded->Fill();
-      }
-      if( m_event_writer )
-      {
-        *m_real_event = events;
-        m_event_writer->Fill();
-      }
+      if( m_event ) *m_event = event;
+      else
+        error( "not writing to file {}", m_rawdata_file.string() );
+      if( m_intermediate_event ) *m_intermediate_event = intermediate;
+      else
+        error( "not writing to file {}", m_intermediate_data_file.string() );
+      if( m_rawdata ) *m_rawdata = raw;
+      else
+        error( "not writing to file {}", m_data_file.string() );
+      fill();
       // send the events to our fellow analysers ;)
-      TString event_json = TBufferJSON::ToJSON( &events );
+      TString event_json = TBufferJSON::ToJSON( m_event.get() );
       send( yaodaq::RawDataBuilder::from_text( event_json.Data(), "MPI::DCT::Singlets::Events" ) );
-      warn( "Event {}", yaodaq::Formatter::format( event_json.Data() ) );
     }
     else
       info( "Received {}", raw->topic() );
   }
 
 private:
-  void fill( const std::uint32_t word, const std::uint32_t bcid )
+  void fill()
   {
-    if( m_bcid ) m_bcid->push_back( bcid );
-    if( m_word ) m_word->push_back( word );
-  }
-  void clear()
-  {
-    if( m_bcid ) m_bcid->clear();
-    if( m_word ) m_word->clear();
-    if( m_event )
+    std::size_t m_writter_bytes{ 0 };
+    if( m_rawdata_writer )
     {
-      m_event->hits.clear();
-      m_event->triggers.clear();
-      m_real_event->hits.clear();
-      m_real_event->trigger_hits.clear();
+      m_writter_bytes = m_rawdata_writer->Fill();
+      //std::ostringstream oss;
+      //m_rawdata_writer->GetMetrics().Print(oss);
+      info( "writing {} bytes to {}", m_writter_bytes, m_rawdata_file );
+      //debug("{}",oss.str());
+    }
+    if( m_intermediate_writer )
+    {
+      m_writter_bytes = m_intermediate_writer->Fill();
+      //std::ostringstream oss;
+      //m_intermediate_writer->GetMetrics().Print(oss);
+      info( "writing {} bytes to {}", m_writter_bytes, m_intermediate_data_file );
+      //debug("{}",oss.str());
+    }
+    if( m_event_writer )
+    {
+      m_writter_bytes = m_event_writer->Fill();
+      //std::ostringstream oss;
+      //m_event_writer->GetMetrics().Print(oss);
+      info( "writing {} bytes to {}", m_writter_bytes, m_data_file );
+      //debug("{}",oss.str());
+      //std::cout<<oss.str()<<std::endl;
     }
   }
   void generate_folder_name()
   {
-    auto    now = std::chrono::system_clock::now();
-    auto    t   = std::chrono::system_clock::to_time_t( now );
-    std::tm tm{};
+    const auto now = std::chrono::system_clock::now();
+    const auto t   = std::chrono::system_clock::to_time_t( now );
+    std::tm    tm{};
 #ifdef _WIN32
     localtime_s( &tm, &t );
 #else
@@ -210,7 +246,7 @@ private:
 #endif
     m_folder = fmt::format( "{:%Y%m%d}", tm );
   }
-  std::string add_root_extension( std::string_view filename )
+  std::string add_root_extension( const std::string_view filename )
   {
     std::filesystem::path p( filename );
     if( !p.has_extension() )
@@ -221,23 +257,28 @@ private:
     return p.string();
   }
   //TFile m_file;
-  std::filesystem::path                       m_path;
-  std::string                                 m_name;
-  std::string                                 m_title;
-  std::string                                 m_folder;
+  std::filesystem::path m_path;    // Path were to store the files
+  std::string           m_name;    // name of the file
+  std::string           m_folder;  // the folder with date
+
+  std::filesystem::path                      m_rawdata_file;            // raw_data full path
+  std::filesystem::path                      m_intermediate_data_file;  // intermediate data
+  std::filesystem::path                      m_data_file;               // data full path
   // rawdata
-  std::unique_ptr<ROOT::RNTupleModel>         m_model{ nullptr };
-  std::unique_ptr<ROOT::RNTupleWriter>        m_writer{ nullptr };
-  std::shared_ptr<std::vector<std::uint32_t>> m_word{ nullptr };
-  std::shared_ptr<std::vector<std::uint32_t>> m_bcid{ nullptr };
+  std::unique_ptr<ROOT::RNTupleModel>        m_rawdata_model{ nullptr };
+  std::shared_ptr<std::vector<DCT::RawData>> m_rawdata{ nullptr };
+  std::unique_ptr<ROOT::RNTupleWriter>       m_rawdata_writer{ nullptr };
+
   // rawdata_decoded
-  std::unique_ptr<ROOT::RNTupleModel>         m_model_decoded{ nullptr };
-  std::unique_ptr<ROOT::RNTupleWriter>        m_writer_decoded{ nullptr };
-  std::shared_ptr<DCT::PreProcessedEvent>     m_event{ nullptr };
+  std::unique_ptr<ROOT::RNTupleModel>     m_intermediate_data_model{ nullptr };
+  std::shared_ptr<DCT::IntermediateEvent> m_intermediate_event{ nullptr };
+  std::unique_ptr<ROOT::RNTupleWriter>    m_intermediate_writer{ nullptr };
+
   // event
-  std::unique_ptr<ROOT::RNTupleModel>         m_model_event{ nullptr };
-  std::shared_ptr<DCT::Event>                 m_real_event{ nullptr };
-  std::unique_ptr<ROOT::RNTupleWriter>        m_event_writer{ nullptr };
+  std::unique_ptr<ROOT::RNTupleModel>  m_data_model{ nullptr };
+  std::shared_ptr<DCT::Event>          m_event{ nullptr };
+  std::unique_ptr<ROOT::RNTupleWriter> m_event_writer{ nullptr };
+  std::atomic<std::uint64_t>           m_run_number{ 0 };
 };
 
 int main( int argc, char* argv[] )

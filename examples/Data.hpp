@@ -2,6 +2,7 @@
 #include "RawData.hpp"
 
 #include <cstdint>
+#include <iostream>
 #include <vector>
 namespace DCT
 {
@@ -97,35 +98,21 @@ public:
   Event( const std::uint64_t event_number ) noexcept : event_number( event_number ) {}
   void push_back( const DecodedRawData& decoded )  // decouple the hits if eta1 and eta2 are save in the same DecodedRawData
   {
-    // if trigger
-    if( decoded.is_trigger() )
+    if( decoded.has_both_side() )
     {
-      if( decoded.has_both_side() )
-      {
-        trigger_hits.push_back( Hit( decoded, Hit::Mask::side1 ) );
-        trigger_hits.push_back( Hit( decoded, Hit::Mask::side2 ) );
-      }
-      else
-        trigger_hits.push_back( Hit( decoded ) );
+      hits.push_back( Hit( decoded, Hit::Mask::side1 ) );
+      hits.push_back( Hit( decoded, Hit::Mask::side2 ) );
     }
     else
-    {
-      if( decoded.has_both_side() )
-      {
-        hits.push_back( Hit( decoded, Hit::Mask::side1 ) );
-        hits.push_back( Hit( decoded, Hit::Mask::side2 ) );
-      }
-      else
-        hits.push_back( Hit( decoded ) );
-    }
+      hits.push_back( Hit( decoded ) );
   }
   void clear()
   {
     hits.clear();
-    trigger_hits.clear();
+    event_number = 0;
   }
+  void             reserve_hits( const std::size_t i ) { hits.reserve( i ); }
   std::vector<Hit> hits;
-  std::vector<Hit> trigger_hits;
   std::uint64_t    event_number{ 0 };
 };
 

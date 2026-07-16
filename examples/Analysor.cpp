@@ -27,7 +27,7 @@ public:
       auto        obj = TBufferJSON::FromJSON<DCT::Event>( raw2 );
       info( "Event {}", obj->event_number );
       for( std::size_t i = 0; i != obj->hits.size(); ++i ) warn( "layer: {}, side: {}, strip: {}, rise: {}", obj->hits[i].getLayer(), obj->hits[i].getSide(), obj->hits[i].getStrip(), obj->hits[i].getRise() );
-      warn( "{} trigger hits, {} hits", obj->trigger_hits.size(), obj->hits.size() );
+      warn( "{} hits", obj->hits.size() );
       info( "END Event {}", obj->event_number );
       ++m_event;
     }
