@@ -24,6 +24,7 @@ public:
     rise     = decoded.is_raise();
     setTime( decoded, mask );
     setPosition( decoded.get_channel() );
+    trigger = decoded.is_trigger();
   };
   std::uint16_t getFineTimeTick() const noexcept { return fine_time; }
   double        getFineTime() const noexcept { return fine_time * m_tick_time; }
@@ -34,6 +35,8 @@ public:
   std::uint8_t  getConnector() const noexcept { return connector; }
   std::uint8_t  getLayer() const noexcept { return layer; }
   bool          getRise() const noexcept { return rise; }
+  bool          isTrigger() const noexcept { return trigger; }
+  bool          isHit() const noexcept { return !trigger; }
 
 private:
   void setPosition( const std::uint8_t channel )  // the DCT channel
@@ -89,6 +92,7 @@ private:
   std::uint32_t           bcid{ 0 };
   std::uint32_t           out_bcid{ 0 };
   std::uint16_t           fine_time{ 0 };
+  bool                    trigger{false};
 };
 
 class Event
