@@ -1,6 +1,7 @@
 #pragma once
 #include "fmt/format.h"
 
+#include <cpp-terminal/screen.hpp>
 #include <cstddef>
 #include <cstdint>
 #include <string>
@@ -8,7 +9,7 @@
 namespace yaodaq
 {
 
-std::string progressBar( std::uint64_t current, std::uint64_t max, std::size_t width = 50 )
+std::string progressBar( std::uint64_t current, std::uint64_t max, std::size_t width = 80 )
 {
   if( max == ( std::numeric_limits<std::uint64_t>::max )() ) return fmt::format( "{}/∞", current );
   const double      ratio  = static_cast<double>( current ) / static_cast<double>( max );

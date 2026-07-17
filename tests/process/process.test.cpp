@@ -24,9 +24,8 @@ public:
   ~Vivado() final {}
   std::function<bool( std::stop_token )> fun = [this]( std::stop_token stop ) -> bool
   {
-    static std::size_t    i    = 0;
-    std::filesystem::path file = m_path / fmt::format( "event_{}.csv", i );
-    info( "Triggering event {}", i );
+    std::filesystem::path file = m_path / fmt::format( "event_{}.csv", event() );
+    info( "Triggering event {}", event() );
     sendCommand( "run_hw_ila [get_hw_ilas -of_objects [get_hw_devices xc7a200t_0] -filter {CELL_NAME=~\"ila_elinks_inst\"}]" );
     sendCommand( "wait_on_hw_ila [get_hw_ilas -of_objects [get_hw_devices xc7a200t_0] -filter {CELL_NAME=~\"ila_elinks_inst\"}]" );
     sendCommand( "upload_hw_ila_data [get_hw_ilas -of_objects [get_hw_devices xc7a200t_0] -filter {CELL_NAME=~\"ila_elinks_inst\"}]" );
@@ -45,9 +44,7 @@ public:
       if( newSize == lastSize ) break;
       lastSize = newSize;
     }
-    if( !stop.stop_requested() ) readFile( file, i );
-
-    ++i;
+    if( !stop.stop_requested() ) readFile( file, event() );
     return true;
   };
 
@@ -182,29 +179,48 @@ public:
 private:
   bool readFile( const std::filesystem::path& file, const std::size_t i )
   {
+    thread_local std::string json;
+    json.reserve( 8192 );
+
     info( "Reading file {}", file.c_str() );
+    const int word_col{ 3 };
+    const int bcid_col{ 4 };
     try
     {
       csv::CSVReader reader( file.c_str() );
-      nlohmann::json json;
-      nlohmann::json raw_hits = nlohmann::json::array();
+
+      json.clear();
+      json += R"({"event_number":)";
+      json += std::to_string( i );
+      json += R"(,"rawdata":[)";
+
+      bool first = true;
       for( auto& row: reader )
       {
-        if( row["elink_out_tmp[27:0]"].get<std::string>() == "5555555" ) continue;
-        nlohmann::json raw_hit = nlohmann::json::object();
-        raw_hit["word"]        = row["elink_out_tmp[27:0]"].get<std::string>();
-        raw_hit["bcid"]        = row["bcid320[11:0]"].get<std::string>();
-        raw_hits.push_back( raw_hit );
+        const auto word = row[word_col].get<std::string_view>();
+        if( word == "5555555" ) continue;
+        const auto bcid = row[bcid_col].get<std::string_view>();
+        if( !first ) json += ',';
+        json += R"({"word":")";
+        json.append( word.data(), word.size() );
+        json += R"(","bcid":")";
+        json.append( bcid.data(), bcid.size() );
+        json += R"("})";
+        first = false;
       }
-      json["event_number"] = static_cast<int>( i );
-      json["rawdata"]      = raw_hits;
-      send( yaodaq::RawDataBuilder::from_text( json.dump(), "MPI::DCT::Singlets::RawData" ) );
+      json += "]}";
+
+      send( yaodaq::RawDataBuilder::from_text( json, "MPI::DCT::Singlets::RawData" ) );
+
+      debug( "JSON: {}", yaodaq::Formatter::format( json ) );
+
       if( !KeepRawFiles() )
       {
         if( std::filesystem::remove( file ) ) info( "removed {}", file.c_str() );
         else
           error( "can't remove {}", file.c_str() );
       }
+
       return true;
     }
     catch( const std::exception& e )

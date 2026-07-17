@@ -1,22 +1,21 @@
 <!DOCTYPE html>
 <html lang="en">
-
 <head>
 
 <meta charset="UTF-8">
 <title>YAODAQ WebSocket Debug Monitor</title>
-
 <style>
 
-body {
+body
+{
     background:#202124;
     color:#eeeeee;
     font-family:Arial,Helvetica,sans-serif;
     margin:20px;
 }
 
-.toolbar {
-
+.toolbar
+{
     display:flex;
     flex-wrap:wrap;
     gap:10px;
@@ -27,17 +26,16 @@ body {
     border-radius:8px;
 }
 
-input {
-
+input
+{
     background:#444;
     color:white;
     border:1px solid #666;
     padding:8px;
 }
 
-
-button {
-
+button
+{
     background:#1976d2;
     color:white;
     border:0;
@@ -45,65 +43,55 @@ button {
     cursor:pointer;
 }
 
-
-button:hover {
+button:hover
+{
     background:#2196f3;
 }
 
-
-#status {
-
+#status
+{
     padding:8px;
     border-radius:4px;
     margin-left:auto;
 }
 
-
-.connected {
+.connected
+{
     background:#2e7d32;
 }
 
 
-.disconnected {
+.disconnected
+{
     background:#b71c1c;
 }
 
-
-.message {
-
+.message
+{
     margin-top:15px;
     padding:15px;
     border-radius:8px;
     background:#2d2d2d;
-
 }
 
-
-pre {
-
+pre
+{
     background:#111;
     padding:12px;
     color:#90ee90;
     white-space:pre-wrap;
     overflow:auto;
-
 }
 
-
-.rx {
-
+.rx
+{
     color:#00ffff;
-
 }
 
-
-.error {
-
+.error
+{
     color:#ff6666;
-
 }
-
-
 </style>
 
 </head>
@@ -124,12 +112,7 @@ pre {
 <button onclick="disconnect()">Disconnect</button>
 <button onclick="clearMessages()">Clear</button>
 
-
-<div id="status" class="disconnected">
-Disconnected
-</div>
-
-
+<div id="status" class="disconnected">Disconnected</div>
 </div>
 
 <div id="messages"></div>
@@ -149,21 +132,8 @@ function connect()
     addMessage( "CONNECT", url);
     ws = new WebSocket(url);
     ws.binaryType="arraybuffer";
-    ws.onopen=()=>{
-        setStatus("Connected", true);
-        addMessage("CONNECTED",url);
-    };
-
-
-
-    ws.onerror=(e)=>{
-
-        addMessage(
-            "WEBSOCKET ERROR",
-            e
-        );
-
-    };
+    ws.onopen=()=>{ setStatus("Connected", true); addMessage("CONNECTED",url);};
+    ws.onerror=(e)=>{ addMessage( "WEBSOCKET ERROR", e ); };
 
 
 

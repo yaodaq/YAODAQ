@@ -3,10 +3,11 @@
 set(ENABLE_CODE_COVERAGE OFF)
 set(CSV_BUILD_PROGRAMS OFF)
 set(CSV_BUILD_TESTS OFF)
+set(CSV_CXX_STANDARD 20) #TODO Fing who is doing wrong stuffs
 FetchContent_Declare(
   csv
   GIT_REPOSITORY https://github.com/vincentlaucsb/csv-parser.git
-  GIT_TAG 3.5.1
+  GIT_TAG 5.3.0
 )
 FetchContent_MakeAvailable(csv)
 

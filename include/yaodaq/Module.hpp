@@ -263,23 +263,20 @@ public:
     }
 
     info( "Stopping Module" );
-
     bool ret = on_stop();  // call the hook
     if( !ret )
     {
       error( "on_stop() hook failed." );
       return false;
     }
-
+    m_event.store( 0, std::memory_order_relaxed );
+    m_worker.request_stop();
+    cv.notify_all();
+    if( m_worker.joinable() ) m_worker.join();
     {
       m_worker_state.store( WorkerState::Stopped );
       updateState( State::Type::Stopped );
     }
-    m_worker.request_stop();
-    cv.notify_all();
-    if( m_worker.joinable() ) m_worker.join();
-    m_event.store( 0, std::memory_order_relaxed );
-
     return true;
   }
 

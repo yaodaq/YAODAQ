@@ -92,7 +92,7 @@ private:
   std::uint32_t           bcid{ 0 };
   std::uint32_t           out_bcid{ 0 };
   std::uint16_t           fine_time{ 0 };
-  bool                    trigger{false};
+  bool                    trigger{ false };
 };
 
 class Event
