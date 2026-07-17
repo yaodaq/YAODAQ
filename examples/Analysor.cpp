@@ -1,5 +1,8 @@
 #include "Data.hpp"
+#include "RPCDataAnalyzer.hpp"
 #include "RawData.hpp"
+#include "TApplication.h"
+#include "TSystem.h"
 #include "fmt/chrono.h"
 #include "fmt/std.h"
 
@@ -17,29 +20,85 @@
 class Analyser : public yaodaq::Module
 {
 public:
-  Analyser( yaodaq::Config cfg, const std::string_view name ) : yaodaq::Module( cfg, "MyLovelyAnalyser", "Analyser" ) {}
+  Analyser( yaodaq::Config cfg, const std::string_view name ) : yaodaq::Module( cfg, "MyLovelyAnalyser", "Analyser" )
+  {
+    Term::terminal.setOptions( Term::Option::Raw, Term::Option::Cursor );  //ROOT is doing bad stufs
+  }
+
   ~Analyser() override {}
+
   void onRawData( const std::unique_ptr<yaodaq::RawData> raw ) override
   {
     if( raw->topic() == "MPI::DCT::Singlets::Events" )
     {
       std::string raw2( reinterpret_cast<const char*>( raw->payload().data() ), raw->payload().size() );
-      auto        obj = TBufferJSON::FromJSON<DCT::Event>( raw2 );
-      info( "Event {}", obj->event_number );
-      for( std::size_t i = 0; i != obj->hits.size(); ++i ) warn( "layer: {}, side: {}, strip: {}, rise: {}", obj->hits[i].getLayer(), obj->hits[i].getSide(), obj->hits[i].getStrip(), obj->hits[i].getRise() );
-      warn( "{} hits", obj->hits.size() );
-      info( "END Event {}", obj->event_number );
-      ++m_event;
+
+      auto obj = TBufferJSON::FromJSON<DCT::Event>( raw2 );
+
+      m_analyse.ProcessEvent( *obj, layer );
+      if( m_can )
+      {
+        m_can->Modified();
+        m_can->Update();
+      }
+      else
+      {
+        createCanvas();
+        createPlots();
+        if( m_can ) m_can->Draw();
+        if( layer ) layer->Draw();
+      }
     }
   }
 
+  bool on_configure() override
+  {
+    bool good{ true };
+    if( !createCanvas() ) return false;
+    if( !createPlots() ) return false;
+    if( m_can ) m_can->Draw();
+    if( layer ) layer->Draw();
+    return true;
+  }
+
+  bool on_stop() override
+  {
+    m_analyse.finalize();
+    return true;
+  }
+  void clear()
+  {
+    warn( "Clearing histograms" );
+    layer->Reset();
+    m_can->Modified();
+    m_can->Update();
+  }
+
 private:
-  std::uint64_t m_event{ 0 };
+  bool createCanvas()
+  {
+    if( !m_can ) m_can = new TCanvas();
+    return m_can;
+  }
+  bool createPlots()
+  {
+    if( !layer ) layer = new TH1D( "layer", "layer", 3, 0, 2 );
+    return layer;
+  }
+  TCanvas*        m_can{ nullptr };
+  TH1D*           layer{ nullptr };
+  std::thread     m_thread;
+  RPCDataAnalyzer m_analyse;
 };
 
 int main( int argc, char* argv[] )
 try
 {
+  TApplication rootApp( "ROOT", &argc, argv );
+  //auto canvas = new TCanvas("c1", "Layer", 800, 600);
+  //auto layer  = new TH1D("layer", "Layer", 3, 0, 3);
+
+  //layer->Draw();
   Term::terminal.setOptions( Term::Option::Raw, Term::Option::Cursor );
   CLI::App app{ "YAODAQ client" };
   argv = app.ensure_utf8( argv );
@@ -63,14 +122,14 @@ try
   }
   yaodaq::Config cfg;
   cfg.setPort( port ).setHost( host );
-  Analyser module( cfg, "DCT" );
+  Analyser module( cfg, "DCT" /*, canvas, layer */ );
   //client.setTLS("/home/work/YAODAQ-1/localhost.crt","/home/work/YAODAQ-1/localhost.key","NONE");
   module.link();
-
   std::size_t nbrCTLC{ 3 };
   Term::cout << Term::color_fg( Term::Color::Name::Red ) << "Press " << std::to_string( nbrCTLC ) << " times CTRL+C to stop" << Term::color_fg( Term::Color::Name::Default ) << std::endl;
   while( true )
   {
+    gSystem->ProcessEvents();
     Term::Event event = Term::read_event();
     switch( event.type() )
     {
@@ -84,6 +143,7 @@ try
           else
             Term::cout << Term::color_fg( Term::Color::Name::Red ) << "Press Ctrl+Q " << std::to_string( nbrCTLC ) << " times to quit" << Term::color_fg( Term::Color::Name::Default ) << std::endl;
         }
+        else if( key == Term::Key::c ) { module.clear(); }
         else
         {
           nbrCTLC = 3;

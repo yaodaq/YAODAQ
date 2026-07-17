@@ -23,4 +23,8 @@ target_link_libraries(FileWriter PRIVATE Data yaodaq::yaodaq CLI11::CLI11 cpp-te
 target_include_directories(FileWriter PRIVATE $<BUILD_INTERFACE:${PROJECT_SOURCE_DIR}/example>)
 
 add_executable(Analysor Analysor.cpp)
-target_link_libraries(Analysor PRIVATE yaodaq::yaodaq Data CLI11::CLI11 fmt::fmt cpp-terminal::cpp-terminal spdlog::spdlog ROOT::Core ROOT::RIO)
+target_link_libraries(Analysor PRIVATE yaodaq::yaodaq Data CLI11::CLI11 fmt::fmt cpp-terminal::cpp-terminal spdlog::spdlog ROOT::Core ROOT::RIO ROOT::Hist ROOT::Gpad)
+
+add_executable(RPCAnalyser rpc_analyzer.cpp)
+target_link_libraries(RPCAnalyser PRIVATE Data CLI11::CLI11 fmt::fmt cpp-terminal::cpp-terminal spdlog::spdlog ROOT::Core ROOT::RIO ROOT::Tree ROOT::ROOTNTuple ROOT::Gpad ROOT::Hist)
+
