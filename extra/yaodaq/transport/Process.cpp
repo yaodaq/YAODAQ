@@ -38,8 +38,8 @@ bool yaodaq::ProcessTransport::open()
   m_stdout        = -1;
   m_stderr        = -1;
   auto executable = getParameters().get_as<std::string>( "executable" ).value();
-  auto args       = getParameters().get_as<yaodaq::Parameters::string_list>( "args" ).value_or( {} );
-  auto env        = getParameters().get_as<yaodaq::Parameters::string_list>( "env" ).value_or( {} );
+  auto args       = getParameters().get_as<yaodaq::Parameters::string_list>( "args" ).value_or( std::vector<std::string>() );
+  auto env        = getParameters().get_as<yaodaq::Parameters::string_list>( "env" ).value_or( std::vector<std::string>() );
 
   int stdin_pipe[2];
   int stdout_pipe[2];

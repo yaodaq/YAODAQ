@@ -52,6 +52,7 @@ target_include_directories(yaodaq PUBLIC $<BUILD_INTERFACE:${PROJECT_SOURCE_DIR}
 target_compile_features(yaodaq PUBLIC cxx_std_20)
 add_library(yaodaq::yaodaq ALIAS yaodaq)
 
+if(YAODAQ_INSTALL)
 install(TARGETS yaodaq
         EXPORT YAODAQTargets
         LIBRARY DESTINATION "${CMAKE_INSTALL_LIBDIR}"
@@ -67,3 +68,4 @@ include(CMakePackageConfigHelpers)
 configure_package_config_file("${PROJECT_SOURCE_DIR}/cmake/YAODAQConfig.cmake.in" "${PROJECT_BINARY_DIR}/cmake/YAODAQConfig.cmake" INSTALL_DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/YAODAQ)
 write_basic_package_version_file("${PROJECT_BINARY_DIR}/cmake/YAODAQConfigVersion.cmake" VERSION "${PROJECT_VERSION}" COMPATIBILITY AnyNewerVersion)
 install(FILES "${PROJECT_BINARY_DIR}/cmake/YAODAQConfig.cmake" "${PROJECT_BINARY_DIR}/cmake/YAODAQConfigVersion.cmake" DESTINATION "${CMAKE_INSTALL_LIBDIR}/cmake/YAODAQ")
+endif()
