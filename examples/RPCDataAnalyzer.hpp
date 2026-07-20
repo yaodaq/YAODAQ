@@ -759,15 +759,16 @@ public:
 private:
   void createCanvas()
   {
-    if(!getCanvas("toto")) m_canvas["toto"]= new TCanvas("gg","ggg");
+    if( !getCanvas( "toto" ) ) m_canvas["toto"] = new TCanvas( "gg", "ggg" );
   }
-  TCanvas* getCanvas(const std::string name)
+  TCanvas* getCanvas( const std::string name )
   {
-    if(m_canvas.find(name)!=m_canvas.end()) return m_canvas[name];
-    else return nullptr;
+    if( m_canvas.find( name ) != m_canvas.end() ) return m_canvas[name];
+    else
+      return nullptr;
   }
-  std::map<std::string,TCanvas*> m_canvas;
-  std::string outPath( const std::string& fname )
+  std::map<std::string, TCanvas*> m_canvas;
+  std::string                     outPath( const std::string& fname )
   {
     if( fOutputDir.empty() ) return fname;
     return fOutputDir + "/" + fname;
@@ -780,11 +781,11 @@ private:
       can->Print( file.c_str(), ( "Title:" + title ).c_str() );
   }
 
-  TCanvas*              c1{ nullptr };
+  TCanvas*             c1{ nullptr };
   // Histogram pointers
   // Histograms for channel counting: rising and falling edges, per (layer,side)
-  std::array<TH1F*, 6>  hRisingCount{ nullptr, nullptr, nullptr, nullptr, nullptr, nullptr };
-  std::array<TH1F*, 6>  hFallingCount{ nullptr, nullptr, nullptr, nullptr, nullptr, nullptr };
+  std::array<TH1F*, 6> hRisingCount{ nullptr, nullptr, nullptr, nullptr, nullptr, nullptr };
+  std::array<TH1F*, 6> hFallingCount{ nullptr, nullptr, nullptr, nullptr, nullptr, nullptr };
 
   TH1F*                hTotalHits{ nullptr };
   TH1F*                hTriggerHits{ nullptr };
