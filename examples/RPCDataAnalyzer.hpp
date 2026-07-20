@@ -11,7 +11,9 @@
 #include <array>
 #include <fstream>
 #include <iostream>
+#include <map>
 #include <set>
+#include <spdlog/spdlog.h>
 #include <string>
 #include <vector>
 
@@ -40,8 +42,6 @@ static const int    MAX_CHANNELS_PER_GROUP = 48;
 //Other setup
 static const int MAX_TRIGGERS_PER_EVENT = 10;  // Maximum expected trigger hits per event (adjust)
 
-// ==========================================================
-
 // =====================================================================
 //  2. Data Structures
 // =====================================================================
@@ -61,6 +61,30 @@ struct EventData
   std::vector<Hit> triggerHits;
 };
 
+class Efficiency
+{
+public:
+  explicit Efficiency() = default;
+  void efficient()
+  {
+    ++m_num;
+    ++m_denum;
+  }
+  void        inefficient() { ++m_denum; }
+  std::size_t numerator() const noexcept { return m_num; }
+  std::size_t denominator() const noexcept { return m_denum; }
+  double      efficiency() const noexcept { return m_num * 1.0 / m_denum; }
+  double      error() const noexcept
+  {
+    double eff = efficiency();
+    return std::sqrt( eff * ( 1.0 - eff ) / m_denum );
+  }
+
+private:
+  std::size_t m_num{ 0 };
+  std::size_t m_denum{ 0 };
+};
+
 // =====================================================================
 //  3. Analyzer Class
 // =====================================================================
@@ -68,8 +92,7 @@ class RPCDataAnalyzer
 {
   // 3.1 Constructor & Destructor
 public:
-  RPCDataAnalyzer() :
-    hRisingCount{ { nullptr } }, hFallingCount{ { nullptr } }, hTotalHits( nullptr ), hTriggerHits( nullptr ), hTot{ { nullptr } }, hDelay{ { nullptr } }, hTriggerCount( nullptr ), hClusterSize{ { nullptr } }, hPosEtaPhi{ { nullptr } }, hRolling( nullptr )
+  RPCDataAnalyzer()
   {
     // Create histograms based on enabled features
     if( ENABLE_CHANNEL_COUNT )
@@ -133,10 +156,10 @@ public:
                                       DETECTOR_LENGTH / ( SIGNAL_SPEED * 5 / 6 / 2 ), 0, DETECTOR_LENGTH );                                                // eta bins
       }
     }
-    /*if (ENABLE_ROLLING) {
-            hRolling = new TH1F("rolling", "BCID rolling count;Rolling value;Hits",
-                                10, -0.5, 9.5);   // Adjust bins if rollover exceeds 9
-        }	*/
+    /*if (ENABLE_ROLLING)
+  {
+    hRolling = new TH1F("rolling", "BCID rolling count;Rolling value;Hits",10, -0.5, 9.5);   // Adjust bins if rollover exceeds 9
+  }	*/
   }
 
   //Clean up histograms to avoid memory leaks
@@ -168,7 +191,6 @@ public:
       for( const auto& hit: ev.hits )
       {
         int layer = hit.layer;
-        std::cout << layer << std::endl;
         if( my_ ) my_->Fill( layer );
 
         int side = hit.side;
@@ -226,19 +248,18 @@ public:
           otherLayersHaveHit = layerHasHit[0] && layerHasHit[2];
         else
           otherLayersHaveHit = layerHasHit[0] && layerHasHit[1];
-
         if( otherLayersHaveHit )
         {
           for( int s = 0; s < 2; ++s )
           {
             int idx = l * 2 + s;
-            fDenominator[idx]++;
-            if( sideHasHit[l][s] ) fNumerator[idx]++;
+            if( sideHasHit[l][s] ) m_efficiencies[idx].efficient();
+            else
+              m_efficiencies[idx].inefficient();
           }
         }
       }
     }
-
     // ----- TOT distribution (compute from rising/falling edges) -----
     if( ENABLE_TOT_HIST )
     {
@@ -416,7 +437,6 @@ public:
         hPosEtaPhi[layer]->Fill( phi, eta );
       }
     }
-
     //other new functions
   }
 
@@ -425,32 +445,8 @@ public:
   void finalize()
   {
     if( !c1 ) c1 = new TCanvas( "c1", "Results", 1200, 800 );
-
-    // Helper to prepend output directory
-    auto outPath = [this]( const std::string& fname ) -> std::string
-    {
-      if( fOutputDir.empty() ) return fname;
-      return fOutputDir + "/" + fname;
-    };
-
     std::string pdfFile   = outPath( "analysis_results.pdf" );
     bool        firstPage = true;
-
-    // Helper to print current canvas to PDF
-    auto printPage = [&]( const char* title )
-    {
-      c1->SetTitle( title );
-      if( firstPage )
-      {
-        c1->Print( ( pdfFile + "(" ).c_str(), ( "Title:" + std::string( title ) ).c_str() );
-        firstPage = false;
-      }
-      else
-      {
-        c1->Print( pdfFile.c_str(), ( "Title:" + std::string( title ) ).c_str() );
-      }
-    };
-
     // ----- Channel count histograms (6 panels: 3 layers �� 2 sides) -----
     if( ENABLE_CHANNEL_COUNT )
     {
@@ -478,7 +474,7 @@ public:
           leg->Draw();
         }
       }
-      printPage( "Channel Counts (Rising/Falling per Layer and Side)" );
+      print_page( c1, pdfFile, "Channel Counts (Rising/Falling per Layer and Side)", true );
     }
 
     // ----- TOT histograms -----
@@ -491,7 +487,7 @@ public:
         c1->cd( i + 1 );
         hTot[i]->Draw();
       }
-      printPage( "TOT Distribution per Layer and Side" );
+      print_page( c1, pdfFile, "TOT Distribution per Layer and Side" );
     }
 
     // ----- Signal delay histograms -----
@@ -509,7 +505,7 @@ public:
           hDelay[idx]->Draw();
         }
       }
-      printPage( "Signal Delay per Layer and Side" );
+      print_page( c1, pdfFile, "Signal Delay per Layer and Side" );
     }
 
     // ----- Trigger count histogram -----
@@ -518,7 +514,7 @@ public:
       c1->Clear();
       c1->SetLogy();
       hTriggerCount->Draw();
-      printPage( "Trigger Count per Event" );
+      print_page( c1, pdfFile, "Trigger Count per Event" );
     }
 
     // ----- Cluster size histograms -----
@@ -536,7 +532,7 @@ public:
           hClusterSize[idx]->Draw();
         }
       }
-      printPage( "Cluster Size per Layer and Side" );
+      print_page( c1, pdfFile, "Cluster Size per Layer and Side" );
     }
 
     // ----- 2D position reconstruction -----
@@ -575,17 +571,16 @@ public:
         latex->DrawLatexNDC( 0.92, 0.1, "Ch 48" );
         delete latex;
       }
-      printPage( "2D Position Reconstruction (Eta vs Phi)" );
+      print_page( c1, pdfFile, "2D Position Reconstruction (Eta vs Phi)" );
     }
 
     /*// ----- Rolling count histogram -----
-	    if (ENABLE_ROLLING && hRolling) {
-	        c1->Clear();
-	        c1->SetLogy();
-	        hRolling->Draw();
-	        printPage("BCID Rolling Count");
-	    }*/
-
+    if (ENABLE_ROLLING && hRolling) {
+	  c1->Clear();
+	  c1->SetLogy();
+	  hRolling->Draw();
+	  printPage("BCID Rolling Count");
+	}*/
     // Add other plots here...
 
     // Close PDF file
@@ -593,89 +588,20 @@ public:
     c1->Update();
     c1->Print( ( pdfFile + ")" ).c_str() );
 
-    if( ENABLE_EFFICIENCY )
-    {
-      // Compute efficiency and uncertainty for each (layer, side)
-      double eff[6] = { 0.0 };
-      double unc[6] = { 0.0 };
-      for( int i = 0; i < 6; ++i )
-      {
-        long long den = fDenominator[i];
-        long long num = fNumerator[i];
-        if( den > 0 )
-        {
-          eff[i] = (double)num / den;
-
-          // Gaussian approximation, Use sqrt(p*(1-p)/n) for standard uncertainty
-          unc[i] = sqrt( eff[i] * ( 1.0 - eff[i] ) / den );
-        }
-        else
-        {
-          eff[i] = 0.0;
-          unc[i] = 0.0;
-        }
-      }
-
-      // Write to file: include original stats + new efficiencies
-      std::ofstream fout( outPath( "run_summary.txt" ) );
-      if( fout.is_open() )
-      {
-        fout << "Total events processed: " << totalEvents << "\n";
-        fout << "Hits per layer (events with at least one hit):\n";
-        for( int i = 0; i < 3; ++i ) fout << "  Layer " << i << ": " << layerHitCount[i] << "\n";
-        fout << "Three-fold coincidence events: " << threeFold << "\n";
-        fout << "Pair counts (other two layers) and layer efficiencies:\n";
-        for( int i = 0; i < 3; ++i )
-        {
-          double oldEff = ( pairCount[i] > 0 ) ? (double)threeFold / pairCount[i] : 0.0;
-          fout << "  Layer " << i << ": denominator = " << pairCount[i] << ", efficiency = " << oldEff << "\n";
-        }
-        fout << "\nEfficiency per (layer, side) with uncertainty:\n";
-        for( int l = 0; l < 3; ++l )
-        {
-          for( int s = 0; s < 2; ++s )
-          {
-            int idx = l * 2 + s;
-            fout << "  Layer " << l << ", Side " << ( s + 1 ) << ": efficiency = " << eff[idx] << " +/- " << unc[idx] << " (denominator = " << fDenominator[idx] << ")\n";
-          }
-        }
-        fout.close();
-      }
-      else
-      {
-        std::cerr << "Warning: Could not write " << outPath( "run_summary.txt" ) << "\n";
-      }
-
-      // Simplified terminal output
-      std::cout << "========================================" << std::endl;
-      std::cout << "Brief Report of the analysis" << std::endl;
-      std::cout << "Total events processed: " << totalEvents << std::endl;
-      for( int l = 0; l < 3; ++l )
-      {
-        for( int s = 0; s < 2; ++s )
-        {
-          int idx = l * 2 + s;
-          std::cout << "Layer " << l << ", Side " << ( s + 1 ) << " efficiency: " << eff[idx] << " +/- " << unc[idx] << std::endl;
-        }
-      }
-      std::cout << "========================================" << std::endl;
-    }
-
+    if( ENABLE_EFFICIENCY ) writeSummary();
     delete c1;
   }
 
   void ProcessEvent( const DCT::Event& dctEvent, TH1D* _my = nullptr )
   {
     EventData localEv;
-
     /*  // Separate last BCID and rolling counters for rising and falling edges
-	        int lastBCID_R = -1;   // invalid initial
-	      	int lastBCID_F = -1;
-	        int rollingR = 0;
-	        int rollingF = 0;*/
-    bool first = true;
-    int  bc0   = 0;
-
+	    int lastBCID_R = -1;   // invalid initial
+	    int lastBCID_F = -1;
+	    int rollingR = 0;
+	    int rollingF = 0;*/
+    bool      first = true;
+    int       bc0   = 0;
     for( const auto& dctHit: dctEvent.hits )
     {
       if( first )
@@ -690,14 +616,14 @@ public:
       bool isRising = dctHit.getRise();
 
       /*// Select appropriate last BCID and rolling counter based on edge type
-	            int* lastBCID_ptr = isRising ? &lastBCID_R : &lastBCID_F;
-	            int* rolling_ptr = isRising ? &rollingR : &rollingF;
-	            int period = isRising ? BCID_PERIOD_R : BCID_PERIOD_F;
+	  int* lastBCID_ptr = isRising ? &lastBCID_R : &lastBCID_F;
+	  int* rolling_ptr = isRising ? &rollingR : &rollingF;
+	  int period = isRising ? BCID_PERIOD_R : BCID_PERIOD_F;
 	
-	            // Detect rollover: if current BCID is smaller than previous (and previous valid)
-	            if (*lastBCID_ptr != -1 && bcid - *lastBCID_ptr < -10) {
-	                (*rolling_ptr)++;
-	            }*/
+	  // Detect rollover: if current BCID is smaller than previous (and previous valid)
+	  if(*lastBCID_ptr != -1 && bcid - *lastBCID_ptr < -10) {
+	    (*rolling_ptr)++;
+	  }*/
 
       // Compute absolute time using the appropriate period and rolling count
       float time = static_cast<float>( bcid * BCID_CLOCK + dctHit.getFineTime() );
@@ -725,36 +651,34 @@ public:
       }
 
       /*// Update the last BCID for this edge type
-	            *lastBCID_ptr = bcid;*/
+	*lastBCID_ptr = bcid;*/
     }
-
     processEvent( localEv, _my );
 
     /*// Debug output for rolling counts (only if enabled)
-	        if (ENABLE_ROLLING) {
-	            // Fill histogram with the total rolling count (use rising as representative, or combine)
-	            // Here we fill with rising rolling (or you can fill both separately)
-	            hRolling->Fill(rollingR);
-	            // Optionally fill falling too, but histogram is 1D; we can fill with sum or separate.
-	            // For simplicity, fill rising only.
-	            
-	            // Print details if rolling is large
-	            if (rollingR > 2 || rollingF > 2) {
-	                std::cout << "\n--- Event " << processed
-	                          << " | rising rolling = " << rollingR
-	                          << ", falling rolling = " << rollingF
-	                          << " (BCIDs: ";
-	                for (const auto& dctHit : dctEvent.hits) {
-	                    std::cout << dctHit.getBCID()
-	                              << (dctHit.isTrigger() ? "(T)" : "")
-	                              << (dctHit.getRise() ? "(r)" : "(f)")
-	                              << "(" << (int)dctHit.getSide() << ")"
-	                              << "  ";
-	                }
-	                std::cout << " ) ---" << std::endl;
-	            }
-	        }
-			*/
+  if (ENABLE_ROLLING) {
+    // Fill histogram with the total rolling count (use rising as representative, or combine)
+	// Here we fill with rising rolling (or you can fill both separately)
+	hRolling->Fill(rollingR);
+	// Optionally fill falling too, but histogram is 1D; we can fill with sum or separate.
+	// For simplicity, fill rising only.          
+	// Print details if rolling is large
+	if (rollingR > 2 || rollingF > 2) {
+	  std::cout << "\n--- Event " << processed
+	  << " | rising rolling = " << rollingR
+	  << ", falling rolling = " << rollingF
+	  << " (BCIDs: ";
+	for (const auto& dctHit : dctEvent.hits) {
+	  std::cout << dctHit.getBCID()
+	  << (dctHit.isTrigger() ? "(T)" : "")
+	  << (dctHit.getRise() ? "(r)" : "(f)")
+	  << "(" << (int)dctHit.getSide() << ")"
+	  << "  ";
+	}
+    std::cout << " ) ---" << std::endl;
+  }
+  }
+  */
   }
 
   // ----- Two running modes -----
@@ -768,13 +692,10 @@ public:
       std::cerr << "Error: Cannot open RNTuple 'hits' in file " << filename << std::endl;
       return;
     }
-
     auto viewEvent    = reader->GetView<DCT::Event>( "event" );
     auto totalEntries = reader->GetNEntries();
 
-    std::cout << " " << std::endl;
-    std::cout << "************************************" << std::endl;
-    std::cout << "Processing " << totalEntries << " events..." << std::endl;
+    spdlog::info( "\n************************************\nProcessing {} events...", totalEntries );
 
     uint64_t processed = 0;
     for( auto entryId: reader->GetEntryRange() )
@@ -782,27 +703,87 @@ public:
       const DCT::Event& dctEvent = viewEvent( entryId );
       ProcessEvent( dctEvent, nullptr );
       processed++;
-      if( processed % 10000 == 0 ) { std::cout << "Processed " << processed << "/" << totalEntries << " events" << std::endl; }
-
-      std::cout << "Finished processing " << processed << " events." << std::endl;
-      std::cout << "************************************" << std::endl;
-      std::cout << " " << std::endl;
+      if( processed % 5000 == 0 ) { spdlog::info( "Processed {}/{} events", processed, totalEntries ); }
     }
+    spdlog::info( "Finished processing {} events.\n************************************\n", processed );
+  }
+
+  void writeSummary()
+  {
+    // Write to file: include original stats + new efficiencies
+    std::ofstream fout( outPath( "run_summary.txt" ) );
+    if( fout.is_open() )
+    {
+      fout << "Total events processed: " << totalEvents << "\n";
+      fout << "Hits per layer (events with at least one hit):\n";
+      for( int i = 0; i < 3; ++i ) fout << "  Layer " << i << ": " << layerHitCount[i] << "\n";
+      fout << "Three-fold coincidence events: " << threeFold << "\n";
+      fout << "Pair counts (other two layers) and layer efficiencies:\n";
+      for( int i = 0; i < 3; ++i )
+      {
+        double oldEff = ( pairCount[i] > 0 ) ? (double)threeFold / pairCount[i] : 0.0;
+        fout << "  Layer " << i << ": denominator = " << pairCount[i] << ", efficiency = " << oldEff << "\n";
+      }
+      fout << "\nEfficiency per (layer, side) with uncertainty:\n";
+      for( int l = 0; l < 3; ++l )
+      {
+        for( int s = 0; s < 2; ++s )
+        {
+          int idx = l * 2 + s;
+          fout << "  Layer " << l << ", Side " << ( s + 1 ) << ": efficiency = " << m_efficiencies[idx].efficiency() << " +/- " << m_efficiencies[idx].error() << " (denominator = " << m_efficiencies[idx].denominator() << ")\n";
+        }
+      }
+      fout.close();
+    }
+    else
+    {
+      std::cerr << "Warning: Could not write " << outPath( "run_summary.txt" ) << "\n";
+    }
+
+    // Simplified terminal output
+    std::cout << "========================================" << std::endl;
+    std::cout << "Brief Report of the analysis" << std::endl;
+    std::cout << "Total events processed: " << totalEvents << std::endl;
+    for( int l = 0; l < 3; ++l )
+    {
+      for( int s = 0; s < 2; ++s )
+      {
+        int idx = l * 2 + s;
+        std::cout << "Layer " << l << ", Side " << ( s + 1 ) << " efficiency: " << m_efficiencies[idx].efficiency() << " +/- " << m_efficiencies[idx].error() << std::endl;
+      }
+    }
+    std::cout << "========================================" << std::endl;
   }
 
   //  4. Private Member Variables
 private:
-  TCanvas*             c1 = nullptr;
+  std::string outPath( const std::string& fname )
+  {
+    if( fOutputDir.empty() ) return fname;
+    return fOutputDir + "/" + fname;
+  };
+  void print_page( TCanvas* can, const std::string file, const std::string title, bool first_page = true )
+  {
+    can->SetTitle( title.c_str() );
+    if( first_page ) can->Print( ( file + "(" ).c_str(), ( "Title:" + title ).c_str() );
+    else
+      can->Print( file.c_str(), ( "Title:" + title ).c_str() );
+  }
+
+  std::vector<TCanvas*> m_canvas;
+  TCanvas*              c1{ nullptr };
   // Histogram pointers
   // Histograms for channel counting: rising and falling edges, per (layer,side)
-  std::array<TH1F*, 6> hRisingCount;
-  std::array<TH1F*, 6> hFallingCount;
+  std::array<TH1F*, 6>  hRisingCount{ nullptr, nullptr, nullptr, nullptr, nullptr, nullptr };
+  std::array<TH1F*, 6>  hFallingCount{ nullptr, nullptr, nullptr, nullptr, nullptr, nullptr };
 
-  TH1F*                hTotalHits;
-  TH1F*                hTriggerHits;
-  std::array<TH1F*, 6> hTot;
-  std::array<TH1F*, 6> hDelay;
-  TH1F*                hTriggerCount;  // Histogram of number of trigger hits per event
+  TH1F*                hTotalHits{ nullptr };
+  TH1F*                hTriggerHits{ nullptr };
+  std::array<TH1F*, 6> hTot{ nullptr, nullptr, nullptr, nullptr, nullptr, nullptr };
+  ;
+  std::array<TH1F*, 6> hDelay{ nullptr, nullptr, nullptr, nullptr, nullptr, nullptr };
+  ;
+  TH1F* hTriggerCount{ nullptr };  // Histogram of number of trigger hits per event
 
   // Counters for new efficiency definition (event-based)
   long long totalEvents      = 0;
@@ -813,12 +794,11 @@ private:
   std::string fOutputDir;  // output directory for all result files
 
   // For efficiency per (layer, side)
-  std::array<long long, 6> fDenominator = { 0, 0, 0, 0, 0, 0 };  // other two layers have hit
-  std::array<long long, 6> fNumerator   = { 0, 0, 0, 0, 0, 0 };  // this (layer,side) also has hit
+  std::array<Efficiency, 6> m_efficiencies;
 
-  std::array<TH1F*, 6> hClusterSize;
+  std::array<TH1F*, 6> hClusterSize{ nullptr, nullptr, nullptr, nullptr, nullptr, nullptr };
 
-  std::array<TH2F*, 3> hPosEtaPhi;  // Eta vs Phi per layer
+  std::array<TH2F*, 3> hPosEtaPhi{ nullptr, nullptr, nullptr };  // Eta vs Phi per layer
 
-  TH1F* hRolling;  // Histogram of BCID rolling count per hit
+  TH1F* hRolling{ nullptr };  // Histogram of BCID rolling count per hit
 };
