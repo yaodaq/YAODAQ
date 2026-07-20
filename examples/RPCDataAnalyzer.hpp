@@ -757,6 +757,16 @@ public:
 
   //  4. Private Member Variables
 private:
+  void createCanvas()
+  {
+    if(!getCanvas("toto")) m_canvas["toto"]= new TCanvas("gg","ggg");
+  }
+  TCanvas* getCanvas(const std::string name)
+  {
+    if(m_canvas.find(name)!=m_canvas.end()) return m_canvas[name];
+    else return nullptr;
+  }
+  std::map<std::string,TCanvas*> m_canvas;
   std::string outPath( const std::string& fname )
   {
     if( fOutputDir.empty() ) return fname;
@@ -770,7 +780,6 @@ private:
       can->Print( file.c_str(), ( "Title:" + title ).c_str() );
   }
 
-  std::vector<TCanvas*> m_canvas;
   TCanvas*              c1{ nullptr };
   // Histogram pointers
   // Histograms for channel counting: rising and falling edges, per (layer,side)
