@@ -46,8 +46,17 @@ public:
 
   bool on_configure() override { return true; }
 
-  bool on_stop() override { return true; }
-  void clear() { warn( "Clearing histograms" ); }
+  bool on_stop() override
+  {
+    clear();
+    return true;
+  }
+  void clear()
+  {
+    warn( "Clearing histograms" );
+    reset_event();
+    m_analyse.reset();
+  }
 
 private:
   RPCDataAnalyzer m_analyse;
@@ -80,11 +89,11 @@ try
   }
   yaodaq::Config cfg;
   cfg.setPort( port ).setHost( host );
-  Analyser module( cfg, "DCT" /*, canvas, layer */ );
+  Analyser    module( cfg, "DCT" /*, canvas, layer */ );
   //client.setTLS("/home/work/YAODAQ-1/localhost.crt","/home/work/YAODAQ-1/localhost.key","NONE");
-  module.link();
   std::size_t nbrCTLC{ 3 };
   Term::cout << Term::color_fg( Term::Color::Name::Red ) << "Press " << std::to_string( nbrCTLC ) << " times CTRL+C to stop" << Term::color_fg( Term::Color::Name::Default ) << std::endl;
+  module.link();
   while( true )
   {
     Term::Event event = Term::read_event();

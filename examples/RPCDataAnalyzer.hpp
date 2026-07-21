@@ -8,6 +8,7 @@
 #include <TH2F.h>
 #include <TLatex.h>
 #include <TLegend.h>
+#include <TLine.h>
 #include <TPaveStats.h>
 #include <array>
 #include <fstream>
@@ -50,6 +51,10 @@ struct AnalyzerConfig
   bool   enableCut = false;
   int    chanTol   = 2;
   double timeTol   = 20.0;  // ns
+
+  bool   enableDelayCut = false;  // if true, only hits with delay in [delayMin, delayMax] are used
+  double delayMin       = -125;   // ns
+  double delayMax       = -85;    // ns
 
   // Other
   int maxTriggersPerEvent = 10;
@@ -108,6 +113,11 @@ public:
     double eff = efficiency();
     return std::sqrt( eff * ( 1.0 - eff ) / m_denum );
   }
+  void reset()
+  {
+    m_num   = 0;
+    m_denum = 0;
+  }
 
 private:
   std::size_t m_num{ 0 };
@@ -123,6 +133,7 @@ public:
   Efficiency       getEfficiency() { return m_eff; }
   void             efficient() { m_eff.efficient(); }
   void             inefficient() { m_eff.inefficient(); }
+  void             ResetEff() { m_eff.reset(); }
 
 private:
   EfficiencySource m_source;
@@ -168,6 +179,7 @@ public:
   void processEvent( const EventData& ev )
   {
     // ----- Channel counting (rising/falling separated, per layer/side) -----
+    std::lock_guard<std::mutex> lock( m_mutex_graph );  // Thread safety
     ensureHistograms();
     if( fConfig.enableChannelCount )
     {
@@ -190,54 +202,86 @@ public:
     // ----- Efficiency (event-based: three-fold / two-fold) -----
     if( fConfig.enableEfficiency )
     {
-      // --- efficiency per layer ---
-      bool layerHasHit[3]   = { false, false, false };
-      bool sideHasHit[3][2] = { { false, false }, { false, false }, { false, false } };
-
-      for( const auto& hit: ev.hits )
+      // --- Determine trigger time if delay cut is enabled ---
+      bool  skipEvent   = false;
+      float triggerTime = -99999.0f;
+      if( fConfig.enableDelayCut )
       {
-        int l = hit.layer;
-        int s = hit.side;
-        if( l >= 0 && l < 3 && s >= 0 && s < 2 )
+        // Find bool  skipEvent   = false;first rising trigger hit
+        for( const auto& trg: ev.triggerHits )
         {
+          if( trg.isRising )
+          {
+            triggerTime = trg.time;
+            break;
+          }
+        }
+
+        // No trigger rising edge -> skip this event entirely for efficiency
+        if( triggerTime < -99998 ) { skipEvent = true; }
+      }
+
+      if( !skipEvent )
+      {
+        // Determine which hits are valid for efficiency calculation
+        bool layerHasHit[3]   = { false, false, false };
+        bool sideHasHit[3][2] = { { false, false }, { false, false }, { false, false } };
+
+        for( const auto& hit: ev.hits )
+        {
+          int l = hit.layer;
+          int s = hit.side;
+          if( l < 0 || l >= 3 || s < 0 || s >= 2 ) continue;
+
+          // Apply delay cut if enabled
+          if( fConfig.enableDelayCut )
+          {
+            float delay = hit.time - triggerTime;
+            if( delay < fConfig.delayMin || delay > fConfig.delayMax )
+            {
+              continue;  // this hit is excluded from efficiency
+            }
+          }
+
+          // Hit passes all cuts
           layerHasHit[l]   = true;
           sideHasHit[l][s] = true;
         }
-      }
 
-      // Update per-layer hit counts (original)
-      for( int i = 0; i < 3; ++i )
-      {
-        if( layerHasHit[i] ) layerHitCount[i]++;
-      }
-
-      // Check three-fold coincidence (original)
-      if( layerHasHit[0] && layerHasHit[1] && layerHasHit[2] ) { threeFold++; }
-
-      // Update pair counts (original)
-      if( layerHasHit[1] && layerHasHit[2] ) pairCount[0]++;
-      if( layerHasHit[0] && layerHasHit[2] ) pairCount[1]++;
-      if( layerHasHit[0] && layerHasHit[1] ) pairCount[2]++;
-
-      // --- New efficiency per (layer, side) ---
-      totalEvents++;  // Count total events
-
-      for( int l = 0; l < 3; ++l )
-      {
-        bool otherLayersHaveHit = false;
-        if( l == 0 ) otherLayersHaveHit = layerHasHit[1] && layerHasHit[2];
-        else if( l == 1 )
-          otherLayersHaveHit = layerHasHit[0] && layerHasHit[2];
-        else
-          otherLayersHaveHit = layerHasHit[0] && layerHasHit[1];
-        if( otherLayersHaveHit )
+        // Update per-layer hit counts (original)
+        for( int i = 0; i < 3; ++i )
         {
-          for( int s = 0; s < 2; ++s )
+          if( layerHasHit[i] ) layerHitCount[i]++;
+        }
+
+        // Check three-fold coincidence (original)
+        if( layerHasHit[0] && layerHasHit[1] && layerHasHit[2] ) threeFold++;
+
+        // Update pair counts (original)
+        if( layerHasHit[1] && layerHasHit[2] ) pairCount[0]++;
+        if( layerHasHit[0] && layerHasHit[2] ) pairCount[1]++;
+        if( layerHasHit[0] && layerHasHit[1] ) pairCount[2]++;
+
+        // --- New efficiency per (layer, side) ---
+        totalEvents++;  // Count total events (each event with at least one hit after cuts)
+
+        for( int l = 0; l < 3; ++l )
+        {
+          bool otherLayersHaveHit = false;
+          if( l == 0 ) otherLayersHaveHit = layerHasHit[1] && layerHasHit[2];
+          else if( l == 1 )
+            otherLayersHaveHit = layerHasHit[0] && layerHasHit[2];
+          else
+            otherLayersHaveHit = layerHasHit[0] && layerHasHit[1];
+          if( otherLayersHaveHit )
           {
-            int idx = l * 2 + s;
-            if( sideHasHit[l][s] ) getEfficiencyInfo( l, s ).efficient();
-            else
-              getEfficiencyInfo( l, s ).inefficient();
+            for( int s = 0; s < 2; ++s )
+            {
+              int idx = l * 2 + s;
+              if( sideHasHit[l][s] ) getEfficiencyInfo( l, s ).efficient();
+              else
+                getEfficiencyInfo( l, s ).inefficient();
+            }
           }
         }
       }
@@ -424,7 +468,9 @@ public:
 
   // 3.4 Finalization
   // Finalize: produce and save plots after all events processed
-  void finalize()
+  void finalize() { refresh(); }
+
+  void refresh()
   {
     // First, refresh all canvases to ensure they contain latest data
     // (Optional: you may also call refreshCanvas for each enabled feature)
@@ -597,6 +643,9 @@ public:
     if( fout.is_open() )
     {
       fout << "Total events processed: " << totalEvents << "\n";
+      fout << "Delay cut enabled: " << ( fConfig.enableDelayCut ? "Yes" : "No" ) << "\n";
+      if( fConfig.enableDelayCut ) { fout << "Delay window: [" << fConfig.delayMin << ", " << fConfig.delayMax << "] ns\n"; }
+      fout << "\n";
       fout << "Hits per layer (events with at least one hit):\n";
       for( int i = 0; i < 3; ++i ) fout << "  Layer " << i << ": " << layerHitCount[i] << "\n";
       fout << "Three-fold coincidence events: " << threeFold << "\n";
@@ -627,6 +676,8 @@ public:
     std::cout << "========================================" << std::endl;
     std::cout << "Brief Report of the analysis" << std::endl;
     std::cout << "Total events processed: " << totalEvents << std::endl;
+    std::cout << "Delay cut enabled: " << ( fConfig.enableDelayCut ? "Yes" : "No" ) << std::endl;
+    if( fConfig.enableDelayCut ) { std::cout << "Delay window: [" << fConfig.delayMin << ", " << fConfig.delayMax << "] ns" << std::endl; }
     for( int l = 0; l < 3; ++l )
     {
       for( int s = 0; s < 2; ++s )
@@ -637,6 +688,52 @@ public:
       }
     }
     std::cout << "========================================" << std::endl;
+  }
+
+  /// Reset all histograms and counters to zero (keeps configuration unchanged).
+  void reset()
+  {
+    std::lock_guard<std::mutex> lock( m_mutex_graph );  // Thread safety
+
+    // Helper lambda to reset a histogram if not null
+    auto resetHist = []( TH1* h )
+    {
+      if( h ) h->Reset();
+    };
+
+    // Reset all existing histograms (do NOT delete/recreate)
+    for( auto& h: hRisingCount ) resetHist( h );
+    for( auto& h: hFallingCount ) resetHist( h );
+    for( auto& h: hTot ) resetHist( h );
+    for( auto& h: hDelay ) resetHist( h );
+    if( hTriggerCount ) hTriggerCount->Reset();
+    if( hTotalHits ) hTotalHits->Reset();
+    if( hTriggerHits ) hTriggerHits->Reset();
+    for( auto& h: hClusterSize ) resetHist( h );
+    for( auto& h: hPosEtaPhi ) resetHist( h );
+    if( hRolling ) hRolling->Reset();
+
+    // Reset all event counters
+    totalEvents = 0;
+    for( int i = 0; i < 3; ++i )
+    {
+      layerHitCount[i] = 0;
+      pairCount[i]     = 0;
+    }
+    threeFold = 0;
+
+    for( auto& info: m_efficiencies )
+    {
+      info.ResetEff();  // Calls Efficiency::reset()
+    }
+
+    // Refresh all canvases to show the cleared histograms
+    //if (fConfig.enableChannelCount)   refreshCanvas(kCanvasChannel);
+    //if (fConfig.enableTotHist)        refreshCanvas(kCanvasTot);
+    //if (fConfig.enableSignalDelay)    refreshCanvas(kCanvasDelay);
+    //if (fConfig.enableTriggerCount)   refreshCanvas(kCanvasTrigger);
+    //if (fConfig.enableClusterSize)    refreshCanvas(kCanvasCluster);
+    //if (fConfig.enablePositionRecon)  refreshCanvas(kCanvasPos);
   }
 
   // Set all parameters at once (optional)
@@ -734,9 +831,18 @@ public:
   }
   void setRefreshRate( int v ) { fConfig.refreshRate = v; }  // no need to reinit histograms
 
+  void setEnableDelayCut( bool v ) { fConfig.enableDelayCut = v; }
+  // Set delay window (in ns)
+  void setDelayWindow( double min, double max )
+  {
+    fConfig.delayMin = min;
+    fConfig.delayMax = max;
+  }
+
   //  4. Private Member Variables
 private:
   mutable std::mutex              m_mutex;
+  mutable std::mutex              m_mutex_graph;
   std::map<std::string, TCanvas*> m_canvas;
 
   void createCanvas( const std::string& key )
@@ -774,7 +880,8 @@ private:
         for( int side = 0; side < 2; ++side )
         {
           int idx = layer * 2 + side;
-          c->cd( pad++ );
+          c->cd( pad );
+          gPad->Clear();
           hRisingCount[idx]->SetLineColor( kBlue );
           hRisingCount[idx]->SetFillColorAlpha( kBlue, 0.3 );
           hRisingCount[idx]->Draw( "hist" );
@@ -785,6 +892,27 @@ private:
           leg->AddEntry( hRisingCount[idx], "Rising", "f" );
           leg->AddEntry( hFallingCount[idx], "Falling", "f" );
           leg->Draw();
+
+          // Vertical lines to separate front‑end boards (every 8 channels)
+          gPad->Update();
+          int nGroups = fConfig.maxChannelsPerGroup / 8;
+          for( int g = 1; g < nGroups; ++g )
+          {
+            double x    = g * 8 - 0.5;  // boundary between channel (g*8-1) and (g*8)
+            double ymin = gPad->GetUymin();
+            double ymax = gPad->GetUymax();
+            if( ymin == ymax )
+            {
+              ymin = 0;
+              ymax = 1;
+            }
+            TLine* line = new TLine( x, ymin, x, ymax );
+            line->SetLineColor( kGray + 2 );
+            line->SetLineStyle( 2 );
+            line->SetLineWidth( 1 );
+            line->Draw();
+          }
+          pad++;
         }
       }
     }

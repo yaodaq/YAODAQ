@@ -51,6 +51,9 @@ int main( int argc, char** argv )
   double timeTol          = 20.0;
   int    maxTriggers      = 10;
   int    refreshRate      = 100;
+  bool   enableDelayCut   = false;
+  double delayMin         = -150;
+  double delayMax         = -75;
 
   app.add_option( "--enable-channel", enableChannel, "Enable channel counting" );
   app.add_option( "--enable-efficiency", enableEfficiency, "Enable efficiency" );
@@ -70,6 +73,9 @@ int main( int argc, char** argv )
   app.add_option( "--time-tol", timeTol, "Time tolerance for cuts (ns)" );
   app.add_option( "--max-triggers", maxTriggers, "Max triggers per event" );
   app.add_option( "--refresh-rate", refreshRate, "Refresh rate (events)" );
+  app.add_option( "--enable-delay-cut", enableDelayCut, "Enable delay cut for efficiency" );
+  app.add_option( "--delay-min", delayMin, "Minimum delay (ns) for efficiency hits" );
+  app.add_option( "--delay-max", delayMax, "Maximum delay (ns) for efficiency hits" );
 
   try
   {
@@ -100,6 +106,8 @@ int main( int argc, char** argv )
   analyzer.setTimeTol( timeTol );
   analyzer.setMaxTriggersPerEvent( maxTriggers );
   analyzer.setRefreshRate( refreshRate );
+  analyzer.setEnableDelayCut( enableDelayCut );
+  analyzer.setDelayWindow( delayMin, delayMax );
 
   // set output directory
   fs::path    p( file_name );

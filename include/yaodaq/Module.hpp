@@ -352,6 +352,7 @@ public:
 
 protected:
   std::uint64_t event() { return m_event.load(); }
+  void          reset_event() { m_event.store( 0 ); }
   void          updateState( const State::Type type )
   {
     State state( State::Type::Empty );
