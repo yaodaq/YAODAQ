@@ -28,10 +28,49 @@ namespace fs = std::filesystem;
 
 int main( int argc, char** argv )
 {
-  CLI::App app{ "RPC Analyzer" };
-  argv = app.ensure_utf8( argv );
-  std::string file_name{ "" };
-  app.add_option( "-f,--file_name", file_name, "File to analyse" )->required()->check( CLI::ExistingFile );
+  CLI::App    app{ "RPC Analyzer" };
+  std::string file_name;
+  app.add_option( "-f,--file", file_name, "Input ROOT file" )->required()->check( CLI::ExistingFile );
+
+  //define all variables that can be configured
+  bool   enableChannel    = true;
+  bool   enableEfficiency = true;
+  bool   enableTot        = true;
+  bool   enableDelay      = true;
+  bool   enableTrigger    = true;
+  bool   enableCluster    = true;
+  bool   enablePosition   = true;
+  double detectorLength   = 1705.0;
+  double detectorWidth    = 1107.0;
+  double signalSpeed      = 220.0;
+  double bcidClock        = 25.0;
+  int    bcidPeriod       = 256;
+  int    maxChannels      = 48;
+  bool   enableCut        = false;
+  int    chanTol          = 2;
+  double timeTol          = 20.0;
+  int    maxTriggers      = 10;
+  int    refreshRate      = 100;
+
+  app.add_option( "--enable-channel", enableChannel, "Enable channel counting" );
+  app.add_option( "--enable-efficiency", enableEfficiency, "Enable efficiency" );
+  app.add_option( "--enable-tot", enableTot, "Enable TOT histograms" );
+  app.add_option( "--enable-delay", enableDelay, "Enable signal delay" );
+  app.add_option( "--enable-trigger-count", enableTrigger, "Enable trigger count" );
+  app.add_option( "--enable-cluster", enableCluster, "Enable cluster size" );
+  app.add_option( "--enable-position", enablePosition, "Enable position reconstruction" );
+  app.add_option( "--detector-length", detectorLength, "Detector length (mm)" );
+  app.add_option( "--detector-width", detectorWidth, "Detector width (mm)" );
+  app.add_option( "--signal-speed", signalSpeed, "Signal speed (mm/ns)" );
+  app.add_option( "--bcid-clock", bcidClock, "BCID clock (ns)" );
+  app.add_option( "--bcid-period", bcidPeriod, "BCID period" );
+  app.add_option( "--max-channels", maxChannels, "Max channels per group" );
+  app.add_option( "--enable-cut", enableCut, "Enable efficiency cuts" );
+  app.add_option( "--chan-tol", chanTol, "Channel tolerance for cuts" );
+  app.add_option( "--time-tol", timeTol, "Time tolerance for cuts (ns)" );
+  app.add_option( "--max-triggers", maxTriggers, "Max triggers per event" );
+  app.add_option( "--refresh-rate", refreshRate, "Refresh rate (events)" );
+
   try
   {
     app.parse( argc, argv );
@@ -40,26 +79,53 @@ int main( int argc, char** argv )
   {
     return app.exit( e );
   }
-  RPCDataAnalyzer analyzer;
-  // Extract base name (without path and extension)
-  fs::path        p( file_name );
-  std::string     stem   = p.stem().string();  // e.g., "data" from "data.root"
-  std::string     outDir = stem + "_analysis";
 
-  // Create output directory (if it doesn't exist)
+  //create analyzer and set all the parameters
+  RPCDataAnalyzer analyzer;
+  analyzer.setEnableChannelCount( enableChannel );
+  analyzer.setEnableEfficiency( enableEfficiency );
+  analyzer.setEnableTotHist( enableTot );
+  analyzer.setEnableSignalDelay( enableDelay );
+  analyzer.setEnableTriggerCount( enableTrigger );
+  analyzer.setEnableClusterSize( enableCluster );
+  analyzer.setEnablePositionRecon( enablePosition );
+  analyzer.setDetectorLength( detectorLength );
+  analyzer.setDetectorWidth( detectorWidth );
+  analyzer.setSignalSpeed( signalSpeed );
+  analyzer.setBcidClock( bcidClock );
+  analyzer.setBcidPeriod( bcidPeriod );
+  analyzer.setMaxChannelsPerGroup( maxChannels );
+  analyzer.setEnableCut( enableCut );
+  analyzer.setChanTol( chanTol );
+  analyzer.setTimeTol( timeTol );
+  analyzer.setMaxTriggersPerEvent( maxTriggers );
+  analyzer.setRefreshRate( refreshRate );
+
+  // set output directory
+  fs::path    p( file_name );
+  std::string stem   = p.stem().string();
+  std::string outDir = stem + "_analysis";
   try
   {
     if( fs::create_directories( outDir ) ) { std::cout << "Created output directory: " << outDir << std::endl; }
     else
-      spdlog::info( "Using existing output directory: {}", outDir );
+    {
+      std::cout << "Using existing output directory: " << outDir << std::endl;
+    }
   }
   catch( const fs::filesystem_error& e )
   {
-    spdlog::warn( "Error: {}\nFailed to create directory {}.\nOutput will be written to current directory.\n", e.what(), outDir );
-    outDir.clear();  // fallback to current dir
+    std::cerr << "Warning: Failed to create directory '" << outDir << "'. Output will be written to current directory.\n"
+              << "Error: " << e.what() << std::endl;
+    outDir.clear();
   }
   analyzer.setOutputDir( outDir );
+
+  // run the analysis
   analyzer.runFromFile( file_name );
   analyzer.finalize();
+  analyzer.WritePDF();
+  analyzer.summary();
+
   return 0;
 }

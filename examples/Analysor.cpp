@@ -35,59 +35,21 @@ public:
 
       auto obj = TBufferJSON::FromJSON<DCT::Event>( raw2 );
 
-      m_analyse.ProcessEvent( *obj, layer );
-      if( m_can )
-      {
-        m_can->Modified();
-        m_can->Update();
-      }
-      else
-      {
-        createCanvas();
-        createPlots();
-        if( m_can ) m_can->Draw();
-        if( layer ) layer->Draw();
-      }
+      m_analyse.ProcessEvent( *obj );
+      m_analyse.finalize();
+      auto effi = m_analyse.getEfficiencies();
+      info( "Event {}", obj->event_number );
+      for( std::size_t i = 0; i != effi.size(); ++i ) { info( "Efficiency layer: {}, side: {}, {:.3f} ± {:.3f}", effi[i].getSource().getLayer(), effi[i].getSource().getSide(), effi[i].getEfficiency().efficiency(), effi[i].getEfficiency().error() ); }
+      info( "\n" );
     }
   }
 
-  bool on_configure() override
-  {
-    bool good{ true };
-    if( !createCanvas() ) return false;
-    if( !createPlots() ) return false;
-    if( m_can ) m_can->Draw();
-    if( layer ) layer->Draw();
-    return true;
-  }
+  bool on_configure() override { return true; }
 
-  bool on_stop() override
-  {
-    m_analyse.finalize();
-    return true;
-  }
-  void clear()
-  {
-    warn( "Clearing histograms" );
-    layer->Reset();
-    m_can->Modified();
-    m_can->Update();
-  }
+  bool on_stop() override { return true; }
+  void clear() { warn( "Clearing histograms" ); }
 
 private:
-  bool createCanvas()
-  {
-    if( !m_can ) m_can = new TCanvas();
-    return m_can;
-  }
-  bool createPlots()
-  {
-    if( !layer ) layer = new TH1D( "layer", "layer", 3, 0, 2 );
-    return layer;
-  }
-  TCanvas*        m_can{ nullptr };
-  TH1D*           layer{ nullptr };
-  std::thread     m_thread;
   RPCDataAnalyzer m_analyse;
 };
 
@@ -95,10 +57,6 @@ int main( int argc, char* argv[] )
 try
 {
   TApplication rootApp( "ROOT", &argc, argv );
-  //auto canvas = new TCanvas("c1", "Layer", 800, 600);
-  //auto layer  = new TH1D("layer", "Layer", 3, 0, 3);
-
-  //layer->Draw();
   Term::terminal.setOptions( Term::Option::Raw, Term::Option::Cursor );
   CLI::App app{ "YAODAQ client" };
   argv = app.ensure_utf8( argv );
@@ -129,7 +87,6 @@ try
   Term::cout << Term::color_fg( Term::Color::Name::Red ) << "Press " << std::to_string( nbrCTLC ) << " times CTRL+C to stop" << Term::color_fg( Term::Color::Name::Default ) << std::endl;
   while( true )
   {
-    gSystem->ProcessEvents();
     Term::Event event = Term::read_event();
     switch( event.type() )
     {
@@ -151,7 +108,11 @@ try
         }
         break;
       }
-      default: break;
+      default:
+      {
+        //gSystem->ProcessEvents();
+        break;
+      }
     }
   };
   return 0;
