@@ -18,6 +18,7 @@
 #include <spdlog/spdlog.h>
 #include <string>
 #include <vector>
+#include <unordered_set>
 
 static constexpr const char* kCanvasChannel = "channel";
 static constexpr const char* kCanvasTot     = "tot";
@@ -25,6 +26,7 @@ static constexpr const char* kCanvasDelay   = "delay";
 static constexpr const char* kCanvasTrigger = "trigger";
 static constexpr const char* kCanvasCluster = "cluster";
 static constexpr const char* kCanvasPos     = "pos";
+static constexpr const char* kCanvasClusterCount = "cluster_count"; 
 // =====================================================================
 //  1. Configuration & Constants (runtime-configurable)
 // =====================================================================
@@ -148,10 +150,14 @@ class RPCDataAnalyzer
   // 3.1 Constructor & Destructor
 public:
   RPCDataAnalyzer() :
-    hRisingCount{ { nullptr } }, hFallingCount{ { nullptr } }, hTotalHits( nullptr ), hTriggerHits( nullptr ), hTot{ { nullptr } }, hDelay{ { nullptr } }, hTriggerCount( nullptr ), hClusterSize{ { nullptr } }, hPosEtaPhi{ { nullptr } }, hRolling( nullptr )
+    hRisingCount{ { nullptr } }, hFallingCount{ { nullptr } }, hTotalHits( nullptr ), hTriggerHits( nullptr ), hTot{ { nullptr } }, hDelay{ { nullptr } }, hTriggerCount( nullptr ), hClusterCount{ { nullptr } }, hPosEtaPhi{ { nullptr } }, hRolling( nullptr ),hClusterSize{ { nullptr } }
   {
+    ensureHistograms();
     PrepareEfficiencies();
     // No histograms created here – they will be created on demand by ensureHistograms()
+        for (int ch = 40; ch < 48; ++ch) {
+        m_ignoredChannels.insert(ch);
+    }
   }
   //Clean up histograms to avoid memory leaks
   ~RPCDataAnalyzer()
@@ -164,6 +170,7 @@ public:
     delete hTotalHits;
     delete hTriggerHits;
     for( auto h: hClusterSize ) delete h;
+    for( auto h: hClusterCount ) delete h; 
     for( auto h: hPosEtaPhi ) delete h;
     delete hRolling;
     for( auto& pair: m_canvas ) delete pair.second;
@@ -180,7 +187,6 @@ public:
   {
     // ----- Channel counting (rising/falling separated, per layer/side) -----
     std::lock_guard<std::mutex> lock( m_mutex_graph );  // Thread safety
-    ensureHistograms();
     if( fConfig.enableChannelCount )
     {
       for( const auto& hit: ev.hits )
@@ -392,16 +398,22 @@ public:
         if( l >= 0 && l < 3 && s >= 0 && s < 2 ) { channelSets[l][s].insert( hit.channel ); }
       }
 
-      // For each (layer, side), sort channels and find clusters
+      // For each (layer, side), sort channels and find clusters, and count clusters
       for( int l = 0; l < 3; ++l )
       {
         for( int s = 0; s < 2; ++s )
         {
           const auto& chSet = channelSets[l][s];
-          if( chSet.empty() ) continue;
-          std::vector<int> chVec( chSet.begin(), chSet.end() );
+          if( chSet.empty() ) 
+          {
+            int idx = l * 2 + s;
+                hClusterCount[idx]->Fill( 0 );
+            continue;
+          }
+            std::vector<int> chVec( chSet.begin(), chSet.end() );
           std::sort( chVec.begin(), chVec.end() );
           int clusterSize = 1;
+          int clusterCount = 0;
           for( size_t i = 1; i < chVec.size(); ++i )
           {
             if( chVec[i] == chVec[i - 1] + 1 ) { clusterSize++; }
@@ -409,12 +421,16 @@ public:
             {
               int idx = l * 2 + s;
               hClusterSize[idx]->Fill( clusterSize );
+              clusterCount++;
               clusterSize = 1;
             }
           }
           // fill the last cluster
           int idx = l * 2 + s;
           hClusterSize[idx]->Fill( clusterSize );
+          clusterCount++;
+          // fill cluster count for this (layer, side)
+          hClusterCount[idx]->Fill( clusterCount );
         }
       }
     }
@@ -478,7 +494,12 @@ public:
     if( fConfig.enableTotHist ) refreshCanvas( kCanvasTot );
     if( fConfig.enableSignalDelay ) refreshCanvas( kCanvasDelay );
     if( fConfig.enableTriggerCount ) refreshCanvas( kCanvasTrigger );
-    if( fConfig.enableClusterSize ) refreshCanvas( kCanvasCluster );
+    if( fConfig.enableClusterSize ) 
+    {
+    refreshCanvas( kCanvasCluster );
+    refreshCanvas( kCanvasClusterCount ); 
+    }
+    
     if( fConfig.enablePositionRecon ) refreshCanvas( kCanvasPos );
   }
 
@@ -553,9 +574,15 @@ public:
       // Fill hit or trigger
       if( !dctHit.isTrigger() )
       {
+        
+        if (isIgnored(dctHit.getStrip()))
+        {
+          continue;
+        }
         Hit h;
         h.time     = time;
         h.channel  = dctHit.getStrip();
+        
         h.layer    = dctHit.getLayer();
         h.side     = dctHit.getSide() - 1;
         h.isRising = isRising;
@@ -710,6 +737,7 @@ public:
     if( hTotalHits ) hTotalHits->Reset();
     if( hTriggerHits ) hTriggerHits->Reset();
     for( auto& h: hClusterSize ) resetHist( h );
+    for( auto& h: hClusterCount ) resetHist( h );
     for( auto& h: hPosEtaPhi ) resetHist( h );
     if( hRolling ) hRolling->Reset();
 
@@ -735,6 +763,7 @@ public:
     //if (fConfig.enableClusterSize)    refreshCanvas(kCanvasCluster);
     //if (fConfig.enablePositionRecon)  refreshCanvas(kCanvasPos);
   }
+
 
   // Set all parameters at once (optional)
   void setConfig( const AnalyzerConfig& cfg )
@@ -839,6 +868,21 @@ public:
     fConfig.delayMax = max;
   }
 
+  // ----- Ignored channels management (setters) -----
+void setIgnoredChannels(const std::vector<int>& channels) {
+    m_ignoredChannels.clear();
+    for (int ch : channels) m_ignoredChannels.insert(ch);
+}
+void addIgnoredChannel(int ch) {
+    m_ignoredChannels.insert(ch);
+}
+void clearIgnoredChannels() {
+    m_ignoredChannels.clear();
+}
+bool isIgnored(int ch) const {
+    return m_ignoredChannels.find(ch) != m_ignoredChannels.end();
+}
+
   //  4. Private Member Variables
 private:
   mutable std::mutex              m_mutex;
@@ -854,7 +898,7 @@ private:
       spdlog::error( "Canvas for {} nullptr", key );
       std::exit( 1 );
     }
-    if( key == kCanvasChannel || key == kCanvasTot || key == kCanvasDelay || key == kCanvasCluster ) { m_canvas[key]->Divide( 2, 3 ); }
+    if( key == kCanvasChannel || key == kCanvasTot || key == kCanvasDelay || key == kCanvasCluster || key == kCanvasClusterCount ) { m_canvas[key]->Divide( 2, 3 ); }
     else if( key == kCanvasPos ) { m_canvas[key]->Divide( 3, 1 ); }
     else if( key == kCanvasTrigger )
     {
@@ -956,6 +1000,19 @@ private:
         }
       }
     }
+    else if( key == kCanvasClusterCount && fConfig.enableClusterSize )
+    {
+    int pad = 1;
+    for( int l = 0; l < 3; ++l )
+    {
+        for( int s = 0; s < 2; ++s )
+        {
+            int idx = l * 2 + s;
+            c->cd( pad++ );
+            hClusterCount[idx]->Draw();
+        }
+    }
+    }
     else if( key == kCanvasPos && fConfig.enablePositionRecon )
     {
       for( int layer = 0; layer < 3; ++layer )
@@ -1056,6 +1113,8 @@ private:
 
   std::array<TH1F*, 6> hClusterSize{ nullptr, nullptr, nullptr, nullptr, nullptr, nullptr };
 
+  std::array<TH1F*, 6> hClusterCount{ nullptr, nullptr, nullptr, nullptr, nullptr, nullptr };
+
   std::array<TH2F*, 3> hPosEtaPhi{ nullptr, nullptr, nullptr };  // Eta vs Phi per layer
 
   TH1F* hRolling{ nullptr };  // Histogram of BCID rolling count per hit
@@ -1063,6 +1122,8 @@ private:
   AnalyzerConfig fConfig;
 
   bool fNeedInit = true;  // flag to recreate histograms when config changes
+
+  std::unordered_set<int> m_ignoredChannels;   // Channels to be excluded from all analyses
 
   void ensureHistograms()
   {
@@ -1158,6 +1219,11 @@ private:
         {
           int idx           = layer * 2 + side;
           hClusterSize[idx] = new TH1F( Form( "cluster_layer%d_side%d", layer, side + 1 ), Form( "Layer %d, Side %d Cluster Size;Cluster Size;Counts", layer, side + 1 ), 11, -0.5, 10.5 );
+        hClusterCount[idx] = new TH1F(
+                Form( "cluster_count_layer%d_side%d", layer, side ),
+                Form( "Layer %d, Side %d Cluster Count per Event;Cluster Count;Events", layer, side+1 ),
+                11, -0.5, 10.5   
+            );
         }
       }
     }

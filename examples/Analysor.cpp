@@ -16,16 +16,31 @@
 #include <filesystem>
 #include <memory>
 #include <yaodaq/Module.hpp>
+#include <THttpServer.h>
 
 class Analyser : public yaodaq::Module
 {
 public:
   Analyser( yaodaq::Config cfg, const std::string_view name ) : yaodaq::Module( cfg, "MyLovelyAnalyser", "Analyser" )
   {
+    
+    m_analyse.setEnableDelayCut(true);
+    m_server= std::make_unique<THttpServer>("http:8080");
     Term::terminal.setOptions( Term::Option::Raw, Term::Option::Cursor );  //ROOT is doing bad stufs
+
   }
 
-  ~Analyser() override {}
+  ~Analyser() override
+  {
+    //if(m_thread.joinable())m_thread.join();
+  }
+
+  bool on_initialize() override
+  {
+    
+    Term::terminal.setOptions( Term::Option::Raw, Term::Option::Cursor );
+    return true;
+  }
 
   void onRawData( const std::unique_ptr<yaodaq::RawData> raw ) override
   {
@@ -41,14 +56,22 @@ public:
       info( "Event {}", obj->event_number );
       for( std::size_t i = 0; i != effi.size(); ++i ) { info( "Efficiency layer: {}, side: {}, {:.3f} ± {:.3f}", effi[i].getSource().getLayer(), effi[i].getSource().getSide(), effi[i].getEfficiency().efficiency(), effi[i].getEfficiency().error() ); }
       info( "\n" );
+      gSystem->ProcessEvents();
     }
   }
 
-  bool on_configure() override { return true; }
+  bool on_configure() override
+  { 
+    //m_analyse.ensureHistograms();
+    //m_analyse.Register(m_server.get());
+    Term::terminal.setOptions( Term::Option::Raw, Term::Option::Cursor );  //ROOT is doing bad stufs
+    return true;
+  }
 
   bool on_stop() override
   {
     clear();
+    Term::terminal.setOptions( Term::Option::Raw, Term::Option::Cursor );  //ROOT is doing bad stufs
     return true;
   }
   void clear()
@@ -56,19 +79,22 @@ public:
     warn( "Clearing histograms" );
     reset_event();
     m_analyse.reset();
+    Term::terminal.setOptions( Term::Option::Raw, Term::Option::Cursor );  //ROOT is doing bad stufs
   }
 
 private:
   RPCDataAnalyzer m_analyse;
+  //std::thread m_thread;
+  std::unique_ptr<THttpServer> m_server{nullptr};
 };
 
 int main( int argc, char* argv[] )
 try
 {
-  TApplication rootApp( "ROOT", &argc, argv );
   Term::terminal.setOptions( Term::Option::Raw, Term::Option::Cursor );
   CLI::App app{ "YAODAQ client" };
   argv = app.ensure_utf8( argv );
+  //TApplication rootApp( "ROOT", &argc, argv,nullptr,-1 );
   std::string host{ "127.0.0.1" };
   app.add_option( "-i,--ip", host, "IP of the server" ) /*->check( CLI::ValidIPV4 )*/;
   int port{ 8888 };
@@ -96,6 +122,7 @@ try
   module.link();
   while( true )
   {
+    //gSystem->ProcessEvents();
     Term::Event event = Term::read_event();
     switch( event.type() )
     {
@@ -119,7 +146,6 @@ try
       }
       default:
       {
-        //gSystem->ProcessEvents();
         break;
       }
     }

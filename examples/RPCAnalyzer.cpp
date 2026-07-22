@@ -5,6 +5,7 @@
 #include <iostream>
 #include <spdlog/spdlog.h>
 #include <string>
+#include <sstream>
 
 // =====================================================================
 //  RPC Data Analyzer - Code Structure (Index)
@@ -54,6 +55,8 @@ int main( int argc, char** argv )
   bool   enableDelayCut   = false;
   double delayMin         = -150;
   double delayMax         = -75;
+  std::string ignoreList;
+  bool        noIgnore = false;
 
   app.add_option( "--enable-channel", enableChannel, "Enable channel counting" );
   app.add_option( "--enable-efficiency", enableEfficiency, "Enable efficiency" );
@@ -76,6 +79,8 @@ int main( int argc, char** argv )
   app.add_option( "--enable-delay-cut", enableDelayCut, "Enable delay cut for efficiency" );
   app.add_option( "--delay-min", delayMin, "Minimum delay (ns) for efficiency hits" );
   app.add_option( "--delay-max", delayMax, "Maximum delay (ns) for efficiency hits" );
+  app.add_option("--ignore-channels", ignoreList, "Comma-separated channel numbers to ignore (overrides default).");
+app.add_flag("--no-ignore-channels", noIgnore, "Do not ignore any channels (overrides default and --ignore-channels).");
 
   try
   {
@@ -129,7 +134,31 @@ int main( int argc, char** argv )
   }
   analyzer.setOutputDir( outDir );
 
-  // run the analysis
+
+  // ----- Configure ignored channels -----
+if (noIgnore) {
+    analyzer.clearIgnoredChannels();
+} else if (!ignoreList.empty()) {
+    std::vector<int> channels;
+    std::stringstream ss(ignoreList);
+    std::string token;
+    while (std::getline(ss, token, ',')) {
+        if (!token.empty()) {
+            try {
+                channels.push_back(std::stoi(token));
+            } catch (...) { /* warning */ }
+        }
+    }
+    analyzer.setIgnoredChannels(channels);
+} else {
+    // default: 40-47
+    std::vector<int> defaultChannels;
+    for (int ch = 40; ch < 48; ++ch) defaultChannels.push_back(ch);
+    analyzer.setIgnoredChannels(defaultChannels);
+}
+
+
+// run the analysis
   analyzer.runFromFile( file_name );
   analyzer.finalize();
   analyzer.WritePDF();
