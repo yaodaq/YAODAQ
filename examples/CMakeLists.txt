@@ -26,5 +26,5 @@ add_executable(Analysor Analysor.cpp)
 target_link_libraries(Analysor PRIVATE yaodaq::yaodaq Data CLI11::CLI11 fmt::fmt cpp-terminal::cpp-terminal spdlog::spdlog ROOT::RHTTP ROOT::Net ROOT::Core ROOT::RIO ROOT::Hist ROOT::Gpad)
 
 add_executable(RPCAnalyzer RPCAnalyzer.cpp)
-target_link_libraries(RPCAnalyzer PRIVATE Data CLI11::CLI11 fmt::fmt cpp-terminal::cpp-terminal spdlog::spdlog ROOT::Core ROOT::RIO ROOT::Tree ROOT::ROOTNTuple ROOT::Gpad ROOT::Hist)
+target_link_libraries(RPCAnalyzer PRIVATE yaodaq::yaodaq  Data CLI11::CLI11 fmt::fmt cpp-terminal::cpp-terminal spdlog::spdlog ROOT::Core ROOT::RIO ROOT::Tree ROOT::ROOTNTuple ROOT::Gpad ROOT::Hist)
 

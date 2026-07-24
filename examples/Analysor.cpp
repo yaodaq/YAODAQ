@@ -21,13 +21,16 @@
 class Analyser : public yaodaq::Module
 {
 public:
-  Analyser( yaodaq::Config cfg, const std::string_view name ) : yaodaq::Module( cfg, "MyLovelyAnalyser", "Analyser" )
+  Analyser( yaodaq::Config cfg, const std::string_view name ) : yaodaq::Module( cfg, name, "Analyser" )
   {
-    
+    m_analyse.setLogger(this->get_logger());
     m_analyse.setEnableDelayCut(true);
-    m_server= std::make_unique<THttpServer>("http:8080");
-    Term::terminal.setOptions( Term::Option::Raw, Term::Option::Cursor );  //ROOT is doing bad stufs
-
+    std::string url = "http:"+std::string(cfg.getHost())+":"+std::to_string(cfg.getPort()+1);
+    m_server= std::make_unique<THttpServer>(url.c_str());
+    
+    m_analyse.finalize();
+          gSystem->ProcessEvents();
+          Term::terminal.setOptions( Term::Option::Raw, Term::Option::Cursor );  //ROOT is doing bad stufs
   }
 
   ~Analyser() override
@@ -44,26 +47,42 @@ public:
 
   void onRawData( const std::unique_ptr<yaodaq::RawData> raw ) override
   {
-    if( raw->topic() == "MPI::DCT::Singlets::Events" )
+    if( raw->topic() == "MPI::DCT::Singlets::RawData" )
     {
-      std::string raw2( reinterpret_cast<const char*>( raw->payload().data() ), raw->payload().size() );
+      const std::string_view j( reinterpret_cast<const char*>( raw->payload().data() ), raw->payload().size() );
+      const nlohmann::json   json = nlohmann::json::parse( j );  //  TODO use simdjson
 
-      auto obj = TBufferJSON::FromJSON<DCT::Event>( raw2 );
+      const std::uint64_t event_number{ json["event_number"].get<std::uint64_t>() };
 
-      m_analyse.ProcessEvent( *obj );
+      // just some hints of how many hits will be stored (approximation but can but goo to reserve upfront the vectors)
+      const std::size_t         estimated_hits_number = json["rawdata"].size();
+      std::vector<DCT::RawData> raw;
+      raw.reserve( event_number );
+
+      DCT::Event event( event_number );
+      event.reserve_hits( estimated_hits_number );
+
+      for( const auto& element: json["rawdata"] )
+      {
+        const std::uint32_t word{ static_cast<std::uint32_t>( std::stoul( element["word"].get<std::string>(), nullptr, 16 ) ) };
+        const std::uint32_t bcid{ static_cast<std::uint32_t>( std::stoul( element["bcid"].get<std::string>(), nullptr, 16 ) ) };
+        const DCT::DecodedRawData raw_data( word, bcid );
+        event.push_back( raw_data );
+      }
+
+      m_analyse.ProcessEvent( event );
       m_analyse.finalize();
       auto effi = m_analyse.getEfficiencies();
-      info( "Event {}", obj->event_number );
+      info( "Event {}", event_number );
       for( std::size_t i = 0; i != effi.size(); ++i ) { info( "Efficiency layer: {}, side: {}, {:.3f} ± {:.3f}", effi[i].getSource().getLayer(), effi[i].getSource().getSide(), effi[i].getEfficiency().efficiency(), effi[i].getEfficiency().error() ); }
       info( "\n" );
       gSystem->ProcessEvents();
+      Term::terminal.setOptions( Term::Option::Raw, Term::Option::Cursor );  //ROOT is doing bad stufs
     }
   }
 
   bool on_configure() override
   { 
-    //m_analyse.ensureHistograms();
-    //m_analyse.Register(m_server.get());
     Term::terminal.setOptions( Term::Option::Raw, Term::Option::Cursor );  //ROOT is doing bad stufs
     return true;
   }
@@ -105,6 +124,8 @@ try
   app.add_option( "-e,--events", event_number, "Number of events to take" );
   std::string vivado_path{ "/opt/vivado/2025.2/Vivado/bin/" };
   app.add_option( "--vivado", vivado_path, "Vivado installation path" );
+  std::string name{ "Analysor" };
+  app.add_option( "-n,--name", name, "Name of the client" );
   try
   {
     app.parse( argc, argv );
@@ -115,7 +136,7 @@ try
   }
   yaodaq::Config cfg;
   cfg.setPort( port ).setHost( host );
-  Analyser    module( cfg, "DCT" /*, canvas, layer */ );
+  Analyser    module( cfg, name);
   //client.setTLS("/home/work/YAODAQ-1/localhost.crt","/home/work/YAODAQ-1/localhost.key","NONE");
   std::size_t nbrCTLC{ 3 };
   Term::cout << Term::color_fg( Term::Color::Name::Red ) << "Press " << std::to_string( nbrCTLC ) << " times CTRL+C to stop" << Term::color_fg( Term::Color::Name::Default ) << std::endl;

@@ -15,10 +15,10 @@
 #include <iostream>
 #include <map>
 #include <set>
-#include <spdlog/spdlog.h>
 #include <string>
 #include <vector>
 #include <unordered_set>
+#include "yaodaq/Logging.hpp"
 
 static constexpr const char* kCanvasChannel = "channel";
 static constexpr const char* kCanvasTot     = "tot";
@@ -69,12 +69,13 @@ struct AnalyzerConfig
 // Event data structure (adjust members according to your RNTuple)
 struct Hit
 {
-  float time;
-  int   channel;
-  int   layer;
-  int   side;
-  bool  isRising;  // true = rising edge, false = falling edge
-                   // add other fields if needed (e.g., leading/trailing)
+  float getTime() const noexcept { return time; }
+  bool  isRised() const noexcept { return isRising;}
+  float time{0.};
+  int   channel{0};
+  int   layer{0};
+  int   side{0};
+  bool  isRising{false};  // true = rising edge, false = falling edge
 };
 struct EventData
 {
@@ -145,14 +146,15 @@ private:
 // =====================================================================
 //  3. Analyzer Class
 // =====================================================================
-class RPCDataAnalyzer
+class RPCDataAnalyzer : public yaodaq::Loggable
 {
   // 3.1 Constructor & Destructor
 public:
-  RPCDataAnalyzer() :
-    hRisingCount{ { nullptr } }, hFallingCount{ { nullptr } }, hTotalHits( nullptr ), hTriggerHits( nullptr ), hTot{ { nullptr } }, hDelay{ { nullptr } }, hTriggerCount( nullptr ), hClusterCount{ { nullptr } }, hPosEtaPhi{ { nullptr } }, hRolling( nullptr ),hClusterSize{ { nullptr } }
+  RPCDataAnalyzer() : yaodaq::Loggable(yaodaq::Identifier(yaodaq::Component::Role::Class,"Analysor","XuRan"))
   {
     ensureHistograms();
+    createAllCanvas();
+    Draws();
     PrepareEfficiencies();
     // No histograms created here – they will be created on demand by ensureHistograms()
         for (int ch = 40; ch < 48; ++ch) {
@@ -346,6 +348,9 @@ public:
     // ----- Signal delay (rising edge time difference with trigger) -----
     if( fConfig.enableSignalDelay )
     {
+
+      if( std::count_if(ev.triggerHits.begin(),ev.triggerHits.end(),[](const Hit& hit) {return hit.isRised();}))
+      {
       // Determine trigger reference time: use the first trigger hit that is rising edge
       float triggerTime = -1.0f;
       for( const auto& trg: ev.triggerHits )
@@ -356,8 +361,6 @@ public:
           break;  // use the first rising trigger hit
         }
       }
-      if( triggerTime >= 0 )
-      {
         // Loop over ordinary hits, only rising edges
         for( const auto& hit: ev.hits )
         {
@@ -486,21 +489,19 @@ public:
   // Finalize: produce and save plots after all events processed
   void finalize() { refresh(); }
 
-  void refresh()
+  void Draws()
   {
-    // First, refresh all canvases to ensure they contain latest data
-    // (Optional: you may also call refreshCanvas for each enabled feature)
-    if( fConfig.enableChannelCount ) refreshCanvas( kCanvasChannel );
-    if( fConfig.enableTotHist ) refreshCanvas( kCanvasTot );
-    if( fConfig.enableSignalDelay ) refreshCanvas( kCanvasDelay );
-    if( fConfig.enableTriggerCount ) refreshCanvas( kCanvasTrigger );
+    if( fConfig.enableChannelCount ) Draw( kCanvasChannel );
+    if( fConfig.enableTotHist ) Draw( kCanvasTot );
+    if( fConfig.enableSignalDelay ) Draw( kCanvasDelay );
+    if( fConfig.enableTriggerCount ) Draw( kCanvasTrigger );
     if( fConfig.enableClusterSize ) 
     {
-    refreshCanvas( kCanvasCluster );
-    refreshCanvas( kCanvasClusterCount ); 
+    Draw( kCanvasCluster );
+    Draw( kCanvasClusterCount ); 
     }
     
-    if( fConfig.enablePositionRecon ) refreshCanvas( kCanvasPos );
+    if( fConfig.enablePositionRecon ) Draw( kCanvasPos );
   }
 
   void summary()
@@ -512,30 +513,18 @@ public:
   void WritePDF()
   {
     // Produce PDF with separate pages for each canvas
-    std::string pdfFile   = outPath( "analysis_results.pdf" );
-    bool        firstPage = true;
-    for( auto& pair: m_canvas )
+    const std::string pdfFile   = outPath( "analysis_results.pdf" );
+    for(std::map<std::string,TCanvas*>::const_iterator it=m_canvas.begin();it!=m_canvas.end();++it )
     {
-      pair.second->Update();
-      if( firstPage )
-      {
-        pair.second->Print( ( pdfFile + "(" ).c_str() );
-        firstPage = false;
-      }
-      else
-      {
-        pair.second->Print( pdfFile.c_str() );
-      }
-    }
-    // Close the PDF
-    if( !m_canvas.empty() )
-    {
-      TCanvas dummy;
-      dummy.Print( ( pdfFile + ")" ).c_str() );
+      it->second->Update();
+      auto next = std::next(it);
+      if(it==m_canvas.begin()) it->second->Print( ( pdfFile + '(' ).c_str() );
+      else if(next==m_canvas.end()) it->second->Print( ( pdfFile + ')' ).c_str() );
+      else it->second->Print( pdfFile.c_str() );
     }
   }
 
-  void ProcessEvent( const DCT::Event& dctEvent, TH1D* _my = nullptr )
+  void ProcessEvent( const DCT::Event& dctEvent)
   {
     EventData localEv;
     /*  // Separate last BCID and rolling counters for rising and falling edges
@@ -602,6 +591,8 @@ public:
       /*// Update the last BCID for this edge type
 	*lastBCID_ptr = bcid;*/
     }
+    std::sort(localEv.triggerHits.begin(),localEv.triggerHits.end(),[]( const Hit& a, const Hit& b) { return a.getTime() < b.getTime();});
+    std::sort(localEv.hits.begin(),localEv.hits.end(),[](const Hit& a,const  Hit& b) { return a.getTime() < b.getTime();});
     processEvent( localEv );
 
     /*// Debug output for rolling counts (only if enabled)
@@ -650,17 +641,17 @@ public:
     auto viewEvent    = reader->GetView<DCT::Event>( "event" );
     auto totalEntries = reader->GetNEntries();
 
-    spdlog::info( "\n************************************\nProcessing {} events...", totalEntries );
+    info( "\n************************************\nProcessing {} events...", totalEntries );
 
     uint64_t processed = 0;
     for( auto entryId: reader->GetEntryRange() )
     {
       const DCT::Event& dctEvent = viewEvent( entryId );
-      ProcessEvent( dctEvent, nullptr );
+      ProcessEvent( dctEvent);
       processed++;
-      if( processed % 5000 == 0 ) { spdlog::info( "Processed {}/{} events", processed, totalEntries ); }
+      if( processed % 1000 == 0 ) { info( "Processed {}/{} events", processed, totalEntries ); }
     }
-    spdlog::info( "Finished processing {} events.\n************************************\n", processed );
+    info( "Finished processing {} events.\n************************************\n", processed );
   }
 
   void writeSummary()
@@ -754,14 +745,7 @@ public:
     {
       info.ResetEff();  // Calls Efficiency::reset()
     }
-
-    // Refresh all canvases to show the cleared histograms
-    //if (fConfig.enableChannelCount)   refreshCanvas(kCanvasChannel);
-    //if (fConfig.enableTotHist)        refreshCanvas(kCanvasTot);
-    //if (fConfig.enableSignalDelay)    refreshCanvas(kCanvasDelay);
-    //if (fConfig.enableTriggerCount)   refreshCanvas(kCanvasTrigger);
-    //if (fConfig.enableClusterSize)    refreshCanvas(kCanvasCluster);
-    //if (fConfig.enablePositionRecon)  refreshCanvas(kCanvasPos);
+    refresh();
   }
 
 
@@ -888,14 +872,17 @@ private:
   mutable std::mutex              m_mutex;
   mutable std::mutex              m_mutex_graph;
   std::map<std::string, TCanvas*> m_canvas;
-
   void createCanvas( const std::string& key )
   {
-    if( m_canvas.find( key ) != m_canvas.end() ) return;
-    m_canvas[key] = new TCanvas( key.c_str(), key.c_str(), 1200, 800 );
+    if( m_canvas.find( key ) != m_canvas.end() )
+    {
+      warn("Canvas {} already created",key);
+      return;
+    }
+    m_canvas[key] = new TCanvas( ("gl"+key).c_str(), key.c_str(), 1200, 800 );
     if( !m_canvas[key] )
     {
-      spdlog::error( "Canvas for {} nullptr", key );
+      error( "Canvas for {} nullptr", key );
       std::exit( 1 );
     }
     if( key == kCanvasChannel || key == kCanvasTot || key == kCanvasDelay || key == kCanvasCluster || key == kCanvasClusterCount ) { m_canvas[key]->Divide( 2, 3 ); }
@@ -910,11 +897,10 @@ private:
     }
   }
 
-  void refreshCanvas( const std::string& key )
+  void Draw(const std::string& key)
   {
     TCanvas* c = getCanvas( key );
     if( !c ) return;
-    //c->Clear();
 
     if( key == kCanvasChannel && fConfig.enableChannelCount )
     {
@@ -1047,15 +1033,49 @@ private:
         delete latex;
       }
     }
+  }
+  void refreshCanvas( const std::string& key )
+  {
+    TCanvas* c = getCanvas( key );
+    if( !c ) return;
     c->Update();
   }
+
+  void createAllCanvas()
+  {
+    if( fConfig.enableChannelCount ) createCanvas( kCanvasChannel );
+    if( fConfig.enableTotHist ) createCanvas( kCanvasTot );
+    if( fConfig.enableSignalDelay ) createCanvas( kCanvasDelay );
+    if( fConfig.enableTriggerCount ) createCanvas( kCanvasTrigger );
+    if( fConfig.enableClusterSize ) 
+    {
+    createCanvas( kCanvasCluster );
+    createCanvas( kCanvasClusterCount ); 
+    }
+    if( fConfig.enablePositionRecon ) createCanvas( kCanvasPos );
+  }
+
+
+void refresh()
+{
+      if( fConfig.enableChannelCount ) refreshCanvas( kCanvasChannel );
+    if( fConfig.enableTotHist ) refreshCanvas( kCanvasTot );
+    if( fConfig.enableSignalDelay ) refreshCanvas( kCanvasDelay );
+    if( fConfig.enableTriggerCount ) refreshCanvas( kCanvasTrigger );
+    if( fConfig.enableClusterSize ) 
+    {
+    refreshCanvas( kCanvasCluster );
+    refreshCanvas( kCanvasClusterCount ); 
+    }
+    if( fConfig.enablePositionRecon ) refreshCanvas( kCanvasPos );
+
+}
 
   TCanvas* getCanvas( const std::string& key )
   {
     auto it = m_canvas.find( key );
     if( it != m_canvas.end() ) return it->second;
-    createCanvas( key );
-    return m_canvas[key];
+    else return nullptr;
   }
 
   std::string outPath( const std::string& fname )
@@ -1076,7 +1096,6 @@ private:
   // Histograms for channel counting: rising and falling edges, per (layer,side)
   std::array<TH1F*, 6> hRisingCount{ nullptr, nullptr, nullptr, nullptr, nullptr, nullptr };
   std::array<TH1F*, 6> hFallingCount{ nullptr, nullptr, nullptr, nullptr, nullptr, nullptr };
-
   TH1F*                hTotalHits{ nullptr };
   TH1F*                hTriggerHits{ nullptr };
   std::array<TH1F*, 6> hTot{ nullptr, nullptr, nullptr, nullptr, nullptr, nullptr };
@@ -1239,4 +1258,5 @@ private:
 
     fNeedInit = false;
   }
+
 };

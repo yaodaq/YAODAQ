@@ -19,12 +19,12 @@ class Log;
 class Logging
 {
 public:
-  explicit Logging() noexcept = delete;
-  explicit Logging( const Identifier& identifier );
+  YAODAQ_API explicit Logging() noexcept = delete;
+  YAODAQ_API explicit Logging( const Identifier& identifier );
 
-  void add_websocket_callback( const std::function<void( const Log& msg )>& f );
+  YAODAQ_API void add_websocket_callback( const std::function<void( const Log& msg )>& f );
 
-  void setVerbosity( const yaodaq::verbosity::level level ) noexcept
+  YAODAQ_API void setVerbosity( const yaodaq::verbosity::level level ) noexcept
   {
     m_verbosity = level;
     // just in case spdlog change the numbers;
@@ -68,7 +68,7 @@ public:
     }
   }
 
-  yaodaq::verbosity::level getVerbosity() const noexcept { return m_verbosity; }
+  YAODAQ_API yaodaq::verbosity::level getVerbosity() const noexcept { return m_verbosity; }
 
   template<typename... Args> void trace( const std::string_view str, Args&&... args ) const noexcept
   {
@@ -139,7 +139,7 @@ private:
 class LoggableBase
 {
 protected:
-  void setLogger( std::shared_ptr<Logging> log ) noexcept { m_log = std::move( log ); }
+  YAODAQ_API void setLogger( std::shared_ptr<Logging> log ) noexcept { m_log = std::move( log ); }
 
 public:
   template<typename... Args> void trace( const std::string_view str, Args&&... args ) const noexcept
@@ -174,8 +174,9 @@ private:
 class Loggable
 {
 public:
-  explicit Loggable( const Identifier& id ) : m_id( id.id() ) {}
-  void setLogger( std::shared_ptr<Logging> log ) noexcept { m_log = std::move( log ); }
+  YAODAQ_API explicit Loggable( const Identifier& id ) : m_id( id.id() ), m_log(std::make_shared<Logging>(id)) {}
+  YAODAQ_API void setLogger( std::shared_ptr<Logging> log ) noexcept { m_log = std::move( log ); }
+
 
 protected:
   template<typename... Args> void trace( const std::string_view str, Args&&... args ) const noexcept
