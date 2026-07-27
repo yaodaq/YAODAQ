@@ -1,5 +1,6 @@
 #pragma once
 #include "Data.hpp"
+#include "yaodaq/Logging.hpp"
 
 #include <ROOT/RNTupleReader.hxx>
 #include <Rtypes.h>
@@ -16,17 +17,17 @@
 #include <map>
 #include <set>
 #include <string>
-#include <vector>
 #include <unordered_set>
-#include "yaodaq/Logging.hpp"
+#include <vector>
 
-static constexpr const char* kCanvasChannel = "channel";
-static constexpr const char* kCanvasTot     = "tot";
-static constexpr const char* kCanvasDelay   = "delay";
-static constexpr const char* kCanvasTrigger = "trigger";
-static constexpr const char* kCanvasCluster = "cluster";
-static constexpr const char* kCanvasPos     = "pos";
-static constexpr const char* kCanvasClusterCount = "cluster_count"; 
+static constexpr const char* kCanvasChannel      = "channel";
+static constexpr const char* kCanvasChannelRate  = "rate";
+static constexpr const char* kCanvasTot          = "tot";
+static constexpr const char* kCanvasDelay        = "delay";
+static constexpr const char* kCanvasTrigger      = "trigger";
+static constexpr const char* kCanvasCluster      = "cluster";
+static constexpr const char* kCanvasPos          = "pos";
+static constexpr const char* kCanvasClusterCount = "cluster_count";
 // =====================================================================
 //  1. Configuration & Constants (runtime-configurable)
 // =====================================================================
@@ -60,7 +61,6 @@ struct AnalyzerConfig
 
   // Other
   int maxTriggersPerEvent = 10;
-  int refreshRate         = 100;  // events between canvas updates
 };
 
 // =====================================================================
@@ -70,12 +70,12 @@ struct AnalyzerConfig
 struct Hit
 {
   float getTime() const noexcept { return time; }
-  bool  isRised() const noexcept { return isRising;}
-  float time{0.};
-  int   channel{0};
-  int   layer{0};
-  int   side{0};
-  bool  isRising{false};  // true = rising edge, false = falling edge
+  bool  isRised() const noexcept { return isRising; }
+  float time{ 0. };
+  int   channel{ 0 };
+  int   layer{ 0 };
+  int   side{ 0 };
+  bool  isRising{ false };  // true = rising edge, false = falling edge
 };
 struct EventData
 {
@@ -150,29 +150,29 @@ class RPCDataAnalyzer : public yaodaq::Loggable
 {
   // 3.1 Constructor & Destructor
 public:
-  RPCDataAnalyzer() : yaodaq::Loggable(yaodaq::Identifier(yaodaq::Component::Role::Class,"Analysor","XuRan"))
+  RPCDataAnalyzer() : yaodaq::Loggable( yaodaq::Identifier( yaodaq::Component::Role::Class, "Analysor", "XuRan" ) )
   {
     ensureHistograms();
     createAllCanvas();
     Draws();
     PrepareEfficiencies();
     // No histograms created here – they will be created on demand by ensureHistograms()
-        for (int ch = 40; ch < 48; ++ch) {
-        m_ignoredChannels.insert(ch);
-    }
+    for( int ch = 40; ch < 48; ++ch ) { m_ignoredChannels.insert( ch ); }
   }
   //Clean up histograms to avoid memory leaks
   ~RPCDataAnalyzer()
   {
     for( auto h: hRisingCount ) delete h;
     for( auto h: hFallingCount ) delete h;
+    for( auto h: hRisingCountRate ) delete h;
+    for( auto h: hFallingCountRate ) delete h;
     for( auto h: hTot ) delete h;
     for( auto h: hDelay ) delete h;
     delete hTriggerCount;
     delete hTotalHits;
     delete hTriggerHits;
     for( auto h: hClusterSize ) delete h;
-    for( auto h: hClusterCount ) delete h; 
+    for( auto h: hClusterCount ) delete h;
     for( auto h: hPosEtaPhi ) delete h;
     delete hRolling;
     for( auto& pair: m_canvas ) delete pair.second;
@@ -189,6 +189,7 @@ public:
   {
     // ----- Channel counting (rising/falling separated, per layer/side) -----
     std::lock_guard<std::mutex> lock( m_mutex_graph );  // Thread safety
+    getCanvas( kCanvasChannelRate )->UpdateAsync();
     if( fConfig.enableChannelCount )
     {
       for( const auto& hit: ev.hits )
@@ -205,6 +206,25 @@ public:
         else
           hFallingCount[idx]->Fill( ch );
       }
+      // Update rate histograms once per event
+      double scale = 1.0 / ( m_event * 400e-9 );
+
+      for( int idx = 0; idx < 6; ++idx )
+      {
+        hRisingCountRate[idx]->Reset();
+        hRisingCountRate[idx]->Add( hRisingCount[idx] );
+        hRisingCountRate[idx]->Scale( scale );
+        hRisingCountRate[idx]->SetTitle( std::to_string( m_event ).c_str() );
+
+        hFallingCountRate[idx]->Reset();
+        hFallingCountRate[idx]->Add( hFallingCount[idx] );
+        hFallingCountRate[idx]->Scale( scale );
+        hFallingCountRate[idx]->SetTitle( std::to_string( m_event ).c_str() );
+      }
+
+      // Refresh after histograms have changed
+      getCanvas( kCanvasChannelRate )->Modified();
+      getCanvas( kCanvasChannelRate )->UpdateAsync();
     }
 
     // ----- Efficiency (event-based: three-fold / two-fold) -----
@@ -348,19 +368,18 @@ public:
     // ----- Signal delay (rising edge time difference with trigger) -----
     if( fConfig.enableSignalDelay )
     {
-
-      if( std::count_if(ev.triggerHits.begin(),ev.triggerHits.end(),[](const Hit& hit) {return hit.isRised();}))
+      if( std::count_if( ev.triggerHits.begin(), ev.triggerHits.end(), []( const Hit& hit ) { return hit.isRised(); } ) )
       {
-      // Determine trigger reference time: use the first trigger hit that is rising edge
-      float triggerTime = -1.0f;
-      for( const auto& trg: ev.triggerHits )
-      {
-        if( trg.isRising )
+        // Determine trigger reference time: use the first trigger hit that is rising edge
+        float triggerTime = -1.0f;
+        for( const auto& trg: ev.triggerHits )
         {
-          triggerTime = trg.time;
-          break;  // use the first rising trigger hit
+          if( trg.isRising )
+          {
+            triggerTime = trg.time;
+            break;  // use the first rising trigger hit
+          }
         }
-      }
         // Loop over ordinary hits, only rising edges
         for( const auto& hit: ev.hits )
         {
@@ -407,15 +426,15 @@ public:
         for( int s = 0; s < 2; ++s )
         {
           const auto& chSet = channelSets[l][s];
-          if( chSet.empty() ) 
+          if( chSet.empty() )
           {
             int idx = l * 2 + s;
-                hClusterCount[idx]->Fill( 0 );
+            hClusterCount[idx]->Fill( 0 );
             continue;
           }
-            std::vector<int> chVec( chSet.begin(), chSet.end() );
+          std::vector<int> chVec( chSet.begin(), chSet.end() );
           std::sort( chVec.begin(), chVec.end() );
-          int clusterSize = 1;
+          int clusterSize  = 1;
           int clusterCount = 0;
           for( size_t i = 1; i < chVec.size(); ++i )
           {
@@ -483,6 +502,7 @@ public:
       }
     }
     //other new functions
+    ++m_event;
   }
 
   // 3.4 Finalization
@@ -491,16 +511,20 @@ public:
 
   void Draws()
   {
-    if( fConfig.enableChannelCount ) Draw( kCanvasChannel );
+    if( fConfig.enableChannelCount )
+    {
+      Draw( kCanvasChannel );
+      Draw( kCanvasChannelRate );
+    }
     if( fConfig.enableTotHist ) Draw( kCanvasTot );
     if( fConfig.enableSignalDelay ) Draw( kCanvasDelay );
     if( fConfig.enableTriggerCount ) Draw( kCanvasTrigger );
-    if( fConfig.enableClusterSize ) 
+    if( fConfig.enableClusterSize )
     {
-    Draw( kCanvasCluster );
-    Draw( kCanvasClusterCount ); 
+      Draw( kCanvasCluster );
+      Draw( kCanvasClusterCount );
     }
-    
+
     if( fConfig.enablePositionRecon ) Draw( kCanvasPos );
   }
 
@@ -513,19 +537,22 @@ public:
   void WritePDF()
   {
     // Produce PDF with separate pages for each canvas
-    const std::string pdfFile   = outPath( "analysis_results.pdf" );
-    for(std::map<std::string,TCanvas*>::const_iterator it=m_canvas.begin();it!=m_canvas.end();++it )
+    const std::string pdfFile = outPath( "analysis_results.pdf" );
+    for( std::map<std::string, TCanvas*>::const_iterator it = m_canvas.begin(); it != m_canvas.end(); ++it )
     {
       it->second->Update();
-      auto next = std::next(it);
-      if(it==m_canvas.begin()) it->second->Print( ( pdfFile + '(' ).c_str() );
-      else if(next==m_canvas.end()) it->second->Print( ( pdfFile + ')' ).c_str() );
-      else it->second->Print( pdfFile.c_str() );
+      auto next = std::next( it );
+      if( it == m_canvas.begin() ) it->second->Print( ( pdfFile + '(' ).c_str() );
+      else if( next == m_canvas.end() )
+        it->second->Print( ( pdfFile + ')' ).c_str() );
+      else
+        it->second->Print( pdfFile.c_str() );
     }
   }
 
-  void ProcessEvent( const DCT::Event& dctEvent)
+  void ProcessEvent( const DCT::Event& dctEvent )
   {
+    info("Analysing event: {} as {}",dctEvent.event_number,m_event);
     EventData localEv;
     /*  // Separate last BCID and rolling counters for rising and falling edges
 	    int lastBCID_R = -1;   // invalid initial
@@ -547,31 +574,17 @@ public:
         bcid = bcid + fConfig.bcidPeriod;
       bool isRising = dctHit.getRise();
 
-      /*// Select appropriate last BCID and rolling counter based on edge type
-	  int* lastBCID_ptr = isRising ? &lastBCID_R : &lastBCID_F;
-	  int* rolling_ptr = isRising ? &rollingR : &rollingF;
-	  int period = isRising ? BCID_PERIOD_R : BCID_PERIOD_F;
-	
-	  // Detect rollover: if current BCID is smaller than previous (and previous valid)
-	  if(*lastBCID_ptr != -1 && bcid - *lastBCID_ptr < -10) {
-	    (*rolling_ptr)++;
-	  }*/
-
       // Compute absolute time using the appropriate period and rolling count
       float time = static_cast<float>( bcid * fConfig.bcidClock + dctHit.getFineTime() );
 
       // Fill hit or trigger
       if( !dctHit.isTrigger() )
       {
-        
-        if (isIgnored(dctHit.getStrip()))
-        {
-          continue;
-        }
+        if( isIgnored( dctHit.getStrip() ) ) { continue; }
         Hit h;
-        h.time     = time;
-        h.channel  = dctHit.getStrip();
-        
+        h.time    = time;
+        h.channel = dctHit.getStrip();
+
         h.layer    = dctHit.getLayer();
         h.side     = dctHit.getSide() - 1;
         h.isRising = isRising;
@@ -587,38 +600,10 @@ public:
         trigger.isRising = isRising;
         localEv.triggerHits.push_back( trigger );
       }
-
-      /*// Update the last BCID for this edge type
-	*lastBCID_ptr = bcid;*/
     }
-    std::sort(localEv.triggerHits.begin(),localEv.triggerHits.end(),[]( const Hit& a, const Hit& b) { return a.getTime() < b.getTime();});
-    std::sort(localEv.hits.begin(),localEv.hits.end(),[](const Hit& a,const  Hit& b) { return a.getTime() < b.getTime();});
+    std::sort( localEv.triggerHits.begin(), localEv.triggerHits.end(), []( const Hit& a, const Hit& b ) { return a.getTime() < b.getTime(); } );
+    std::sort( localEv.hits.begin(), localEv.hits.end(), []( const Hit& a, const Hit& b ) { return a.getTime() < b.getTime(); } );
     processEvent( localEv );
-
-    /*// Debug output for rolling counts (only if enabled)
-  if (ENABLE_ROLLING) {
-    // Fill histogram with the total rolling count (use rising as representative, or combine)
-	// Here we fill with rising rolling (or you can fill both separately)
-	hRolling->Fill(rollingR);
-	// Optionally fill falling too, but histogram is 1D; we can fill with sum or separate.
-	// For simplicity, fill rising only.          
-	// Print details if rolling is large
-	if (rollingR > 2 || rollingF > 2) {
-	  std::cout << "\n--- Event " << processed
-	  << " | rising rolling = " << rollingR
-	  << ", falling rolling = " << rollingF
-	  << " (BCIDs: ";
-	for (const auto& dctHit : dctEvent.hits) {
-	  std::cout << dctHit.getBCID()
-	  << (dctHit.isTrigger() ? "(T)" : "")
-	  << (dctHit.getRise() ? "(r)" : "(f)")
-	  << "(" << (int)dctHit.getSide() << ")"
-	  << "  ";
-	}
-    std::cout << " ) ---" << std::endl;
-  }
-  }
-  */
   }
 
   std::array<EfficiencyInfo, 6> getEfficiencies()
@@ -647,7 +632,7 @@ public:
     for( auto entryId: reader->GetEntryRange() )
     {
       const DCT::Event& dctEvent = viewEvent( entryId );
-      ProcessEvent( dctEvent);
+      ProcessEvent( dctEvent );
       processed++;
       if( processed % 1000 == 0 ) { info( "Processed {}/{} events", processed, totalEntries ); }
     }
@@ -722,6 +707,8 @@ public:
     // Reset all existing histograms (do NOT delete/recreate)
     for( auto& h: hRisingCount ) resetHist( h );
     for( auto& h: hFallingCount ) resetHist( h );
+    for( auto& h: hRisingCountRate ) resetHist( h );
+    for( auto& h: hFallingCountRate ) resetHist( h );
     for( auto& h: hTot ) resetHist( h );
     for( auto& h: hDelay ) resetHist( h );
     if( hTriggerCount ) hTriggerCount->Reset();
@@ -747,7 +734,6 @@ public:
     }
     refresh();
   }
-
 
   // Set all parameters at once (optional)
   void setConfig( const AnalyzerConfig& cfg )
@@ -842,7 +828,6 @@ public:
     fConfig.maxTriggersPerEvent = v;
     fNeedInit                   = true;
   }
-  void setRefreshRate( int v ) { fConfig.refreshRate = v; }  // no need to reinit histograms
 
   void setEnableDelayCut( bool v ) { fConfig.enableDelayCut = v; }
   // Set delay window (in ns)
@@ -853,39 +838,34 @@ public:
   }
 
   // ----- Ignored channels management (setters) -----
-void setIgnoredChannels(const std::vector<int>& channels) {
+  void setIgnoredChannels( const std::vector<int>& channels )
+  {
     m_ignoredChannels.clear();
-    for (int ch : channels) m_ignoredChannels.insert(ch);
-}
-void addIgnoredChannel(int ch) {
-    m_ignoredChannels.insert(ch);
-}
-void clearIgnoredChannels() {
-    m_ignoredChannels.clear();
-}
-bool isIgnored(int ch) const {
-    return m_ignoredChannels.find(ch) != m_ignoredChannels.end();
-}
+    for( int ch: channels ) m_ignoredChannels.insert( ch );
+  }
+  void addIgnoredChannel( int ch ) { m_ignoredChannels.insert( ch ); }
+  void clearIgnoredChannels() { m_ignoredChannels.clear(); }
+  bool isIgnored( int ch ) const { return m_ignoredChannels.find( ch ) != m_ignoredChannels.end(); }
 
   //  4. Private Member Variables
 private:
   mutable std::mutex              m_mutex;
   mutable std::mutex              m_mutex_graph;
   std::map<std::string, TCanvas*> m_canvas;
-  void createCanvas( const std::string& key )
+  void                            createCanvas( const std::string& key )
   {
     if( m_canvas.find( key ) != m_canvas.end() )
     {
-      warn("Canvas {} already created",key);
+      warn( "Canvas {} already created", key );
       return;
     }
-    m_canvas[key] = new TCanvas( ("gl"+key).c_str(), key.c_str(), 1200, 800 );
+    m_canvas[key] = new TCanvas( ( "gl" + key ).c_str(), key.c_str(), 1200, 800 );
     if( !m_canvas[key] )
     {
       error( "Canvas for {} nullptr", key );
       std::exit( 1 );
     }
-    if( key == kCanvasChannel || key == kCanvasTot || key == kCanvasDelay || key == kCanvasCluster || key == kCanvasClusterCount ) { m_canvas[key]->Divide( 2, 3 ); }
+    if( key == kCanvasChannel || key == kCanvasTot || key == kCanvasDelay || key == kCanvasCluster || key == kCanvasClusterCount || key == kCanvasChannelRate ) { m_canvas[key]->Divide( 2, 3 ); }
     else if( key == kCanvasPos ) { m_canvas[key]->Divide( 3, 1 ); }
     else if( key == kCanvasTrigger )
     {
@@ -897,12 +877,12 @@ private:
     }
   }
 
-  void Draw(const std::string& key)
+  void Draw( const std::string& key )
   {
     TCanvas* c = getCanvas( key );
     if( !c ) return;
 
-    if( key == kCanvasChannel && fConfig.enableChannelCount )
+    if( ( key == kCanvasChannel || key == kCanvasChannelRate ) && fConfig.enableChannelCount )
     {
       int pad = 1;
       for( int layer = 0; layer < 3; ++layer )
@@ -912,16 +892,38 @@ private:
           int idx = layer * 2 + side;
           c->cd( pad );
           gPad->Clear();
-          hRisingCount[idx]->SetLineColor( kBlue );
-          hRisingCount[idx]->SetFillColorAlpha( kBlue, 0.3 );
-          hRisingCount[idx]->Draw( "hist" );
-          hFallingCount[idx]->SetLineColor( kRed );
-          hFallingCount[idx]->SetFillColorAlpha( kRed, 0.3 );
-          hFallingCount[idx]->Draw( "hist same" );
-          TLegend* leg = new TLegend( 0.12, 0.8, 0.32, 0.9 );
-          leg->AddEntry( hRisingCount[idx], "Rising", "f" );
-          leg->AddEntry( hFallingCount[idx], "Falling", "f" );
-          leg->Draw();
+          if( key == kCanvasChannel )
+          {
+            hRisingCount[idx]->SetLineColor( kBlue );
+            hRisingCount[idx]->SetFillColorAlpha( kBlue, 0.3 );
+            hRisingCount[idx]->Draw( "hist" );
+            hFallingCount[idx]->SetLineColor( kRed );
+            hFallingCount[idx]->SetFillColorAlpha( kRed, 0.3 );
+            hFallingCount[idx]->Draw( "hist same" );
+          }
+          else if( key == kCanvasChannelRate )
+          {
+            hRisingCountRate[idx]->SetLineColor( kBlue );
+            hRisingCountRate[idx]->SetFillColorAlpha( kBlue, 0.3 );
+            hRisingCountRate[idx]->Draw( "hist" );
+            hFallingCountRate[idx]->SetLineColor( kRed );
+            hFallingCountRate[idx]->SetFillColorAlpha( kRed, 0.3 );
+            hFallingCountRate[idx]->Draw( "hist same" );
+          }
+          if( key == kCanvasChannel )
+          {
+            TLegend* leg = new TLegend( 0.12, 0.8, 0.32, 0.9 );
+            leg->AddEntry( hRisingCount[idx], "Rising", "f" );
+            leg->AddEntry( hFallingCount[idx], "Falling", "f" );
+            leg->Draw();
+          }
+          else if( key == kCanvasChannelRate )
+          {
+            TLegend* leg = new TLegend( 0.12, 0.8, 0.32, 0.9 );
+            leg->AddEntry( hRisingCountRate[idx], "Rising", "f" );
+            leg->AddEntry( hFallingCountRate[idx], "Falling", "f" );
+            leg->Draw();
+          }
 
           // Vertical lines to separate front‑end boards (every 8 channels)
           gPad->Update();
@@ -988,16 +990,16 @@ private:
     }
     else if( key == kCanvasClusterCount && fConfig.enableClusterSize )
     {
-    int pad = 1;
-    for( int l = 0; l < 3; ++l )
-    {
+      int pad = 1;
+      for( int l = 0; l < 3; ++l )
+      {
         for( int s = 0; s < 2; ++s )
         {
-            int idx = l * 2 + s;
-            c->cd( pad++ );
-            hClusterCount[idx]->Draw();
+          int idx = l * 2 + s;
+          c->cd( pad++ );
+          hClusterCount[idx]->Draw();
         }
-    }
+      }
     }
     else if( key == kCanvasPos && fConfig.enablePositionRecon )
     {
@@ -1043,39 +1045,47 @@ private:
 
   void createAllCanvas()
   {
-    if( fConfig.enableChannelCount ) createCanvas( kCanvasChannel );
+    if( fConfig.enableChannelCount )
+    {
+      createCanvas( kCanvasChannel );
+      createCanvas( kCanvasChannelRate );
+    }
     if( fConfig.enableTotHist ) createCanvas( kCanvasTot );
     if( fConfig.enableSignalDelay ) createCanvas( kCanvasDelay );
     if( fConfig.enableTriggerCount ) createCanvas( kCanvasTrigger );
-    if( fConfig.enableClusterSize ) 
+    if( fConfig.enableClusterSize )
     {
-    createCanvas( kCanvasCluster );
-    createCanvas( kCanvasClusterCount ); 
+      createCanvas( kCanvasCluster );
+      createCanvas( kCanvasClusterCount );
     }
     if( fConfig.enablePositionRecon ) createCanvas( kCanvasPos );
   }
 
+  void refresh()
+  {
+    if( fConfig.enableChannelCount )
+    {
+      refreshCanvas( kCanvasChannel );
+      refreshCanvas( kCanvasChannelRate );
+    }
 
-void refresh()
-{
-      if( fConfig.enableChannelCount ) refreshCanvas( kCanvasChannel );
     if( fConfig.enableTotHist ) refreshCanvas( kCanvasTot );
     if( fConfig.enableSignalDelay ) refreshCanvas( kCanvasDelay );
     if( fConfig.enableTriggerCount ) refreshCanvas( kCanvasTrigger );
-    if( fConfig.enableClusterSize ) 
+    if( fConfig.enableClusterSize )
     {
-    refreshCanvas( kCanvasCluster );
-    refreshCanvas( kCanvasClusterCount ); 
+      refreshCanvas( kCanvasCluster );
+      refreshCanvas( kCanvasClusterCount );
     }
     if( fConfig.enablePositionRecon ) refreshCanvas( kCanvasPos );
-
-}
+  }
 
   TCanvas* getCanvas( const std::string& key )
   {
     auto it = m_canvas.find( key );
     if( it != m_canvas.end() ) return it->second;
-    else return nullptr;
+    else
+      return nullptr;
   }
 
   std::string outPath( const std::string& fname )
@@ -1096,13 +1106,16 @@ void refresh()
   // Histograms for channel counting: rising and falling edges, per (layer,side)
   std::array<TH1F*, 6> hRisingCount{ nullptr, nullptr, nullptr, nullptr, nullptr, nullptr };
   std::array<TH1F*, 6> hFallingCount{ nullptr, nullptr, nullptr, nullptr, nullptr, nullptr };
+  std::array<TH1F*, 6> hRisingCountRate{ nullptr, nullptr, nullptr, nullptr, nullptr, nullptr };
+  std::array<TH1F*, 6> hFallingCountRate{ nullptr, nullptr, nullptr, nullptr, nullptr, nullptr };
   TH1F*                hTotalHits{ nullptr };
   TH1F*                hTriggerHits{ nullptr };
   std::array<TH1F*, 6> hTot{ nullptr, nullptr, nullptr, nullptr, nullptr, nullptr };
 
   std::array<TH1F*, 6> hDelay{ nullptr, nullptr, nullptr, nullptr, nullptr, nullptr };
 
-  TH1F* hTriggerCount{ nullptr };  // Histogram of number of trigger hits per event
+  TH1F*       hTriggerCount{ nullptr };  // Histogram of number of trigger hits per event
+  std::size_t m_event{ 1 };
 
   // Counters for new efficiency definition (event-based)
   long long totalEvents      = 0;
@@ -1142,7 +1155,7 @@ void refresh()
 
   bool fNeedInit = true;  // flag to recreate histograms when config changes
 
-  std::unordered_set<int> m_ignoredChannels;   // Channels to be excluded from all analyses
+  std::unordered_set<int> m_ignoredChannels;  // Channels to be excluded from all analyses
 
   void ensureHistograms()
   {
@@ -1156,6 +1169,16 @@ void refresh()
       h = nullptr;
     }
     for( auto& h: hFallingCount )
+    {
+      delete h;
+      h = nullptr;
+    }
+    for( auto& h: hRisingCountRate )
+    {
+      delete h;
+      h = nullptr;
+    }
+    for( auto& h: hFallingCountRate )
     {
       delete h;
       h = nullptr;
@@ -1196,9 +1219,11 @@ void refresh()
       {
         for( int side = 0; side < 2; ++side )
         {
-          int idx            = layer * 2 + side;
-          hRisingCount[idx]  = new TH1F( Form( "rising_layer%d_side%d", layer, side ), Form( "Layer %d, Side %d Channel Distribution;Channel Number;Counts", layer, side + 1 ), fConfig.maxChannelsPerGroup, -0.5, fConfig.maxChannelsPerGroup - 0.5 );
-          hFallingCount[idx] = new TH1F( Form( "falling_layer%d_side%d", layer, side ), Form( "Layer %d, Side %d Channel Distribution;Channel Number;Counts", layer, side + 1 ), fConfig.maxChannelsPerGroup, -0.5, fConfig.maxChannelsPerGroup - 0.5 );
+          int idx                = layer * 2 + side;
+          hRisingCount[idx]      = new TH1F( Form( "rising_layer%d_side%d", layer, side ), Form( "Layer %d, Side %d Channel Distribution;Channel Number;Counts", layer, side + 1 ), fConfig.maxChannelsPerGroup, -0.5, fConfig.maxChannelsPerGroup - 0.5 );
+          hFallingCount[idx]     = new TH1F( Form( "falling_layer%d_side%d", layer, side ), Form( "Layer %d, Side %d Channel Distribution;Channel Number;Counts", layer, side + 1 ), fConfig.maxChannelsPerGroup, -0.5, fConfig.maxChannelsPerGroup - 0.5 );
+          hRisingCountRate[idx]  = new TH1F( Form( "rising_layer%d_side%d_rate", layer, side ), Form( "Layer %d, Side %d rate;Channel Number;Rate", layer, side + 1 ), fConfig.maxChannelsPerGroup, -0.5, fConfig.maxChannelsPerGroup - 0.5 );
+          hFallingCountRate[idx] = new TH1F( Form( "falling_layer%d_side%d_rate", layer, side ), Form( "Layer %d, Side %d rate;Channel Number;Rate", layer, side + 1 ), fConfig.maxChannelsPerGroup, -0.5, fConfig.maxChannelsPerGroup - 0.5 );
         }
       }
     }
@@ -1236,13 +1261,9 @@ void refresh()
       {
         for( int side = 0; side < 2; ++side )
         {
-          int idx           = layer * 2 + side;
-          hClusterSize[idx] = new TH1F( Form( "cluster_layer%d_side%d", layer, side + 1 ), Form( "Layer %d, Side %d Cluster Size;Cluster Size;Counts", layer, side + 1 ), 11, -0.5, 10.5 );
-        hClusterCount[idx] = new TH1F(
-                Form( "cluster_count_layer%d_side%d", layer, side ),
-                Form( "Layer %d, Side %d Cluster Count per Event;Cluster Count;Events", layer, side+1 ),
-                11, -0.5, 10.5   
-            );
+          int idx            = layer * 2 + side;
+          hClusterSize[idx]  = new TH1F( Form( "cluster_layer%d_side%d", layer, side + 1 ), Form( "Layer %d, Side %d Cluster Size;Cluster Size;Counts", layer, side + 1 ), 11, -0.5, 10.5 );
+          hClusterCount[idx] = new TH1F( Form( "cluster_count_layer%d_side%d", layer, side ), Form( "Layer %d, Side %d Cluster Count per Event;Cluster Count;Events", layer, side + 1 ), 11, -0.5, 10.5 );
         }
       }
     }
@@ -1258,5 +1279,4 @@ void refresh()
 
     fNeedInit = false;
   }
-
 };

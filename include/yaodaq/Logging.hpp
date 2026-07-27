@@ -174,9 +174,8 @@ private:
 class Loggable
 {
 public:
-  YAODAQ_API explicit Loggable( const Identifier& id ) : m_id( id.id() ), m_log(std::make_shared<Logging>(id)) {}
+  YAODAQ_API explicit Loggable( const Identifier& id ) : m_id( id.id() ), m_log( std::make_shared<Logging>( id ) ) {}
   YAODAQ_API void setLogger( std::shared_ptr<Logging> log ) noexcept { m_log = std::move( log ); }
-
 
 protected:
   template<typename... Args> void trace( const std::string_view str, Args&&... args ) const noexcept

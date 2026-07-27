@@ -24,7 +24,7 @@ public:
     Transport,
     Codec,
 
-    Class=255, // UserClass
+    Class = 255,  // UserClass
   };
   YAODAQ_API Component() noexcept = delete;
   YAODAQ_API explicit Component( const Component::Role role ) noexcept : m_role( role ) {}

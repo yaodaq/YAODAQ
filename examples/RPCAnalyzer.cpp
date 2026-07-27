@@ -4,8 +4,8 @@
 #include <filesystem>
 #include <iostream>
 #include <spdlog/spdlog.h>
-#include <string>
 #include <sstream>
+#include <string>
 
 // =====================================================================
 //  RPC Data Analyzer - Code Structure (Index)
@@ -34,27 +34,26 @@ int main( int argc, char** argv )
   app.add_option( "-f,--file", file_name, "Input ROOT file" )->required()->check( CLI::ExistingFile );
 
   //define all variables that can be configured
-  bool   enableChannel    = true;
-  bool   enableEfficiency = true;
-  bool   enableTot        = true;
-  bool   enableDelay      = true;
-  bool   enableTrigger    = true;
-  bool   enableCluster    = true;
-  bool   enablePosition   = true;
-  double detectorLength   = 1705.0;
-  double detectorWidth    = 1107.0;
-  double signalSpeed      = 220.0;
-  double bcidClock        = 25.0;
-  int    bcidPeriod       = 256;
-  int    maxChannels      = 48;
-  bool   enableCut        = false;
-  int    chanTol          = 2;
-  double timeTol          = 20.0;
-  int    maxTriggers      = 10;
-  int    refreshRate      = 100;
-  bool   enableDelayCut   = false;
-  double delayMin         = -150;
-  double delayMax         = -75;
+  bool        enableChannel    = true;
+  bool        enableEfficiency = true;
+  bool        enableTot        = true;
+  bool        enableDelay      = true;
+  bool        enableTrigger    = true;
+  bool        enableCluster    = true;
+  bool        enablePosition   = true;
+  double      detectorLength   = 1705.0;
+  double      detectorWidth    = 1107.0;
+  double      signalSpeed      = 220.0;
+  double      bcidClock        = 25.0;
+  int         bcidPeriod       = 256;
+  int         maxChannels      = 48;
+  bool        enableCut        = false;
+  int         chanTol          = 2;
+  double      timeTol          = 20.0;
+  int         maxTriggers      = 10;
+  bool        enableDelayCut   = false;
+  double      delayMin         = -150;
+  double      delayMax         = -75;
   std::string ignoreList;
   bool        noIgnore = false;
 
@@ -75,12 +74,11 @@ int main( int argc, char** argv )
   app.add_option( "--chan-tol", chanTol, "Channel tolerance for cuts" );
   app.add_option( "--time-tol", timeTol, "Time tolerance for cuts (ns)" );
   app.add_option( "--max-triggers", maxTriggers, "Max triggers per event" );
-  app.add_option( "--refresh-rate", refreshRate, "Refresh rate (events)" );
   app.add_option( "--enable-delay-cut", enableDelayCut, "Enable delay cut for efficiency" );
   app.add_option( "--delay-min", delayMin, "Minimum delay (ns) for efficiency hits" );
   app.add_option( "--delay-max", delayMax, "Maximum delay (ns) for efficiency hits" );
-  app.add_option("--ignore-channels", ignoreList, "Comma-separated channel numbers to ignore (overrides default).");
-app.add_flag("--no-ignore-channels", noIgnore, "Do not ignore any channels (overrides default and --ignore-channels).");
+  app.add_option( "--ignore-channels", ignoreList, "Comma-separated channel numbers to ignore (overrides default)." );
+  app.add_flag( "--no-ignore-channels", noIgnore, "Do not ignore any channels (overrides default and --ignore-channels)." );
 
   try
   {
@@ -110,7 +108,6 @@ app.add_flag("--no-ignore-channels", noIgnore, "Do not ignore any channels (over
   analyzer.setChanTol( chanTol );
   analyzer.setTimeTol( timeTol );
   analyzer.setMaxTriggersPerEvent( maxTriggers );
-  analyzer.setRefreshRate( refreshRate );
   analyzer.setEnableDelayCut( enableDelayCut );
   analyzer.setDelayWindow( delayMin, delayMax );
 
@@ -134,31 +131,37 @@ app.add_flag("--no-ignore-channels", noIgnore, "Do not ignore any channels (over
   }
   analyzer.setOutputDir( outDir );
 
-
   // ----- Configure ignored channels -----
-if (noIgnore) {
-    analyzer.clearIgnoredChannels();
-} else if (!ignoreList.empty()) {
-    std::vector<int> channels;
-    std::stringstream ss(ignoreList);
-    std::string token;
-    while (std::getline(ss, token, ',')) {
-        if (!token.empty()) {
-            try {
-                channels.push_back(std::stoi(token));
-            } catch (...) { /* warning */ }
+  if( noIgnore ) { analyzer.clearIgnoredChannels(); }
+  else if( !ignoreList.empty() )
+  {
+    std::vector<int>  channels;
+    std::stringstream ss( ignoreList );
+    std::string       token;
+    while( std::getline( ss, token, ',' ) )
+    {
+      if( !token.empty() )
+      {
+        try
+        {
+          channels.push_back( std::stoi( token ) );
         }
+        catch( ... )
+        { /* warning */
+        }
+      }
     }
-    analyzer.setIgnoredChannels(channels);
-} else {
+    analyzer.setIgnoredChannels( channels );
+  }
+  else
+  {
     // default: 40-47
     std::vector<int> defaultChannels;
-    for (int ch = 40; ch < 48; ++ch) defaultChannels.push_back(ch);
-    analyzer.setIgnoredChannels(defaultChannels);
-}
+    for( int ch = 40; ch < 48; ++ch ) defaultChannels.push_back( ch );
+    analyzer.setIgnoredChannels( defaultChannels );
+  }
 
-
-// run the analysis
+  // run the analysis
   analyzer.runFromFile( file_name );
   analyzer.finalize();
   analyzer.WritePDF();

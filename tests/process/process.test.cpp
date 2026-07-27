@@ -26,6 +26,7 @@ public:
   {
     std::filesystem::path file = m_path / fmt::format( "event_{}.csv", event() );
     info( "Triggering event {}", event() );
+    auto start = std::chrono::steady_clock::now();
     sendCommand( "run_hw_ila [get_hw_ilas -of_objects [get_hw_devices xc7a200t_0] -filter {CELL_NAME=~\"ila_elinks_inst\"}]" );
     sendCommand( "wait_on_hw_ila [get_hw_ilas -of_objects [get_hw_devices xc7a200t_0] -filter {CELL_NAME=~\"ila_elinks_inst\"}]" );
     sendCommand( "upload_hw_ila_data [get_hw_ilas -of_objects [get_hw_devices xc7a200t_0] -filter {CELL_NAME=~\"ila_elinks_inst\"}]" );
@@ -35,8 +36,10 @@ public:
       if( stop.stop_requested() ) return true;
       std::this_thread::sleep_for( std::chrono::milliseconds( 1 ) );
     }
-    auto lastSize = std::filesystem::file_size( file );
+    auto end = std::chrono::steady_clock::now();
+    info("Event {} extracted in {} us",event(),std::chrono::duration_cast<std::chrono::microseconds>(end - start).count());
 
+    auto lastSize = std::filesystem::file_size(file);
     while( !stop.stop_requested() )
     {
       std::this_thread::sleep_for( std::chrono::milliseconds( 1 ) );
@@ -211,8 +214,6 @@ private:
       json += "]}";
 
       send( yaodaq::RawDataBuilder::from_text( json, "MPI::DCT::Singlets::RawData" ) );
-
-      debug( "JSON: {}", yaodaq::Formatter::format( json ) );
 
       if( !KeepRawFiles() )
       {

@@ -197,8 +197,8 @@ public:
         error( "not writing to file {}", m_data_file.string() );
       fill();
       // send the events to our fellow analysers ;)
-      TString event_json = TBufferJSON::ToJSON( m_event.get() );
-      send( yaodaq::RawDataBuilder::from_text( event_json.Data(), "MPI::DCT::Singlets::Events" ) );
+      //TString event_json = TBufferJSON::ToJSON( m_event.get() );
+      //send( yaodaq::RawDataBuilder::from_text( event_json.Data(), "MPI::DCT::Singlets::Events" ) );
     }
     else
       info( "Received {}", raw->topic() );
