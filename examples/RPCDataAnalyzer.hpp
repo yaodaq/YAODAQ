@@ -552,13 +552,8 @@ public:
 
   void ProcessEvent( const DCT::Event& dctEvent )
   {
-    info("Analysing event: {} as {}",dctEvent.event_number,m_event);
+    info( "Analysing event: {} as {}", dctEvent.event_number, m_event );
     EventData localEv;
-    /*  // Separate last BCID and rolling counters for rising and falling edges
-	    int lastBCID_R = -1;   // invalid initial
-	    int lastBCID_F = -1;
-	    int rollingR = 0;
-	    int rollingF = 0;*/
     bool      first = true;
     int       bc0   = 0;
     for( const auto& dctHit: dctEvent.hits )

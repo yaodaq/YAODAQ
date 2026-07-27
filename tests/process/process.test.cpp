@@ -37,9 +37,9 @@ public:
       std::this_thread::sleep_for( std::chrono::milliseconds( 1 ) );
     }
     auto end = std::chrono::steady_clock::now();
-    info("Event {} extracted in {} us",event(),std::chrono::duration_cast<std::chrono::microseconds>(end - start).count());
+    info( "Event {} extracted in {} us", event(), std::chrono::duration_cast<std::chrono::microseconds>( end - start ).count() );
 
-    auto lastSize = std::filesystem::file_size(file);
+    auto lastSize = std::filesystem::file_size( file );
     while( !stop.stop_requested() )
     {
       std::this_thread::sleep_for( std::chrono::milliseconds( 1 ) );
