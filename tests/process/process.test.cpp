@@ -298,7 +298,7 @@ int main( int argc, char* argv[] )
   Vivado board( cfg, "MyVivado" );
   board.setFirmwarePath( firmware_path );
   board.setKeepRawFiles( keep_raw_files );
-  board.setMaxNumberEvents( nbr_event );
+  board.setMaxEvents( nbr_event );
   board.link();
   board.dispatcher().subscribe<yaodaq::RawData>(
     [&board]( const yaodaq::RawData& msg )

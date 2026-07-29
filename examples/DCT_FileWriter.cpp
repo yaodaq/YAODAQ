@@ -69,11 +69,15 @@ private:
 public:
   FileWriter( yaodaq::Config cfg, const std::string_view name ) : yaodaq::Module( cfg, "DCT", "FileWriter" )
   {
+    Add( "getFileName", jsonrpc::GetHandle( &FileWriter::getFileName, *this ) );
+    Add( "setFileName", jsonrpc::GetHandle( &FileWriter::setFileName, *this ) );
     ROOT::Experimental::DisableObjectAutoRegistration();
     ROOT::EnableImplicitMT();
     if( !create_models() ) throw yaodaq::Exception( "Model creations failed !" );
     Term::terminal.setOptions( Term::Option::Raw, Term::Option::Cursor );  //ROOT is doing bad stufs
   }
+  std::string_view getFileName() const noexcept { return m_name; }
+
   ~FileWriter() override {}
   bool on_initialize() override { return create_fields(); }
 
@@ -135,12 +139,15 @@ public:
       }
     }
     std::filesystem::create_directories( m_path / m_folder );
-
-    Term::terminal.setOptions( Term::Option::Raw, Term::Option::Cursor );  //ROOT is doing bad stufs
     return true;
   }
 
-  void setName( const std::string_view name ) { m_name = name; }
+  std::string_view setFileName( const std::string& name )
+  {
+    m_name = std::string( name );
+    info( "filename changed to {}", m_name );
+    return m_name;
+  }
 
   void setPath( const std::string_view path )
   {
@@ -293,7 +300,7 @@ try
   app.add_option( "-p,--port", port, "Port to listen" )->check( CLI::Range( 0, 65535 ) );
   std::string path{ "/data/RPC/YAODAQ/" };
   app.add_option( "--path", path, "Path where to store the file" );
-  std::string file_name;
+  std::string file_name{ "Unknown" };
   app.add_option( "--file_name", file_name, "filename folder" );
   try
   {
@@ -307,7 +314,7 @@ try
   cfg.setPort( port ).setHost( host );
   FileWriter module( cfg, "DCT" );
   module.setPath( path );
-  module.setName( file_name );
+  module.setFileName( file_name );
   module.link();
 
   std::size_t nbrCTLC{ 3 };

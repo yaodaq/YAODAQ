@@ -27,14 +27,15 @@ public:
     m_analyse.setEnableDelayCut( true );
     std::string url = "http:" + std::string( cfg.getHost() ) + ":" + std::to_string( cfg.getPort() + 1 );
     m_server        = std::make_unique<THttpServer>( url.c_str() );
+    m_server->SetTimer( 0, kTRUE );
     m_analyse.finalize();
     m_thread = std::jthread(
-      []( std::stop_token st )
+      [this]( std::stop_token st )
       {
         while( !st.stop_requested() )
         {
-          gSystem->ProcessEvents();
-          std::this_thread::sleep_for( std::chrono::milliseconds( 10 ) );
+          m_server->ProcessRequests();
+          //std::this_thread::sleep_for( std::chrono::milliseconds( 10 ) );
         }
       } );
     Term::terminal.setOptions( Term::Option::Raw, Term::Option::Cursor );  //ROOT is doing bad stufs
@@ -44,6 +45,7 @@ public:
 
   bool on_initialize() override
   {
+    clear();
     Term::terminal.setOptions( Term::Option::Raw, Term::Option::Cursor );
     return true;
   }
@@ -89,10 +91,12 @@ public:
 
   bool on_stop() override
   {
-    clear();
     Term::terminal.setOptions( Term::Option::Raw, Term::Option::Cursor );  //ROOT is doing bad stufs
     return true;
   }
+
+  bool on_start() override { return true; }
+
   void clear()
   {
     warn( "Clearing histograms" );

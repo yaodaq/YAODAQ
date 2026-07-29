@@ -38,7 +38,8 @@ public:
     Add( "getState", jsonrpc::GetHandle( &yaodaq::Module::getStateStr, *this ) );
     Add( "connect", jsonrpc::GetHandle( &yaodaq::Module::connect, *this ) );
     Add( "disconnect", jsonrpc::GetHandle( &yaodaq::Module::disconnect, *this ) );
-    Add( "setMaxNumberEvents", jsonrpc::GetHandle( &yaodaq::Module::setMaxNumberEvents, *this ) );
+    Add( "setMaxEvents", jsonrpc::GetHandle( &yaodaq::Module::setMaxEvents, *this ) );
+    Add( "getMaxEvents", jsonrpc::GetHandle( &yaodaq::Module::getMaxEvents, *this ) );
   }
   Module( const Module& )            = delete;
   Module& operator=( const Module& ) = delete;
@@ -348,7 +349,11 @@ public:
   }
 
   YAODAQ_API void setRun( const std::function<bool( std::stop_token )>& fun ) noexcept { m_onrun = fun; }
-  void            setMaxNumberEvents( std::uint64_t max ) noexcept { m_max_event.store( max, std::memory_order_relaxed ); }
+  std::size_t     setMaxEvents( std::uint64_t max ) noexcept
+  {
+    m_max_event.store( max, std::memory_order_relaxed );
+    return getMaxEvents();
+  }
 
 protected:
   std::uint64_t event() { return m_event.load(); }
@@ -452,7 +457,7 @@ protected:
   }
 
   void          send_to_server( const std::string_view str ) { send( str ); }
-  std::uint64_t getMaxNumberEvents() const noexcept { return m_max_event.load( std::memory_order_relaxed ); }
+  std::uint64_t getMaxEvents() const noexcept { return m_max_event.load( std::memory_order_relaxed ); }
 
 private:
   enum class WorkerState : std::uint8_t
