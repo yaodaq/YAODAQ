@@ -58,74 +58,71 @@ public:
   }
 
   // Events
-  YAODAQ_API bool link()
+  YAODAQ_API bool link() noexcept
   {
-    info( "Linking" );
-    Transition transition{ allowTransition( State::Type::Linked ) };
-    if( transition == Transition::alreadyDone ) return true;
-    if( transition != Transition::allowed )
+    try
     {
-      warn( "{} to {} unauthorised", getStateStr(), "Linked" );
+      const Transition transition = allowTransition( State::Type::Linked );
+      if( !shouldExecute( transition ) ) return isSuccess( transition );
+      info( "Linking" );
+      yaodaq::Client::start();
+      updateState( State::Type::Linked );
+      return true;
+    }
+    catch( const std::exception& ex )
+    {
+      error( "error while linking: {}", ex.what() );
       return false;
     }
-    yaodaq::Client::start();
-    updateState( State::Type::Linked );
-    return true;
+    catch( ... )
+    {
+      error( "error while linking" );
+      return false;
+    }
   }
 
-  YAODAQ_API bool initialize()
+  YAODAQ_API bool initialize() noexcept
   {
-    Transition transition{ allowTransition( State::Type::Initialized ) };
-    if( transition == Transition::alreadyDone ) return true;
-    else if( transition == Transition::allowed )
+    try
     {
+      const Transition transition{ allowTransition( State::Type::Initialized ) };
+      if( !shouldExecute( transition ) ) return isSuccess( transition );
       info( "Initializing" );
       bool ret = on_initialize();
       if( ret ) { updateState( State::Type::Initialized ); }
       return ret;
     }
-    else
+    catch( const std::exception& ex )
     {
-      warn( "{} to {} unauthorised", getStateStr(), "Initialized" );
+      error( "error while initializing: {}", ex.what() );
+      return false;
+    }
+    catch( ... )
+    {
+      error( "error while initializing" );
       return false;
     }
   }
 
   YAODAQ_API bool configure()
   {
-    Transition transition{ allowTransition( State::Type::Configured ) };
-    if( transition == Transition::alreadyDone ) return true;
-    else if( transition == Transition::allowed )
-    {
-      info( "Configuring" );
-      bool ret = on_configure();
-      if( ret ) { updateState( State::Type::Configured ); }
-      return ret;
-    }
-    else
-    {
-      warn( "{} to {} unauthorised", getStateStr(), "Configured" );
-      return false;
-    }
+    const Transition transition{ allowTransition( State::Type::Configured ) };
+    if( !shouldExecute( transition ) ) return isSuccess( transition );
+    info( "Configuring" );
+    bool ret = on_configure();
+    if( ret ) { updateState( State::Type::Configured ); }
+    return ret;
   }
 
   YAODAQ_API bool start()
   {
-    Transition transition{ allowTransition( State::Type::Started ) };
-    if( transition == Transition::alreadyDone ) return true;
-    if( transition != Transition::allowed )
-    {
-      warn( "{} to {} unauthorised", getStateStr(), "Started" );
-      return false;
-    }
-
-    info( "Starting Module" );
-
+    const Transition transition{ allowTransition( State::Type::Started ) };
+    if( !shouldExecute( transition ) ) return isSuccess( transition );
+    info( "Starting" );
     {
       updateState( State::Type::Started );
       m_worker_state.store( WorkerState::Running );
     }
-
     // Start worker first
     if( m_onrun && !m_worker.joinable() )
     {
@@ -206,64 +203,37 @@ public:
 
   YAODAQ_API bool pause()
   {
-    Transition transition{ allowTransition( State::Type::Paused ) };
-    if( transition == Transition::alreadyDone ) return true;
-    if( transition != Transition::allowed )
-    {
-      warn( "{} to {} unauthorised", getStateStr(), "Paused" );
-      return false;
-    }
-
-    info( "Pausing Module" );
-
-    // Update state safely
+    const Transition transition{ allowTransition( State::Type::Paused ) };
+    if( !shouldExecute( transition ) ) return isSuccess( transition );
+    info( "Pausing" );
     {
       updateState( State::Type::Paused );
-
       // Only pause worker thread if it exists
       if( m_worker.joinable() ) { m_worker_state.store( WorkerState::Paused ); }
     }
-
     cv.notify_all();  // Notify worker if it exists
-
     return true;
   }
 
   YAODAQ_API bool resume()
   {
-    Transition transition{ allowTransition( State::Type::Started ) };
-    if( transition == Transition::alreadyDone ) return true;
-    if( transition != Transition::allowed )
-    {
-      warn( "{} to {} unauthorised", getStateStr(), "Started" );
-      return false;
-    }
-
-    info( "Resuming Module" );
-
+    const Transition transition{ allowTransition( State::Type::Started ) };
+    if( !shouldExecute( transition ) ) return isSuccess( transition );
+    info( "Resuming " );
     {
       updateState( State::Type::Started );
-
       // Only resume worker thread if it exists
       if( m_worker.joinable() ) { m_worker_state.store( WorkerState::Running ); }
     }
-
     cv.notify_all();  // Notify worker if it exists
-
     return true;
   }
 
   YAODAQ_API bool stop()
   {
-    Transition transition{ allowTransition( State::Type::Stopped ) };
-    if( transition == Transition::alreadyDone ) return true;
-    if( transition != Transition::allowed )
-    {
-      warn( "{} to {} unauthorised", getStateStr(), "Stopped" );
-      return false;
-    }
-
-    info( "Stopping Module" );
+    const Transition transition{ allowTransition( State::Type::Stopped ) };
+    if( !shouldExecute( transition ) ) return isSuccess( transition );
+    info( "Stopping" );
     bool ret = on_stop();  // call the hook
     if( !ret )
     {
@@ -283,38 +253,22 @@ public:
 
   YAODAQ_API bool clear()
   {
-    Transition transition{ allowTransition( State::Type::Cleared ) };
-    if( transition == Transition::alreadyDone ) return true;
-    else if( transition == Transition::allowed )
-    {
-      info( "Clearing" );
-      bool ret = on_clear();
-      if( ret ) { updateState( State::Type::Cleared ); }
-      return ret;
-    }
-    else
-    {
-      warn( "{} to {} unauthorised", getStateStr(), "Cleared" );
-      return false;
-    }
+    const Transition transition{ allowTransition( State::Type::Cleared ) };
+    if( !shouldExecute( transition ) ) return isSuccess( transition );
+    info( "Clearing" );
+    bool ret = on_clear();
+    if( ret ) { updateState( State::Type::Cleared ); }
+    return ret;
   }
 
   YAODAQ_API bool release()
   {
-    Transition transition{ allowTransition( State::Type::Released ) };
-    if( transition == Transition::alreadyDone ) return true;
-    else if( transition == Transition::allowed )
-    {
-      info( "Releasing" );
-      bool ret = on_release();
-      if( ret ) { updateState( State::Type::Released ); }
-      return ret;
-    }
-    else
-    {
-      warn( "{} to {} unauthorised", getStateStr(), "Released" );
-      return false;
-    }
+    const Transition transition{ allowTransition( State::Type::Released ) };
+    if( !shouldExecute( transition ) ) return isSuccess( transition );
+    info( "Releasing" );
+    bool ret = on_release();
+    if( ret ) { updateState( State::Type::Released ); }
+    return ret;
   }
 
   YAODAQ_API bool relink()
@@ -425,12 +379,14 @@ protected:
 
   State      m_State{ State::Type::Empty };
   std::mutex m_mutex;
-  enum class Transition : std::uint8_t
+  enum class Transition : std::int8_t
   {
-    allowed     = true,
-    refused     = false,
-    alreadyDone = 2,
+    allowed     = 1,
+    refused     = 0,
+    alreadyDone = -1,
   };
+  constexpr bool                                                                       shouldExecute( const Transition t ) noexcept { return t == Transition::allowed; }
+  constexpr bool                                                                       isSuccess( const Transition t ) noexcept { return t != Transition::refused; }
   inline static const std::unordered_map<State::Type, std::unordered_set<State::Type>> allowed = { { State::Type::Empty, { State::Type::Linked } },
                                                                                                    { State::Type::Linked, { State::Type::Initialized } },
                                                                                                    { State::Type::Initialized, { State::Type::Connected, State::Type::Released } },
@@ -452,8 +408,12 @@ protected:
       return Transition::alreadyDone;
     }
     const auto it = allowed.find( current );
-    if( it == allowed.end() ) return Transition::refused;
-    return it->second.contains( to ) ? Transition::allowed : Transition::refused;
+    if( it == allowed.end() || !it->second.contains( to ) )
+    {
+      warn( "{} to {} unauthorised", getStateStr(), State( to ).str() );
+      return Transition::refused;
+    }
+    return Transition::allowed;
   }
 
   void          send_to_server( const std::string_view str ) { send( str ); }
