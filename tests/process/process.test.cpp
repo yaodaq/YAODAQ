@@ -51,7 +51,7 @@ public:
     return true;
   };
 
-  bool pre_connect() override
+  bool pre_connect( const bool alreadyDone ) override
   {
     info( "pre-connect" );
     Term::terminal.setOptions( Term::Option::Raw, Term::Option::Cursor );
@@ -74,7 +74,7 @@ public:
     return true;
   }
 
-  bool pre_disconnect() override
+  bool pre_disconnect( const bool alreadyDone ) override
   {
     info( "pre_disconnect()" );
     Term::terminal.setOptions( Term::Option::Raw, Term::Option::Cursor );

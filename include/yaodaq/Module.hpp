@@ -2,6 +2,7 @@
 #include "yaodaq/Client.hpp"
 #include "yaodaq/Component.hpp"
 #include "yaodaq/Export.hpp"
+#include "yaodaq/ReturnValue.hpp"
 #include "yaodaq/State.hpp"
 #include "yaodaq/Utilities.hpp"
 
@@ -46,72 +47,129 @@ public:
   Module( Module&& )                 = delete;
   Module& operator=( Module&& )      = delete;
 
-  YAODAQ_API virtual bool connect()
+  YAODAQ_API virtual ReturnValue connect() noexcept
   {
-    updateState( State::Type::Connected );
-    return true;
-  }
-  YAODAQ_API virtual bool disconnect()
-  {
-    updateState( State::Type::Disconnected );
-    return true;
+    try
+    {
+      updateState( State::Type::Connected );
+      return ReturnValue( true );
+    }
+    catch( const std::exception& ex )
+    {
+      error( "error while linking: {}", ex.what() );
+      return ReturnValue( ex );
+    }
+    catch( ... )
+    {
+      error( "error while linking" );
+      return ReturnValue::fromException();
+    }
   }
 
-  // Events
-  YAODAQ_API bool link() noexcept
+  YAODAQ_API virtual ReturnValue disconnect() noexcept
+  {
+    try
+    {
+      updateState( State::Type::Disconnected );
+      return ReturnValue( true );
+    }
+    catch( const std::exception& ex )
+    {
+      error( "error while linking: {}", ex.what() );
+      return ReturnValue( ex );
+    }
+    catch( ... )
+    {
+      error( "error while linking" );
+      return ReturnValue::fromException();
+    }
+  }
+
+  YAODAQ_API ReturnValue link() noexcept
   {
     try
     {
       const Transition transition = allowTransition( State::Type::Linked );
       if( !shouldExecute( transition ) ) return isSuccess( transition );
       info( "Linking" );
-      yaodaq::Client::start();
+      bool good{ true };
+      good = pre_link( transition == Transition::alreadyDone );
+      if( !good ) return ReturnValue( "pre_link() failed" );
+      good = on_link();
+      if( !good ) return ReturnValue( "on_link() failed" );
       updateState( State::Type::Linked );
-      return true;
+      good = post_link();
+      if( !good ) return ReturnValue( "post_link() failed" );
+      return ReturnValue( true );
     }
     catch( const std::exception& ex )
     {
       error( "error while linking: {}", ex.what() );
-      return false;
+      return ReturnValue( ex );
     }
     catch( ... )
     {
       error( "error while linking" );
-      return false;
+      return ReturnValue::fromException();
     }
   }
 
-  YAODAQ_API bool initialize() noexcept
+  YAODAQ_API ReturnValue initialize() noexcept
   {
     try
     {
       const Transition transition{ allowTransition( State::Type::Initialized ) };
       if( !shouldExecute( transition ) ) return isSuccess( transition );
       info( "Initializing" );
-      bool ret = on_initialize();
-      if( ret ) { updateState( State::Type::Initialized ); }
-      return ret;
+      bool good{ true };
+      good = pre_initialize( transition == Transition::alreadyDone );
+      if( !good ) return ReturnValue( "pre_initialize() failed" );
+      good = on_initialize();
+      if( !good ) return ReturnValue( "on_initialize() failed" );
+      updateState( State::Type::Initialized );
+      good = post_initialize();
+      if( !good ) return ReturnValue( "post_initialize() failed" );
+      return ReturnValue( true );
     }
     catch( const std::exception& ex )
     {
       error( "error while initializing: {}", ex.what() );
-      return false;
+      return ReturnValue( ex );
     }
     catch( ... )
     {
       error( "error while initializing" );
-      return false;
+      return ReturnValue::fromException();
     }
   }
 
-  YAODAQ_API bool configure()
+  YAODAQ_API ReturnValue configure()
   {
-    const Transition transition{ allowTransition( State::Type::Configured ) };
-    if( !shouldExecute( transition ) ) return isSuccess( transition );
-    info( "Configuring" );
-    bool ret = on_configure();
-    if( ret ) { updateState( State::Type::Configured ); }
-    return ret;
+    try
+    {
+      const Transition transition{ allowTransition( State::Type::Configured ) };
+      if( !shouldExecute( transition ) ) return isSuccess( transition );
+      info( "Configuring" );
+      bool good{ true };
+      good = pre_configure( transition == Transition::alreadyDone );
+      if( !good ) return ReturnValue( "pre_configure() failed" );
+      good = on_configure();
+      if( !good ) return ReturnValue( "on_configure() failed" );
+      updateState( State::Type::Configured );
+      good = post_configure();
+      if( !good ) return ReturnValue( "post_configure() failed" );
+      return ReturnValue( true );
+    }
+    catch( const std::exception& ex )
+    {
+      error( "error while configuring: {}", ex.what() );
+      return ReturnValue( ex );
+    }
+    catch( ... )
+    {
+      error( "error while configuring" );
+      return ReturnValue::fromException();
+    }
   }
 
   YAODAQ_API bool start()
@@ -340,40 +398,43 @@ protected:
     return true;
   }
   // link
-  virtual bool pre_link() { return true; }
-  virtual bool on_link() { return true; }
+  virtual bool pre_link( const bool alreadyDone ) { return true; }
+  virtual bool on_link()
+  {
+    yaodaq::Client::start();
+    return true;
+  }
   virtual bool post_link() { return true; }
   // initialize
-  virtual bool pre_initialize() { return true; }
+  virtual bool pre_initialize( const bool alreadyDone ) { return true; }
   virtual bool on_initialize() { return true; }
   virtual bool post_initialize() { return true; }
   // configure
-  virtual bool pre_configure() { return true; }
+  virtual bool pre_configure( const bool alreadyDone ) { return true; }
   virtual bool on_configure() { return true; }
   virtual bool post_configure() { return true; }
   // start
-  virtual bool pre_start() { return true; }
+  virtual bool pre_start( const bool alreadyDone ) { return true; }
   virtual bool on_start() { return true; }
   virtual bool post_start() { return true; }
-  virtual bool on_first_start() { return true; }  // TODO
   // pause
-  virtual bool pre_pause() { return true; }
+  virtual bool pre_pause( const bool alreadyDone ) { return true; }
   virtual bool on_pause() { return true; }
   virtual bool post_pause() { return true; }
   // resume
-  virtual bool pre_resume() { return true; }
+  virtual bool pre_resume( const bool alreadyDone ) { return true; }
   virtual bool on_resume() { return true; }
   virtual bool post_resume() { return true; }
   // stop
-  virtual bool pre_stop() { return true; }
+  virtual bool pre_stop( const bool alreadyDone ) { return true; }
   virtual bool on_stop() { return true; }
   virtual bool post_stop() { return true; }
   // clear
-  virtual bool pre_clear() { return true; }
+  virtual bool pre_clear( const bool alreadyDone ) { return true; }
   virtual bool on_clear() { return true; }
   virtual bool post_clear() { return true; }
   // release
-  virtual bool pre_release() { return true; }
+  virtual bool pre_release( const bool alreadyDone ) { return true; }
   virtual bool on_release() { return true; }
   virtual bool post_release() { return true; }
 
@@ -386,7 +447,8 @@ protected:
     alreadyDone = -1,
   };
   constexpr bool                                                                       shouldExecute( const Transition t ) noexcept { return t == Transition::allowed; }
-  constexpr bool                                                                       isSuccess( const Transition t ) noexcept { return t != Transition::refused; }
+  constexpr bool                                                                       alreadyDone( const Transition t ) noexcept { return t == Transition::alreadyDone; }
+  ReturnValue                                                                          isSuccess( const Transition t ) noexcept { return t != Transition::refused; }
   inline static const std::unordered_map<State::Type, std::unordered_set<State::Type>> allowed = { { State::Type::Empty, { State::Type::Linked } },
                                                                                                    { State::Type::Linked, { State::Type::Initialized } },
                                                                                                    { State::Type::Initialized, { State::Type::Connected, State::Type::Released } },

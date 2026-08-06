@@ -1,13 +1,13 @@
 #pragma once
+#include "yaodaq/Connector.hpp"
+#include "yaodaq/Defaults.hpp"
 #include "yaodaq/Export.hpp"
+#include "yaodaq/Identifier.hpp"
 #include "yaodaq/Module.hpp"
 
-#include <cstdint>
-#include <mutex>
+#include <future>
+#include <memory>
 #include <string_view>
-#include <yaodaq/Connector.hpp>
-#include <yaodaq/Defaults.hpp>
-#include <yaodaq/Identifier.hpp>
 
 namespace yaodaq
 {
@@ -28,57 +28,68 @@ public:
   YAODAQ_API Board& operator=( const Board& ) noexcept = delete;
   YAODAQ_API        Board( Board&& ) noexcept          = delete;
   YAODAQ_API Board& operator=( Board&& ) noexcept      = delete;
-  YAODAQ_API bool   connect() final
+
+  YAODAQ_API ReturnValue connect() noexcept final
   {
-    m_connector->setCodecParameters( m_config.codecParameters() );
-    m_connector->setTransportParameters( m_config.transportParameters() );
-    m_connector->setLogger( this->get_logger() );
-    Transition transition{ allowTransition( State::Type::Connected ) };
-    if( transition == Transition::alreadyDone ) return true;
-    else if( transition == Transition::allowed )
+    try
     {
-      bool good = true;
+      m_connector->setCodecParameters( m_config.codecParameters() );
+      m_connector->setTransportParameters( m_config.transportParameters() );
+      m_connector->setLogger( this->get_logger() );
+      const Transition transition{ allowTransition( State::Type::Connected ) };
+      if( !shouldExecute( transition ) ) return isSuccess( transition );
       info( "Connecting" );
-      good = pre_connect();
-      if( !good ) return false;
-      good = m_connector->connect();
-      if( !good ) return false;
+      bool good{ true };
+      good = pre_connect( transition == Transition::alreadyDone );
+      if( !good ) return ReturnValue( "pre_connect() failed" );
+      good = on_connect();
+      if( !good ) return ReturnValue( "on_connect() failed" );
       updateState( State::Type::Connected );
       good = post_connect();
-      if( !good ) return false;
-      else
-        return true;
+      if( !good ) return ReturnValue( "post_connect() failed" );
+      return ReturnValue( true );
     }
-    else
+    catch( const std::exception& ex )
     {
-      warn( "{} to {} unauthorised", getStateStr(), "Connected" );
-      return false;
+      error( "error while configuring: {}", ex.what() );
+      return ReturnValue( ex );
+    }
+    catch( ... )
+    {
+      error( "error while configuring" );
+      return ReturnValue::fromException();
     }
   };
-  YAODAQ_API bool disconnect() final
+
+  YAODAQ_API ReturnValue disconnect() noexcept final
   {
-    Transition transition{ allowTransition( State::Type::Disconnected ) };
-    if( transition == Transition::alreadyDone ) return true;
-    else if( transition == Transition::allowed )
+    try
     {
-      bool good = true;
+      const Transition transition{ allowTransition( State::Type::Disconnected ) };
+      if( !shouldExecute( transition ) ) return isSuccess( transition );
       info( "Disconnecting" );
-      good = pre_disconnect();
-      if( !good ) return false;
-      good = m_connector->disconnect();
-      if( !good ) return false;
+      bool good{ true };
+      good = pre_disconnect( transition == Transition::alreadyDone );
+      if( !good ) return ReturnValue( "pre_disconnect() failed" );
+      good = on_disconnect();
+      if( !good ) return ReturnValue( "on_disconnect() failed" );
       updateState( State::Type::Disconnected );
       good = post_disconnect();
-      if( !good ) return false;
-      else
-        return true;
+      if( !good ) return ReturnValue( "post_disconnect() failed" );
+      return ReturnValue( true );
     }
-    else
+    catch( const std::exception& ex )
     {
-      warn( "{} to {} unauthorised", getStateStr(), "Disconnected" );
-      return false;
+      error( "error while configuring: {}", ex.what() );
+      return ReturnValue( ex );
+    }
+    catch( ... )
+    {
+      error( "error while configuring" );
+      return ReturnValue::fromException();
     }
   };
+
   YAODAQ_API explicit Board() noexcept = delete;
   YAODAQ_API virtual ~Board() noexcept
   {
@@ -92,9 +103,9 @@ public:
   YAODAQ_API Dispatcher& dispatcher() { return m_connector->dispatcher(); }
 
 protected:
-  virtual bool            pre_connect() { return true; };
+  virtual bool            pre_connect( const bool alreadyDone ) { return true; };
   virtual bool            post_connect() { return true; };
-  virtual bool            pre_disconnect() { return true; };
+  virtual bool            pre_disconnect( const bool alreadyDone ) { return true; };
   virtual bool            post_disconnect() { return true; };
   YAODAQ_API virtual bool cleanup() final
   {
@@ -105,6 +116,8 @@ protected:
   }
 
 private:
+  bool                       on_connect() { return m_connector->connect(); };
+  bool                       on_disconnect() { return m_connector->disconnect(); };
   std::unique_ptr<Connector> m_connector{ nullptr };
   BoardConfig                m_config;
 };

@@ -296,7 +296,7 @@ public:
     return true;
   }
 
-  bool pre_connect() override
+  bool pre_connect( const bool alreadyDone ) override
   {
     std::function<bool( std::stop_token )> fun = [this]( std::stop_token stop ) -> bool
     {
@@ -319,7 +319,7 @@ public:
     return true;
   }
 
-  bool pre_disconnect() override
+  bool pre_disconnect( const bool alreadyDone ) override
   {
     info( "I'm calling on_disconnect" );
     return true;
