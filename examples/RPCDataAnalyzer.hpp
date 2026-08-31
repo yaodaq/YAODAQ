@@ -462,9 +462,7 @@ public:
     {
       // Group rising edges by (layer, channel) for both sides
       struct SideTimes
-      {
-        float t0 = -99999.0f, t1 = -99999.0f;
-      };
+      { float t0 = -99999.0f, t1 = -99999.0f; };
       std::map<std::pair<int, int>, SideTimes> timeMap;  // key = (layer, channel)
 
       for( const auto& hit: ev.hits )
