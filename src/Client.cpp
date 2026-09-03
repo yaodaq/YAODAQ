@@ -193,9 +193,9 @@ void yaodaq::Client::onRawData( const std::unique_ptr<RawData> raw )
 void yaodaq::Client::onClose( const Close& close )
 {
   send( close );
-  if( close.remote() ) warn( "closing by remote: {} ({})", close.reason(), close.code() );
+  if( close.remote() ) warn( "Closed by remote: {} ({})", close.reason(), close.code() );
   else
-    info( "closing: {} ({})", close.reason(), close.code() );
+    info( "Closed: {} ({})", close.reason(), close.code() );
 }
 
 void yaodaq::Client::onReject( const Reject& reject )

@@ -35,7 +35,6 @@ public:
     Add( "resume", jsonrpc::GetHandle( &yaodaq::Module::resume, *this ) );
     Add( "clear", jsonrpc::GetHandle( &yaodaq::Module::clear, *this ) );
     Add( "release", jsonrpc::GetHandle( &yaodaq::Module::release, *this ) );
-    Add( "relink", jsonrpc::GetHandle( &yaodaq::Module::relink, *this ) );
     Add( "getState", jsonrpc::GetHandle( &yaodaq::Module::getStateStr, *this ) );
     Add( "connect", jsonrpc::GetHandle( &yaodaq::Module::connect, *this ) );
     Add( "disconnect", jsonrpc::GetHandle( &yaodaq::Module::disconnect, *this ) );
@@ -329,15 +328,6 @@ public:
     return ret;
   }
 
-  YAODAQ_API bool relink()
-  {
-    info( "Relinking" );
-    stop();
-    bool ret = link();
-    if( ret ) { updateState( State::Type::Linked ); }
-    return ret;
-  }
-
   YAODAQ_API State getState() noexcept
   {
     std::scoped_lock lock( m_mutex );
@@ -382,24 +372,50 @@ protected:
 
     send( StateUpdate( state ) );
   }
-  bool cleanup() override
+  bool cleanup() noexcept final
   {
-    info( "Module cleanup" );
-    if( m_worker.joinable() )
+    try
     {
+      // clang-format off
+      switch( getState().type() )
       {
-        m_worker_state.store( WorkerState::Stopped );
+        case State::Type::Started:
+        case State::Type::Paused:
+          stop();
+          [[fallthrough]];
+        case State::Type::Stopped:
+        case State::Type::Configured:
+          clear();
+          [[fallthrough]];
+        case State::Type::Cleared:
+        case State::Type::Connected:
+          disconnect();
+          [[fallthrough]];
+        case State::Type::Disconnected:
+        case State::Type::Initialized:
+          release();
+          [[fallthrough]];
+        default:
+          yaodaq::Client::cleanup();
+          break;
       }
-      cv.notify_all();
-      on_stop();  // call hook for proper cleanup
-      m_worker.join();
+      // clang-format on
+      return true;
     }
-    Client::cleanup();
-    return true;
+    catch( const std::exception& ex )
+    {
+      error( "error while cleaning up: {}", ex.what() );
+      return false;
+    }
+    catch( ... )
+    {
+      error( "unknown error while cleaning up" );
+      return false;
+    }
   }
   // link
   virtual bool pre_link( const bool alreadyDone ) { return true; }
-  virtual bool on_link()
+  bool         on_link()
   {
     yaodaq::Client::start();
     return true;
@@ -440,6 +456,7 @@ protected:
 
   State      m_State{ State::Type::Empty };
   std::mutex m_mutex;
+
   enum class Transition : std::int8_t
   {
     allowed     = 1,

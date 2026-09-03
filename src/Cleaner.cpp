@@ -39,23 +39,6 @@ bool yaodaq::Cleaner::add( Server* s )
   }
 }
 
-/*bool yaodaq::Cleaner::add( ProcessTransport* s )
-{
-  std::lock_guard lock( m_mutex );
-
-  auto it = std::find( m_process.begin(), m_process.end(), s );
-  if( it != m_process.end() )
-  {
-    *it = s;  // replace existing pointer
-    return true;
-  }
-  else
-  {
-    m_process.push_back( s );
-    return true;
-  }
-}*/
-
 void yaodaq::Cleaner::remove( Client* c )
 {
   std::lock_guard lock( m_mutex );
@@ -79,25 +62,12 @@ void yaodaq::Cleaner::remove( Server* s )
   }
 }
 
-/*void yaodaq::Cleaner::remove( ProcessTransport* s )
-{
-  std::lock_guard lock( m_mutex );
-  auto it = std::find( m_process.begin(), m_process.end(), s );
-  if( it != m_process.end() )
-  {
-    s->cleanup();          // cleanup first
-    m_process.erase( it );  // then remove from vector
-  }
-}*/
-
 void yaodaq::Cleaner::clean()
 {
-  std::cout << "cleaning" << std::endl;
   std::lock_guard lock( m_mutex );
   for( auto* c: m_clients )
   {
-    std::cout << "cleaning" << std::endl;
+    std::cout << "cleaning" << c->identifier().name() << std::endl;
     if( c ) c->cleanup();
   }
-  //m_clients.clear();
 }

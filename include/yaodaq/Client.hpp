@@ -30,11 +30,24 @@ public:
   YAODAQ_API explicit Client( const Identifier& id, const Config& client_config );
 
   YAODAQ_API const Identifier& identifier() const noexcept { return m_identifier; }
-  YAODAQ_API virtual bool      cleanup()
+  YAODAQ_API virtual bool      cleanup() noexcept
   {
-    debug( "Client cleanup" );
-    close();
-    return true;
+    try
+    {
+      debug( "Client cleanup" );
+      close();
+      return true;
+    }
+    catch( const std::exception& ex )
+    {
+      error( "error while cleaning up: {}", ex.what() );
+      return false;
+    }
+    catch( ... )
+    {
+      error( "unknown error while cleaning up" );
+      return false;
+    }
   }
   enum class send_as : std::uint8_t
   {

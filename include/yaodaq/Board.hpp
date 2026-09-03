@@ -103,17 +103,10 @@ public:
   YAODAQ_API Dispatcher& dispatcher() { return m_connector->dispatcher(); }
 
 protected:
-  virtual bool            pre_connect( const bool alreadyDone ) { return true; };
-  virtual bool            post_connect() { return true; };
-  virtual bool            pre_disconnect( const bool alreadyDone ) { return true; };
-  virtual bool            post_disconnect() { return true; };
-  YAODAQ_API virtual bool cleanup() final
-  {
-    debug( "Board cleanup" );
-    disconnect();
-    Module::cleanup();
-    return true;
-  }
+  virtual bool pre_connect( const bool alreadyDone ) { return true; };
+  virtual bool post_connect() { return true; };
+  virtual bool pre_disconnect( const bool alreadyDone ) { return true; };
+  virtual bool post_disconnect() { return true; };
 
 private:
   bool                       on_connect() { return m_connector->connect(); };
