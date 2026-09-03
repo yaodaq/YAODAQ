@@ -6,7 +6,7 @@ fail_fast: false
 
 repos:
   - repo: https://github.com/editorconfig-checker/editorconfig-checker.python
-    rev: '3.8.0'
+    rev: '3.11.1'
     hooks:
       - id: editorconfig-checker
   - repo: https://github.com/Kr4is/cmake-format-precommit
@@ -21,11 +21,11 @@ repos:
     hooks:
       - id: codespell
   - repo: https://github.com/sirosen/check-jsonschema
-    rev: '0.37.4'
+    rev: '0.38.0'
     hooks:
       - id: check-github-workflows
   -   repo: https://github.com/pre-commit/mirrors-clang-format
-      rev: 'v22.1.8'
+      rev: 'v23.1.0'
       hooks:
         - id: clang-format
 ...
