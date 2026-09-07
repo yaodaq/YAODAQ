@@ -20,3 +20,7 @@ install(TARGETS YAODAQServer RUNTIME DESTINATION bin)
 add_executable(YAODAQBoard YAODAQBoard.cpp)
 target_link_libraries(YAODAQBoard PRIVATE SOCI::SOCI yaodaq::yaodaq CLI11::CLI11 cpp-terminal::cpp-terminal spdlog::spdlog yaodaq::transport::websocket)
 install(TARGETS YAODAQBoard RUNTIME DESTINATION bin)
+
+add_executable(YAODAQSerialBoard YAODAQSerialBoard.cpp)
+target_link_libraries(YAODAQSerialBoard PRIVATE yaodaq::yaodaq CLI11::CLI11 cpp-terminal::cpp-terminal spdlog::spdlog yaodaq::transport::serial)
+install(TARGETS YAODAQSerialBoard RUNTIME DESTINATION bin)
