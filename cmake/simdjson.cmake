@@ -8,7 +8,7 @@ if(NOT DEFINED SIMDJSON_REPOSITORY)
 endif()
 
 if(NOT DEFINED SIMDJSON_TAG)
-  set(SIMDJSON_TAG "v4.6.4")
+  set(SIMDJSON_TAG "v4.6.11")
 endif()
 
 CPMAddPackage(NAME simdjson
