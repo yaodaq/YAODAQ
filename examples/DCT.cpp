@@ -1,9 +1,8 @@
-#include "yaodaq/transport/Process.hpp"
-
 #include "csv.hpp"
 #include "yaodaq/Board.hpp"
 #include "yaodaq/Connector.hpp"
 #include "yaodaq/codec/ProcessIOCodec.hpp"
+#include "yaodaq/transport/Process.hpp"
 
 #include <CLI/CLI.hpp>
 #include <atomic>
@@ -190,6 +189,11 @@ private:
     const int bcid_col{ 4 };
     try
     {
+      //std::ifstream file_(file.c_str());
+      //std::string content(std::istreambuf_iterator<char>(file_),std::istreambuf_iterator<char>());
+      //file_.close();
+      //send( yaodaq::RawDataBuilder::from_text( json, "MPI::DCT::Singlets::File" ) );
+
       csv::CSVReader reader( file.c_str() );
 
       json.clear();

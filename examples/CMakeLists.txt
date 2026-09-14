@@ -28,3 +28,6 @@ target_link_libraries(Analysor PRIVATE yaodaq::yaodaq Data CLI11::CLI11 fmt::fmt
 add_executable(RPCAnalyzer RPCAnalyzer.cpp)
 target_link_libraries(RPCAnalyzer PRIVATE yaodaq::yaodaq  Data CLI11::CLI11 fmt::fmt cpp-terminal::cpp-terminal spdlog::spdlog ROOT::Core ROOT::RIO ROOT::Tree ROOT::ROOTNTuple ROOT::Gpad ROOT::Hist)
 
+add_executable(DCT DCT.cpp)
+target_link_libraries(DCT PRIVATE csv yaodaq::yaodaq yaodaq::transport::process doctest::doctest_with_main CLI11::CLI11 cpp-terminal::cpp-terminal)
+install(TARGETS DCT RUNTIME DESTINATION bin)
