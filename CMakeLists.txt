@@ -39,6 +39,7 @@ endif()
 
 option(YAODAQ_TESTS "Compile the tests" ON)
 option(YAODAQ_EXAMPLES "Compile the examples" ON)
+option(YAODAQ_INSTALL "Install" ON)
 
 # File with all dependencies
 include("${CMAKE_CURRENT_SOURCE_DIR}/dependencies.cmake")
