@@ -38,6 +38,7 @@ else()
 endif()
 
 option(YAODAQ_TESTS "Compile the tests" ON)
+option(YAODAQ_EXAMPLES "Compile the examples" ON)
 
 # File with all dependencies
 include("${CMAKE_CURRENT_SOURCE_DIR}/dependencies.cmake")
@@ -49,10 +50,12 @@ add_subdirectory(src)
 add_subdirectory(extra)
 add_subdirectory(web)
 add_subdirectory(apps)
-add_subdirectory(examples)
+
+if(YAODAQ_EXAMPLES)
+  add_subdirectory(examples)
+endif()
 
 if(YAODAQ_TESTS)
   include(CTest)
   add_subdirectory(tests)
 endif()
-
