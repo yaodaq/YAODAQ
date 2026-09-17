@@ -19,7 +19,7 @@ CPMAddPackage(NAME fmt
               OPTIONS "FMT_PEDANTIC OFF"
                       "FMT_WERROR OFF"
                       "FMT_DOC OFF"
-                      "FMT_INSTALL OFF"
+                      "FMT_INSTALL ON"
                       "FMT_FUZZ OFF"
                       "FMT_CUDA_TEST OFF"
                       "FMT_OS ON"

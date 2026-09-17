@@ -54,7 +54,7 @@ target_compile_features(yaodaq PUBLIC cxx_std_20)
 add_library(yaodaq::yaodaq ALIAS yaodaq)
 
 if(YAODAQ_INSTALL)
-install(TARGETS yaodaq simdjson fmt spdlog nlohmann_json
+install(TARGETS yaodaq simdjson spdlog nlohmann_json
         EXPORT YAODAQTargets
         LIBRARY DESTINATION "${CMAKE_INSTALL_LIBDIR}"
         ARCHIVE DESTINATION "${CMAKE_INSTALL_LIBDIR}"
