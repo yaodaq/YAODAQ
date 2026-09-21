@@ -5,7 +5,7 @@ include(cxx-jsonrpc)
 include(cpp-terminal)
 include(simdjson)
 include(soci)
-include(Pcap++)
+#include(Pcap++)
 
 configure_file("${PROJECT_SOURCE_DIR}/include/yaodaq/Version.hpp.in" "${PROJECT_BINARY_DIR}/include/yaodaq/Version.hpp" @ONLY)
 
