@@ -2,14 +2,32 @@ add_library(yaodaq_websocket_transport SHARED WebSocket.cpp)
 target_link_libraries(yaodaq_websocket_transport PUBLIC yaodaq::yaodaq)
 target_include_directories(yaodaq_websocket_transport PUBLIC $<BUILD_INTERFACE:${PROJECT_SOURCE_DIR}/extra> $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>)
 add_library(yaodaq::transport::websocket ALIAS yaodaq_websocket_transport)
+install(TARGETS yaodaq_websocket_transport
+        EXPORT YAODAQTargets
+        LIBRARY DESTINATION "${CMAKE_INSTALL_LIBDIR}"
+        ARCHIVE DESTINATION "${CMAKE_INSTALL_LIBDIR}"
+        RUNTIME DESTINATION "${CMAKE_INSTALL_BINDIR}"
+        PUBLIC_HEADER DESTINATION "${CMAKE_INSTALL_INCLUDEDIR}/yaodaq")
 
 add_library(yaodaq_process_transport SHARED Process.cpp)
 target_link_libraries(yaodaq_process_transport PUBLIC yaodaq::yaodaq)
 target_include_directories(yaodaq_process_transport PUBLIC $<BUILD_INTERFACE:${PROJECT_SOURCE_DIR}/extra> $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>)
 add_library(yaodaq::transport::process ALIAS yaodaq_process_transport)
+install(TARGETS yaodaq_process_transport
+        EXPORT YAODAQTargets
+        LIBRARY DESTINATION "${CMAKE_INSTALL_LIBDIR}"
+        ARCHIVE DESTINATION "${CMAKE_INSTALL_LIBDIR}"
+        RUNTIME DESTINATION "${CMAKE_INSTALL_BINDIR}"
+        PUBLIC_HEADER DESTINATION "${CMAKE_INSTALL_INCLUDEDIR}/yaodaq")
 
 include(cxx-serial)
 add_library(yaodaq_serial_transport SHARED Process.cpp)
 target_link_libraries(yaodaq_serial_transport PUBLIC yaodaq::yaodaq serial_cpp::serial_cpp)
 target_include_directories(yaodaq_serial_transport PUBLIC $<BUILD_INTERFACE:${PROJECT_SOURCE_DIR}/extra> $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>)
 add_library(yaodaq::transport::serial ALIAS yaodaq_serial_transport)
+install(TARGETS yaodaq_serial_transport
+        EXPORT YAODAQTargets
+        LIBRARY DESTINATION "${CMAKE_INSTALL_LIBDIR}"
+        ARCHIVE DESTINATION "${CMAKE_INSTALL_LIBDIR}"
+        RUNTIME DESTINATION "${CMAKE_INSTALL_BINDIR}"
+        PUBLIC_HEADER DESTINATION "${CMAKE_INSTALL_INCLUDEDIR}/yaodaq")

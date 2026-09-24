@@ -142,7 +142,7 @@ public:
     }
   }
 
-  YAODAQ_API ReturnValue configure()
+  YAODAQ_API ReturnValue configure() noexcept
   {
     try
     {
@@ -258,74 +258,160 @@ public:
     return true;
   }
 
-  YAODAQ_API bool pause()
+  YAODAQ_API ReturnValue pause() noexcept
   {
-    const Transition transition{ allowTransition( State::Type::Paused ) };
-    if( !shouldExecute( transition ) ) return isSuccess( transition );
-    info( "Pausing" );
+    try
     {
-      updateState( State::Type::Paused );
-      // Only pause worker thread if it exists
+      const Transition transition{ allowTransition( State::Type::Paused ) };
+      if( !shouldExecute( transition ) ) return isSuccess( transition );
+      info( "Pausing" );
+      bool good{ true };
+      good = pre_pause( transition == Transition::alreadyDone );
+      if( !good ) return ReturnValue( "pre_pause() failed" );
       if( m_worker.joinable() ) { m_worker_state.store( WorkerState::Paused ); }
+      updateState( State::Type::Paused );
+      cv.notify_all();  // Notify worker if it exists
+      good = on_pause();
+      if( !good ) return ReturnValue( "on_pausing() failed" );
+      good = post_pause();
+      if( !good ) return ReturnValue( "post_pausing() failed" );
+      return ReturnValue( true );
     }
-    cv.notify_all();  // Notify worker if it exists
-    return true;
+    catch( const std::exception& ex )
+    {
+      error( "error while pausing: {}", ex.what() );
+      return ReturnValue( ex );
+    }
+    catch( ... )
+    {
+      error( "error while pausing" );
+      return ReturnValue::fromException();
+    }
   }
 
-  YAODAQ_API bool resume()
+  YAODAQ_API ReturnValue resume() noexcept
   {
-    const Transition transition{ allowTransition( State::Type::Started ) };
-    if( !shouldExecute( transition ) ) return isSuccess( transition );
-    info( "Resuming " );
+    try
     {
-      updateState( State::Type::Started );
-      // Only resume worker thread if it exists
+      const Transition transition{ allowTransition( State::Type::Started ) };
+      if( !shouldExecute( transition ) ) return isSuccess( transition );
+      info( "Resuming" );
+      bool good{ true };
+      good = pre_resume( transition == Transition::alreadyDone );
+      if( !good ) return ReturnValue( "pre_resume() failed" );
       if( m_worker.joinable() ) { m_worker_state.store( WorkerState::Running ); }
+      updateState( State::Type::Started );
+      cv.notify_all();  // Notify worker if it exists
+      good = on_resume();
+      if( !good ) return ReturnValue( "on_resume() failed" );
+      good = post_resume();
+      if( !good ) return ReturnValue( "post_resume() failed" );
+      return ReturnValue( true );
     }
-    cv.notify_all();  // Notify worker if it exists
-    return true;
-  }
-
-  YAODAQ_API bool stop()
-  {
-    const Transition transition{ allowTransition( State::Type::Stopped ) };
-    if( !shouldExecute( transition ) ) return isSuccess( transition );
-    info( "Stopping" );
-    bool ret = on_stop();  // call the hook
-    if( !ret )
+    catch( const std::exception& ex )
     {
-      error( "on_stop() hook failed." );
-      return false;
+      error( "error while pausing: {}", ex.what() );
+      return ReturnValue( ex );
     }
-    m_event.store( 0, std::memory_order_relaxed );
-    m_worker.request_stop();
-    cv.notify_all();
-    if( m_worker.joinable() ) m_worker.join();
+    catch( ... )
     {
-      m_worker_state.store( WorkerState::Stopped );
-      updateState( State::Type::Stopped );
+      error( "error while pausing" );
+      return ReturnValue::fromException();
     }
-    return true;
   }
 
-  YAODAQ_API bool clear()
+  YAODAQ_API ReturnValue stop() noexcept
   {
-    const Transition transition{ allowTransition( State::Type::Cleared ) };
-    if( !shouldExecute( transition ) ) return isSuccess( transition );
-    info( "Clearing" );
-    bool ret = on_clear();
-    if( ret ) { updateState( State::Type::Cleared ); }
-    return ret;
+    try
+    {
+      const Transition transition{ allowTransition( State::Type::Stopped ) };
+      if( !shouldExecute( transition ) ) return isSuccess( transition );
+      info( "Stopping" );
+      bool good{ true };
+      good = pre_stop( transition == Transition::alreadyDone );
+      if( !good ) return ReturnValue( "pre_stop() failed" );
+      m_worker.request_stop();
+      if( m_worker.joinable() ) m_worker.join();
+      cv.notify_all();
+      {
+        m_worker_state.store( WorkerState::Stopped );
+        updateState( State::Type::Stopped );
+      }
+      good = on_stop();
+      if( !good ) return ReturnValue( "on_stop() failed" );
+      good = post_stop();
+      if( !good ) return ReturnValue( "post_stop() failed" );
+      m_event.store( 0, std::memory_order_relaxed );  // Here so all pre on post can have the event number;
+      return ReturnValue( true );
+    }
+    catch( const std::exception& ex )
+    {
+      error( "error while pausing: {}", ex.what() );
+      return ReturnValue( ex );
+    }
+    catch( ... )
+    {
+      error( "error while pausing" );
+      return ReturnValue::fromException();
+    }
   }
 
-  YAODAQ_API bool release()
+  YAODAQ_API ReturnValue clear() noexcept
   {
-    const Transition transition{ allowTransition( State::Type::Released ) };
-    if( !shouldExecute( transition ) ) return isSuccess( transition );
-    info( "Releasing" );
-    bool ret = on_release();
-    if( ret ) { updateState( State::Type::Released ); }
-    return ret;
+    try
+    {
+      const Transition transition{ allowTransition( State::Type::Cleared ) };
+      if( !shouldExecute( transition ) ) return isSuccess( transition );
+      info( "Clearing" );
+      bool good{ true };
+      good = pre_clear( transition == Transition::alreadyDone );
+      if( !good ) return ReturnValue( "pre_clear() failed" );
+      good = on_clear();
+      if( !good ) return ReturnValue( "on_clear() failed" );
+      updateState( State::Type::Cleared );
+      good = post_clear();
+      if( !good ) return ReturnValue( "post_clear() failed" );
+      return ReturnValue( true );
+    }
+    catch( const std::exception& ex )
+    {
+      error( "error while configuring: {}", ex.what() );
+      return ReturnValue( ex );
+    }
+    catch( ... )
+    {
+      error( "error while configuring" );
+      return ReturnValue::fromException();
+    }
+  }
+
+  YAODAQ_API ReturnValue release() noexcept
+  {
+    try
+    {
+      const Transition transition{ allowTransition( State::Type::Released ) };
+      if( !shouldExecute( transition ) ) return isSuccess( transition );
+      info( "Releasing" );
+      bool good{ true };
+      good = pre_release( transition == Transition::alreadyDone );
+      if( !good ) return ReturnValue( "pre_clear() failed" );
+      good = on_release();
+      if( !good ) return ReturnValue( "on_release() failed" );
+      updateState( State::Type::Released );
+      good = post_release();
+      if( !good ) return ReturnValue( "post_released() failed" );
+      return ReturnValue( true );
+    }
+    catch( const std::exception& ex )
+    {
+      error( "error while configuring: {}", ex.what() );
+      return ReturnValue( ex );
+    }
+    catch( ... )
+    {
+      error( "error while configuring" );
+      return ReturnValue::fromException();
+    }
   }
 
   YAODAQ_API State getState() noexcept
