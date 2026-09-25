@@ -560,7 +560,7 @@ protected:
                                                                                                    { State::Type::Started, { State::Type::Paused, State::Type::Stopped } },
                                                                                                    { State::Type::Paused, { State::Type::Stopped, State::Type::Started } },
                                                                                                    { State::Type::Stopped, { State::Type::Started, State::Type::Cleared } },
-                                                                                                   { State::Type::Finished, { State::Type::Started, State::Type::Cleared } },
+                                                                                                   { State::Type::Finished, { State::Type::Stopped } },
                                                                                                    { State::Type::Cleared, { State::Type::Disconnected, State::Type::Configured } },
                                                                                                    { State::Type::Disconnected, { State::Type::Connected, State::Type::Released } },
                                                                                                    { State::Type::Released, { State::Type::Initialized } } };
