@@ -91,14 +91,14 @@ private:
   // Messages
   YAODAQ_INTERNAL void onMessage( const std::string& str, const std::size_t size, const bool binary );
   // Others
-  YAODAQ_INTERNAL void onOpen( const Open& open );
-  YAODAQ_INTERNAL void onClose( const Close& close );
-  YAODAQ_INTERNAL void onReject( const Reject& reject );  // Has been closed by server because of some criteria
-  YAODAQ_INTERNAL void onError( const Error& error );
+  YAODAQ_INTERNAL void onOpen( const _Open& open );
+  YAODAQ_INTERNAL void onClose( const _Close& close );
+  YAODAQ_INTERNAL void onReject( const _Reject& reject );  // Has been closed by server because of some criteria
+  YAODAQ_INTERNAL void onError( const _Error& error );
   /*YAODAQ_API void onFragment( const std::string& str, const std::size_t size, const bool binary );*/
 
-  YAODAQ_INTERNAL void onPing( const Ping& ping );
-  YAODAQ_INTERNAL void onPong( const Pong& pong );
+  YAODAQ_INTERNAL void onPing( const _Ping& ping );
+  YAODAQ_INTERNAL void onPong( const _Pong& pong );
   YAODAQ_INTERNAL void onLog( const std::unique_ptr<Log> log );
 };
 

@@ -19,25 +19,25 @@ std::vector<std::byte> yaodaq::JSONCodec::encode( const yaodaq::Message& msg ) c
   json["payload"]                            = nlohmann::json::object();
   switch( msg.type() )
   {
-    case Message::Type::Close:
+    case Message::Type::_Close:
     {
-      const auto& close         = static_cast<const Close&>( msg );
+      const auto& close         = static_cast<const _Close&>( msg );
       json["payload"]["code"]   = close.code();
       json["payload"]["reason"] = close.reason();
       json["payload"]["remote"] = close.remote();
       break;
     }
-    case Message::Type::Reject:
+    case Message::Type::_Reject:
     {
-      const auto& reject        = static_cast<const Reject&>( msg );
+      const auto& reject        = static_cast<const _Reject&>( msg );
       json["payload"]["code"]   = reject.code();
       json["payload"]["reason"] = reject.reason();
       json["payload"]["remote"] = reject.remote();
       break;
     }
-    case Message::Type::Error:
+    case Message::Type::_Error:
     {
-      const auto& error                      = static_cast<const Error&>( msg );
+      const auto& error                      = static_cast<const _Error&>( msg );
       json["payload"]["retries"]             = error.retries();
       json["payload"]["wait_time"]           = error.wait_time();
       json["payload"]["http_status"]         = error.http_status();
@@ -64,25 +64,25 @@ std::vector<std::byte> yaodaq::JSONCodec::encode( const yaodaq::Message& msg ) c
       json["payload"]["source_loc"]["line"]     = log.line();
       break;
     }
-    case Message::Type::Open:
+    case Message::Type::_Open:
     {
-      const auto& open            = static_cast<const Open&>( msg );
+      const auto& open            = static_cast<const _Open&>( msg );
       json["payload"]["uri"]      = open.uri();
       json["payload"]["headers"]  = open.headers();
       json["payload"]["protocol"] = open.protocol();
       break;
     }
-    case Message::Type::Ping:
+    case Message::Type::_Ping:
     {
-      const auto& ping           = static_cast<const Ping&>( msg );
+      const auto& ping           = static_cast<const _Ping&>( msg );
       json["payload"]["message"] = ping.message();
       json["payload"]["binary"]  = ping.binary();
       json["payload"]["size"]    = ping.size();
       break;
     }
-    case Message::Type::Pong:
+    case Message::Type::_Pong:
     {
-      const auto& pong           = static_cast<const Pong&>( msg );
+      const auto& pong           = static_cast<const _Pong&>( msg );
       json["payload"]["message"] = pong.message();
       json["payload"]["binary"]  = pong.binary();
       json["payload"]["size"]    = pong.size();
@@ -182,7 +182,7 @@ std::unique_ptr<yaodaq::Message> yaodaq::JSONCodec::decode( const TransportPacke
 
   switch( type )
   {
-    case Message::Type::Close:
+    case Message::Type::_Close:
     {
       std::uint64_t    code{};
       bool             remote{};
@@ -192,10 +192,10 @@ std::unique_ptr<yaodaq::Message> yaodaq::JSONCodec::decode( const TransportPacke
       payload["reason"].get( reason );
       payload["remote"].get( remote );
 
-      msg = std::make_unique<Close>( static_cast<std::uint16_t>( code ), reason, remote );
+      msg = std::make_unique<_Close>( static_cast<std::uint16_t>( code ), reason, remote );
       break;
     }
-    case Message::Type::Reject:
+    case Message::Type::_Reject:
     {
       std::uint64_t    code{};
       bool             remote{};
@@ -205,10 +205,10 @@ std::unique_ptr<yaodaq::Message> yaodaq::JSONCodec::decode( const TransportPacke
       payload["reason"].get( reason );
       payload["remote"].get( remote );
 
-      msg = std::make_unique<Reject>( static_cast<std::uint16_t>( code ), reason, remote );
+      msg = std::make_unique<_Reject>( static_cast<std::uint16_t>( code ), reason, remote );
       break;
     }
-    case Message::Type::Error:
+    case Message::Type::_Error:
     {
       std::string_view reason;
       std::uint64_t    retries{};
@@ -222,7 +222,7 @@ std::unique_ptr<yaodaq::Message> yaodaq::JSONCodec::decode( const TransportPacke
       payload["http_status"].get( http_status );
       payload["decompression_error"].get( decompression );
 
-      msg = std::make_unique<Error>( reason, static_cast<std::uint32_t>( retries ), wait_time, static_cast<int>( http_status ), decompression );
+      msg = std::make_unique<_Error>( reason, static_cast<std::uint32_t>( retries ), wait_time, static_cast<int>( http_status ), decompression );
       break;
     }
     case Message::Type::Exception:
@@ -235,7 +235,7 @@ std::unique_ptr<yaodaq::Message> yaodaq::JSONCodec::decode( const TransportPacke
       msg = std::make_unique<Except>( what, exception_type );
       break;
     }
-    case Message::Type::Ping:
+    case Message::Type::_Ping:
     {
       std::string_view message;
       std::uint64_t    size{};
@@ -245,10 +245,10 @@ std::unique_ptr<yaodaq::Message> yaodaq::JSONCodec::decode( const TransportPacke
       payload["size"].get( size );
       payload["binary"].get( binary );
 
-      msg = std::make_unique<Ping>( message, static_cast<std::size_t>( size ), binary );
+      msg = std::make_unique<_Ping>( message, static_cast<std::size_t>( size ), binary );
       break;
     }
-    case Message::Type::Pong:
+    case Message::Type::_Pong:
     {
       std::string_view message;
       std::uint64_t    size{};
@@ -258,10 +258,10 @@ std::unique_ptr<yaodaq::Message> yaodaq::JSONCodec::decode( const TransportPacke
       payload["size"].get( size );
       payload["binary"].get( binary );
 
-      msg = std::make_unique<Pong>( message, static_cast<std::size_t>( size ), binary );
+      msg = std::make_unique<_Pong>( message, static_cast<std::size_t>( size ), binary );
       break;
     }
-    case Message::Type::Open:
+    case Message::Type::_Open:
     {
       std::string_view uri;
       std::string_view protocol;
@@ -277,7 +277,7 @@ std::unique_ptr<yaodaq::Message> yaodaq::JSONCodec::decode( const TransportPacke
         if( !field.value.get( value ) ) headers.emplace( std::string( field.key ), std::string( value ) );
       }
 
-      msg = std::make_unique<Open>( uri, headers, protocol );
+      msg = std::make_unique<_Open>( uri, headers, protocol );
       break;
     }
     case Message::Type::Log:
@@ -327,25 +327,25 @@ std::vector<std::byte> yaodaq::YAODAQJSONCodec::encode( const yaodaq::Message& m
   json["payload"]                            = nlohmann::json::object();
   switch( msg.type() )
   {
-    case Message::Type::Close:
+    case Message::Type::_Close:
     {
-      const auto& close         = static_cast<const Close&>( msg );
+      const auto& close         = static_cast<const _Close&>( msg );
       json["payload"]["code"]   = close.code();
       json["payload"]["reason"] = close.reason();
       json["payload"]["remote"] = close.remote();
       break;
     }
-    case Message::Type::Reject:
+    case Message::Type::_Reject:
     {
-      const auto& reject        = static_cast<const Reject&>( msg );
+      const auto& reject        = static_cast<const _Reject&>( msg );
       json["payload"]["code"]   = reject.code();
       json["payload"]["reason"] = reject.reason();
       json["payload"]["remote"] = reject.remote();
       break;
     }
-    case Message::Type::Error:
+    case Message::Type::_Error:
     {
-      const auto& error                      = static_cast<const Error&>( msg );
+      const auto& error                      = static_cast<const _Error&>( msg );
       json["payload"]["retries"]             = error.retries();
       json["payload"]["wait_time"]           = error.wait_time();
       json["payload"]["http_status"]         = error.http_status();
@@ -372,25 +372,25 @@ std::vector<std::byte> yaodaq::YAODAQJSONCodec::encode( const yaodaq::Message& m
       json["payload"]["source_loc"]["line"]     = log.line();
       break;
     }
-    case Message::Type::Open:
+    case Message::Type::_Open:
     {
-      const auto& open            = static_cast<const Open&>( msg );
+      const auto& open            = static_cast<const _Open&>( msg );
       json["payload"]["uri"]      = open.uri();
       json["payload"]["headers"]  = open.headers();
       json["payload"]["protocol"] = open.protocol();
       break;
     }
-    case Message::Type::Ping:
+    case Message::Type::_Ping:
     {
-      const auto& ping           = static_cast<const Ping&>( msg );
+      const auto& ping           = static_cast<const _Ping&>( msg );
       json["payload"]["message"] = ping.message();
       json["payload"]["binary"]  = ping.binary();
       json["payload"]["size"]    = ping.size();
       break;
     }
-    case Message::Type::Pong:
+    case Message::Type::_Pong:
     {
-      const auto& pong           = static_cast<const Pong&>( msg );
+      const auto& pong           = static_cast<const _Pong&>( msg );
       json["payload"]["message"] = pong.message();
       json["payload"]["binary"]  = pong.binary();
       json["payload"]["size"]    = pong.size();
@@ -499,7 +499,7 @@ std::unique_ptr<yaodaq::Message> yaodaq::YAODAQJSONCodec::decode( const Transpor
 
   switch( type )
   {
-    case Message::Type::Close:
+    case Message::Type::_Close:
     {
       std::uint64_t    code{};
       bool             remote{};
@@ -509,10 +509,10 @@ std::unique_ptr<yaodaq::Message> yaodaq::YAODAQJSONCodec::decode( const Transpor
       payload["reason"].get( reason );
       payload["remote"].get( remote );
 
-      msg = std::make_unique<Close>( static_cast<std::uint16_t>( code ), reason, remote );
+      msg = std::make_unique<_Close>( static_cast<std::uint16_t>( code ), reason, remote );
       break;
     }
-    case Message::Type::Reject:
+    case Message::Type::_Reject:
     {
       std::uint64_t    code{};
       bool             remote{};
@@ -522,10 +522,10 @@ std::unique_ptr<yaodaq::Message> yaodaq::YAODAQJSONCodec::decode( const Transpor
       payload["reason"].get( reason );
       payload["remote"].get( remote );
 
-      msg = std::make_unique<Reject>( static_cast<std::uint16_t>( code ), reason, remote );
+      msg = std::make_unique<_Reject>( static_cast<std::uint16_t>( code ), reason, remote );
       break;
     }
-    case Message::Type::Error:
+    case Message::Type::_Error:
     {
       std::string_view reason;
       std::uint64_t    retries{};
@@ -539,7 +539,7 @@ std::unique_ptr<yaodaq::Message> yaodaq::YAODAQJSONCodec::decode( const Transpor
       payload["http_status"].get( http_status );
       payload["decompression_error"].get( decompression );
 
-      msg = std::make_unique<Error>( reason, static_cast<std::uint32_t>( retries ), wait_time, static_cast<int>( http_status ), decompression );
+      msg = std::make_unique<_Error>( reason, static_cast<std::uint32_t>( retries ), wait_time, static_cast<int>( http_status ), decompression );
       break;
     }
     case Message::Type::Exception:
@@ -552,7 +552,7 @@ std::unique_ptr<yaodaq::Message> yaodaq::YAODAQJSONCodec::decode( const Transpor
       msg = std::make_unique<Except>( what, exception_type );
       break;
     }
-    case Message::Type::Ping:
+    case Message::Type::_Ping:
     {
       std::string_view message;
       std::uint64_t    size{};
@@ -562,10 +562,10 @@ std::unique_ptr<yaodaq::Message> yaodaq::YAODAQJSONCodec::decode( const Transpor
       payload["size"].get( size );
       payload["binary"].get( binary );
 
-      msg = std::make_unique<Ping>( message, static_cast<std::size_t>( size ), binary );
+      msg = std::make_unique<_Ping>( message, static_cast<std::size_t>( size ), binary );
       break;
     }
-    case Message::Type::Pong:
+    case Message::Type::_Pong:
     {
       std::string_view message;
       std::uint64_t    size{};
@@ -575,10 +575,10 @@ std::unique_ptr<yaodaq::Message> yaodaq::YAODAQJSONCodec::decode( const Transpor
       payload["size"].get( size );
       payload["binary"].get( binary );
 
-      msg = std::make_unique<Pong>( message, static_cast<std::size_t>( size ), binary );
+      msg = std::make_unique<_Pong>( message, static_cast<std::size_t>( size ), binary );
       break;
     }
-    case Message::Type::Open:
+    case Message::Type::_Open:
     {
       std::string_view uri;
       std::string_view protocol;
@@ -594,7 +594,7 @@ std::unique_ptr<yaodaq::Message> yaodaq::YAODAQJSONCodec::decode( const Transpor
         if( !field.value.get( value ) ) headers.emplace( std::string( field.key ), std::string( value ) );
       }
 
-      msg = std::make_unique<Open>( uri, headers, protocol );
+      msg = std::make_unique<_Open>( uri, headers, protocol );
       break;
     }
     case Message::Type::Log:

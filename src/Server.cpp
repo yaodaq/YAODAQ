@@ -183,13 +183,13 @@ void yaodaq::Server::checkClient( std::shared_ptr<ix::ConnectionState> connectio
   }
 }
 
-void yaodaq::Server::onOpen( std::shared_ptr<ix::ConnectionState> connectionState, ix::WebSocket& webSocket, const yaodaq::Open& open )
+void yaodaq::Server::onOpen( std::shared_ptr<ix::ConnectionState> connectionState, ix::WebSocket& webSocket, const yaodaq::_Open& open )
 {
   info( "client {} at {} port {} connected to server:\n  {}", connectionState->getId(), connectionState->getRemoteIp(), connectionState->getRemotePort(), yaodaq::Formatter::format( open.headers() ) );
   sendExcept( open, webSocket );
 }
 
-void yaodaq::Server::onClose( std::shared_ptr<ix::ConnectionState> connectionState, ix::WebSocket& webSocket, const Close& close )
+void yaodaq::Server::onClose( std::shared_ptr<ix::ConnectionState> connectionState, ix::WebSocket& webSocket, const _Close& close )
 {
   if( close.remote() ) warn( "client {} at {} port {} disconnected to server remotelly: {}({})", connectionState->getId(), connectionState->getRemoteIp(), connectionState->getRemotePort(), close.reason(), close.code() );
   else
@@ -197,7 +197,7 @@ void yaodaq::Server::onClose( std::shared_ptr<ix::ConnectionState> connectionSta
   sendExcept( close, webSocket );
 }
 
-void yaodaq::Server::onReject( std::shared_ptr<ix::ConnectionState> connectionState, ix::WebSocket& webSocket, const Reject& reject )
+void yaodaq::Server::onReject( std::shared_ptr<ix::ConnectionState> connectionState, ix::WebSocket& webSocket, const _Reject& reject )
 {
   if( reject.remote() ) error( "client {} at {} port {} rejected by server remotelly: {}({})", connectionState->getId(), connectionState->getRemoteIp(), connectionState->getRemotePort(), reject.reason(), reject.code() );
   else
@@ -385,12 +385,12 @@ std::size_t yaodaq::Server::getNumberOfClients() noexcept
   return m_server.getClients().size();
 }
 
-void yaodaq::Server::onPing( std::shared_ptr<ix::ConnectionState> connectionState, ix::WebSocket& webSocket, const Ping& ping )
+void yaodaq::Server::onPing( std::shared_ptr<ix::ConnectionState> connectionState, ix::WebSocket& webSocket, const _Ping& ping )
 { info( "client {} at {} port {} sent ping: {}", connectionState->getId(), connectionState->getRemoteIp(), connectionState->getRemotePort(), ping.message() ); }
 
-void yaodaq::Server::onError( std::shared_ptr<ix::ConnectionState> connectionState, ix::WebSocket& webSocket, const Error& error ) {}
+void yaodaq::Server::onError( std::shared_ptr<ix::ConnectionState> connectionState, ix::WebSocket& webSocket, const _Error& error ) {}
 
-void yaodaq::Server::onPong( std::shared_ptr<ix::ConnectionState> connectionState, ix::WebSocket& webSocket, const Pong& pong )
+void yaodaq::Server::onPong( std::shared_ptr<ix::ConnectionState> connectionState, ix::WebSocket& webSocket, const _Pong& pong )
 { info( "client {} at {} port {} sent pong: {}", connectionState->getId(), connectionState->getRemoteIp(), connectionState->getRemotePort(), pong.message() ); }
 
 void yaodaq::Server::sendExcept( const std::string_view& str, ix::WebSocket& webSocket )
@@ -475,32 +475,32 @@ void yaodaq::Server::handleMessage( std::shared_ptr<ix::ConnectionState> connect
       case ix::WebSocketMessageType::Open:
       {
         checkClient( connectionState, webSocket, msg );
-        onOpen( connectionState, webSocket, Open( msg->openInfo ) );
+        onOpen( connectionState, webSocket, _Open( msg->openInfo ) );
         break;
       }
       case ix::WebSocketMessageType::Close:
       {
-        if( WebSocketCloseConstant::isRejected( msg->closeInfo.code ) ) { onReject( connectionState, webSocket, Reject( msg->closeInfo ) ); }
+        if( WebSocketCloseConstant::isRejected( msg->closeInfo.code ) ) { onReject( connectionState, webSocket, _Reject( msg->closeInfo ) ); }
         else
         {
           m_registry.erase( std::static_pointer_cast<yaodaq::ConnectionState>( connectionState )->getID() );
-          onClose( connectionState, webSocket, Close( msg->closeInfo ) );
+          onClose( connectionState, webSocket, _Close( msg->closeInfo ) );
         }
         break;
       }
       case ix::WebSocketMessageType::Error:
       {
-        onError( connectionState, webSocket, Error( msg->errorInfo ) );
+        onError( connectionState, webSocket, _Error( msg->errorInfo ) );
         break;
       }
       case ix::WebSocketMessageType::Ping:
       {
-        onPing( connectionState, webSocket, Ping( msg->str, msg->wireSize, msg->binary ) );
+        onPing( connectionState, webSocket, _Ping( msg->str, msg->wireSize, msg->binary ) );
         break;
       }
       case ix::WebSocketMessageType::Pong:
       {
-        onPong( connectionState, webSocket, Pong( msg->str, msg->wireSize, msg->binary ) );
+        onPong( connectionState, webSocket, _Pong( msg->str, msg->wireSize, msg->binary ) );
         break;
       }
     }

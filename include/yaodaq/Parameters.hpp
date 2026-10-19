@@ -8,6 +8,7 @@
 #include <shared_mutex>
 #include <stdexcept>
 #include <string>
+#include <type_traits>
 #include <unordered_map>
 #include <variant>
 #include <vector>
@@ -22,7 +23,7 @@ public:
   using double_list = std::vector<double>;
   using string_list = std::vector<std::string>;
 
-  using parameter = std::variant<bool, std::int64_t, double, std::string, int_list, double_list, string_list>;
+  using parameter = std::variant<bool, std::int8_t, std::int16_t, std::int32_t, std::int64_t, std::uint8_t, std::uint16_t, std::uint32_t, std::uint64_t, double, std::string, int_list, double_list, string_list>;
   using value_ref = std::reference_wrapper<const parameter>;
 
 private:
@@ -99,11 +100,36 @@ public:
 
   template<typename T> std::optional<T> get_as( const std::string_view key ) const
   {
+    static_assert( !std::is_void_v<T>, "T must not be void" );
+
     std::shared_lock lock( m_mutex );
-    auto             it = m_params.find( key.data() );
+
+    auto it = m_params.find( std::string( key ) );
     if( it == m_params.end() ) return std::nullopt;
-    if( auto ptr = std::get_if<T>( &it->second ) ) return *ptr;
-    return std::nullopt;
+
+    if constexpr( std::is_enum_v<T> )
+    {
+      using underlying_t = std::underlying_type_t<T>;
+
+      return std::visit(
+        []( const auto& value ) -> std::optional<T>
+        {
+          using U = std::decay_t<decltype( value )>;
+
+          if constexpr( std::is_integral_v<U> && !std::is_same_v<U, bool> ) { return static_cast<T>( static_cast<underlying_t>( value ) ); }
+          else
+          {
+            return std::nullopt;
+          }
+        },
+        it->second );
+    }
+    else
+    {
+      if( auto ptr = std::get_if<T>( &it->second ) ) return *ptr;
+
+      return std::nullopt;
+    }
   }
 
   template<typename T> class getter

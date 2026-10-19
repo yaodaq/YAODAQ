@@ -21,10 +21,9 @@ public:
   YAODAQ_API virtual bool open()   = 0;
   YAODAQ_API virtual bool close()  = 0;
 
-  YAODAQ_API virtual void write( std::span<const std::byte> data ) = 0;
-
-  YAODAQ_API virtual std::vector<TransportPacket> read()             = 0;
-  YAODAQ_API virtual bool                         verifyParameters() = 0;
+  YAODAQ_API virtual void                         write( std::span<const std::byte> data ) = 0;
+  YAODAQ_API virtual std::vector<TransportPacket> read()                                   = 0;
+  YAODAQ_API virtual bool                         verifyParameters()                       = 0;
   YAODAQ_API void                                 setParameters( const Parameters& params ) noexcept { m_params = params; }
   YAODAQ_API const Parameters&                    getParameters() const noexcept { return m_params; }
   YAODAQ_API Parameters&                          getParameters() noexcept { return m_params; }

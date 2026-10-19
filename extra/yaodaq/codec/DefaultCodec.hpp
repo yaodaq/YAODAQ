@@ -2,6 +2,8 @@
 #include "yaodaq/Export.hpp"
 #include "yaodaq/ICodec.hpp"
 
+#include <iostream>
+
 namespace yaodaq
 {
 

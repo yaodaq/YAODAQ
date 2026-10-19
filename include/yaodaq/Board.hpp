@@ -99,6 +99,7 @@ public:
   YAODAQ_API void send_to_device( std::unique_ptr<Message> msg ) { m_connector->send( std::move( msg ) ); }
 
   YAODAQ_API std::future<std::unique_ptr<Message>> request( std::unique_ptr<Message> msg ) { return m_connector->request( std::move( msg ) ); }
+  YAODAQ_API std::future<std::unique_ptr<Message>> request_fifo( std::unique_ptr<Message> msg ) { return m_connector->request_fifo( std::move( msg ) ); }
 
   YAODAQ_API Dispatcher& dispatcher() { return m_connector->dispatcher(); }
 

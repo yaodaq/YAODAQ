@@ -68,29 +68,29 @@ void yaodaq::Client::handleMessage( const ix::WebSocketMessagePtr& msg ) noexcep
       }
       case ix::WebSocketMessageType::Open:
       {
-        onOpen( Open( msg->openInfo ) );
+        onOpen( _Open( msg->openInfo ) );
         break;
       }
       case ix::WebSocketMessageType::Close:
       {
-        if( WebSocketCloseConstant::isRejected( msg->closeInfo.code ) ) { onReject( Reject( msg->closeInfo ) ); }
+        if( WebSocketCloseConstant::isRejected( msg->closeInfo.code ) ) { onReject( _Reject( msg->closeInfo ) ); }
         else
-          onClose( Close( msg->closeInfo ) );
+          onClose( _Close( msg->closeInfo ) );
         break;
       }
       case ix::WebSocketMessageType::Error:
       {
-        onError( Error( msg->errorInfo ) );
+        onError( _Error( msg->errorInfo ) );
         break;
       }
       case ix::WebSocketMessageType::Ping:
       {
-        onPing( Ping( msg->str, msg->wireSize, msg->binary ) );
+        onPing( _Ping( msg->str, msg->wireSize, msg->binary ) );
         break;
       }
       case ix::WebSocketMessageType::Pong:
       {
-        onPong( Pong( msg->str, msg->wireSize, msg->binary ) );
+        onPong( _Pong( msg->str, msg->wireSize, msg->binary ) );
         break;
       }
     }
@@ -130,7 +130,7 @@ void yaodaq::Client::handleMessage( const ix::WebSocketMessagePtr& msg ) noexcep
   }
 }
 
-void yaodaq::Client::onOpen( const Open& open )
+void yaodaq::Client::onOpen( const _Open& open )
 {
   info( "Connected (uri: {})\nheaders: {}\nprotocol: {}", open.uri(), yaodaq::Formatter::format( open.headers() ), open.protocol() );
   send( open );
@@ -190,7 +190,7 @@ void yaodaq::Client::onRawData( const std::unique_ptr<RawData> raw )
     warn( "You subscribe to RawData with topic {} but you didn't overloaded onRawData", fmt::styled( raw->topic(), fmt::fg( fmt::color::gray ) | fmt::emphasis::bold ) );
 }
 
-void yaodaq::Client::onClose( const Close& close )
+void yaodaq::Client::onClose( const _Close& close )
 {
   send( close );
   if( close.remote() ) warn( "Closed by remote: {} ({})", close.reason(), close.code() );
@@ -198,7 +198,7 @@ void yaodaq::Client::onClose( const Close& close )
     info( "Closed: {} ({})", close.reason(), close.code() );
 }
 
-void yaodaq::Client::onReject( const Reject& reject )
+void yaodaq::Client::onReject( const _Reject& reject )
 {
   while( m_client.isAutomaticReconnectionEnabled() ) m_client.disableAutomaticReconnection();  // don't try to reconnect dude I don't want you !
                                                                                                //if(m_client.getReadyState() != ix::ReadyState::Closed && m_client.getReadyState() != ix::ReadyState::Closing)
@@ -210,7 +210,7 @@ void yaodaq::Client::onReject( const Reject& reject )
   //}
 }
 
-void yaodaq::Client::onError( const Error& err )
+void yaodaq::Client::onError( const _Error& err )
 {
   error( "error {} ({}), retries: {}, waiting_time: {}{}", err.reason(), err.http_status(), err.retries(), err.wait_time(), err.decompression_error() ? " (decompression error)" : "" );
   send( err );
@@ -218,13 +218,13 @@ void yaodaq::Client::onError( const Error& err )
 
 //void yaodaq::Client::onFragment( const std::string& str, const std::size_t size, const bool binary ) { std::cout << str << " " << size << " " << binary << std::endl; }
 
-void yaodaq::Client::onPing( const Ping& ping )
+void yaodaq::Client::onPing( const _Ping& ping )
 {
   send( ping );
   info( "received ping: {}", ping.message() );
 }
 
-void yaodaq::Client::onPong( const Pong& pong )
+void yaodaq::Client::onPong( const _Pong& pong )
 {
   send( pong );
   info( "received pong: {}", pong.message() );

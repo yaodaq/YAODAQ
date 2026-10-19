@@ -31,3 +31,7 @@ target_link_libraries(RPCAnalyzer PRIVATE yaodaq::yaodaq  Data CLI11::CLI11 fmt:
 add_executable(DCT DCT.cpp)
 target_link_libraries(DCT PRIVATE csv yaodaq::yaodaq yaodaq::transport::process doctest::doctest_with_main CLI11::CLI11 cpp-terminal::cpp-terminal)
 install(TARGETS DCT RUNTIME DESTINATION bin)
+
+add_executable(CAENHVBoard CAENHVBoard.cpp)
+target_link_libraries(CAENHVBoard PRIVATE csv serial_cpp::serial_cpp yaodaq::yaodaq yaodaq::transport::process doctest::doctest_with_main CLI11::CLI11 cpp-terminal::cpp-terminal)
+install(TARGETS CAENHVBoard RUNTIME DESTINATION bin)

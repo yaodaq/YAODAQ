@@ -14,11 +14,11 @@
 class WebSocketTransport final : public yaodaq::ITransport
 {
 public:
-  YAODAQ_API explicit WebSocketTransport() : ITransport( "default", "Websocket" )
+  YAODAQ_API explicit WebSocketTransport() : ITransport( "Yaodaq", "Websocket" )
   {
     trace( "WebSocketTransport() called" );
     ix::initNetSystem();
-    m_client.disablePerMessageDeflate();
+    //m_client.disablePerMessageDeflate();
     m_client.enablePong();
     m_client.setOnMessageCallback( [this]( const ix::WebSocketMessagePtr& msg ) noexcept { onMessage( msg ); } );
   }

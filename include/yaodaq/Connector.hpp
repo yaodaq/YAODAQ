@@ -113,6 +113,13 @@ public:
     return future;
   }
 
+  YAODAQ_API std::future<std::unique_ptr<yaodaq::Message>> request_fifo( std::unique_ptr<yaodaq::Message> msg )
+  {
+    auto future = m_transactions.create_fifo();
+    send( std::move( msg ) );
+    return future;
+  }
+
   YAODAQ_API Dispatcher& dispatcher() { return m_dispatcher; }
 
 private:
@@ -137,7 +144,7 @@ private:
       while( m_running )
       {
         auto msgOpt = m_outgoing.pop();
-        if( !msgOpt.has_value() ) continue;  //or continue ?!!?!?!
+        if( !msgOpt.has_value() ) continue;
         auto& msg = msgOpt.value();
         auto  raw = m_codec->encode( *msg );
         m_transport->write( raw );

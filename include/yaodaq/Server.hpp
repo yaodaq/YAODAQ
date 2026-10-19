@@ -78,12 +78,12 @@ private:
   YAODAQ_INTERNAL void onLog( std::shared_ptr<ix::ConnectionState> connectionState, ix::WebSocket& webSocket, const Log& request );
   YAODAQ_INTERNAL void onRawData( std::shared_ptr<ix::ConnectionState> connectionState, ix::WebSocket& webSocket, const std::string& raw );
   // Others
-  YAODAQ_INTERNAL void onOpen( std::shared_ptr<ix::ConnectionState> connectionState, ix::WebSocket& webSocket, const Open& open );
-  YAODAQ_INTERNAL void onClose( std::shared_ptr<ix::ConnectionState> connectionState, ix::WebSocket& webSocket, const Close& close );
-  YAODAQ_INTERNAL void onReject( std::shared_ptr<ix::ConnectionState> connectionState, ix::WebSocket& webSocket, const Reject& reject );
-  YAODAQ_INTERNAL void onPing( std::shared_ptr<ix::ConnectionState> connectionState, ix::WebSocket& webSocket, const Ping& ping );
-  YAODAQ_INTERNAL void onPong( std::shared_ptr<ix::ConnectionState> connectionState, ix::WebSocket& webSocket, const Pong& pong );
-  YAODAQ_INTERNAL void onError( std::shared_ptr<ix::ConnectionState> connectionState, ix::WebSocket& webSocket, const Error& error );
+  YAODAQ_INTERNAL void onOpen( std::shared_ptr<ix::ConnectionState> connectionState, ix::WebSocket& webSocket, const _Open& open );
+  YAODAQ_INTERNAL void onClose( std::shared_ptr<ix::ConnectionState> connectionState, ix::WebSocket& webSocket, const _Close& close );
+  YAODAQ_INTERNAL void onReject( std::shared_ptr<ix::ConnectionState> connectionState, ix::WebSocket& webSocket, const _Reject& reject );
+  YAODAQ_INTERNAL void onPing( std::shared_ptr<ix::ConnectionState> connectionState, ix::WebSocket& webSocket, const _Ping& ping );
+  YAODAQ_INTERNAL void onPong( std::shared_ptr<ix::ConnectionState> connectionState, ix::WebSocket& webSocket, const _Pong& pong );
+  YAODAQ_INTERNAL void onError( std::shared_ptr<ix::ConnectionState> connectionState, ix::WebSocket& webSocket, const _Error& error );
 
   std::mutex                                                                m_map_mutex;
   std::unordered_map<jsonrpc::id_t, std::shared_ptr<yaodaq::ServerRequest>> m_server_construct_response;

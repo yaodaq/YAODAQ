@@ -44,7 +44,7 @@ try
   {
     return app.exit( e );
   }
-  yaodaq::BoardConfig cfg( std::make_unique<yaodaq::Connector>( std::make_unique<SerialTransport>(), std::make_unique<yaodaq::DefaultCodec>() ) );
+  yaodaq::BoardConfig cfg( std::make_unique<yaodaq::Connector>( std::make_unique<yaodaq::Serial>(), std::make_unique<yaodaq::DefaultCodec>() ) );
 
   cfg.setPort( port ).setHost( host ).verbosity( verbosity );
   cfg.transportParameters().set( "port", std::string( "/tmp/ttyV0" ) );
